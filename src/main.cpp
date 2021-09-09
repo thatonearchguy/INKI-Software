@@ -87,6 +87,8 @@ static uint8_t buf_1[ screenWidth * screenHeight / 8 ];
 TaskHandle_t Handle_GUIUpdate;
 SemaphoreHandle_t GuiSemaphore;
 
+SemaphoreHandle_t I2CSemaphore;
+
 #define MY_RUN_SYMBOL "\xEF\x9C\x8C"
 #define MY_HEART_SYMBOL "\xEF\x88\x9E"
 #define MY_PHONE_SYMBOL "\xEF\x8F\x8D"
@@ -595,6 +597,7 @@ static void guiTask(void *pvParameter)
 {
   (void) pvParameter;
   GuiSemaphore = xSemaphoreCreateMutex();
+  I2CSemaphore = xSemaphoreCreateMutex();
   lv_init();
   if (epd.Init(lut_full_update) != 0) {
     SEGGER_RTT_WriteString(0, "e-Paper init failure");
@@ -687,12 +690,16 @@ static void getMAXData(void* pvParameters)
   {
     char out[75];
     //read the first 100 samples, and determine the signal range
-    for(i=0;i<BUFFER_SIZE;i++)
+    if(pdTRUE==xSemaphoreTake(GuiSemaphore, portMAX_DELAY))
     {
-      while(digitalRead(oxiInt)==1);  //wait until the interrupt pin asserts
-      maxim_max30102_read_fifo((aun_ir_buffer+i), (aun_red_buffer+i));  //read from MAX30102 FIFO
-      //sprintf(out, "red:%li, ir:%li\n", aun_red_buffer[i], aun_ir_buffer[i]);
-      //SEGGER_RTT_WriteString(0, out);
+      for(i=0;i<BUFFER_SIZE;i++)
+      {
+        while(digitalRead(oxiInt)==1);  //wait until the interrupt pin asserts
+        maxim_max30102_read_fifo((aun_ir_buffer+i), (aun_red_buffer+i));  //read from MAX30102 FIFO
+        //sprintf(out, "red:%li, ir:%li\n", aun_red_buffer[i], aun_ir_buffer[i]);
+        //SEGGER_RTT_WriteString(0, out);
+      }
+      xSemaphoreGive(I2CSemaphore);
     }
     //calculate heart rate and SpO2 after BUFFER_SIZE samples (ST seconds of samples) using Robert's method
     rf_heart_rate_and_oxygen_saturation(aun_ir_buffer, BUFFER_SIZE, aun_red_buffer, &n_spo2, &ch_spo2_valid, &n_heart_rate, &ch_hr_valid, &ratio, &correl); 
@@ -707,10 +714,14 @@ static void getIMUData(void* pvParameters)
   while(1)
   {
     char out[50];
-    icm20948.task();
-    if(icm20948.stepsDataIsReady())
+    if(pdTRUE==xSemaphoreTake(GuiSemaphore, portMAX_DELAY))
     {
-      icm20948.readStepsData(&icm_steps);
+      icm20948.task();
+      if(icm20948.stepsDataIsReady())
+      {
+        icm20948.readStepsData(&icm_steps);
+      }
+      xSemaphoreGive(I2CSemaphore);
     }
     sprintf(out, "Steps: %li\n", icm_steps);
     SEGGER_RTT_WriteString(0, out);
@@ -824,24 +835,28 @@ void button_reader(lv_indev_drv_t* drv, lv_indev_data_t* data)
 
 void button_feedback(lv_indev_drv_t* indev, uint8_t e)
 {
-  switch(e)
+  if(pdTRUE==xSemaphoreTake(GuiSemaphore, portMAX_DELAY))
   {
-    case LV_EVENT_CLICKED:
-      drv.setWaveform(0, 24);
-      drv.setWaveform(1, 0);
-      drv.go();
-      break;
-    case LV_EVENT_FOCUSED:
-      drv.setWaveform(0, 26);
-      drv.setWaveform(1, 0);
-      drv.go();
-      break;
-    case LV_EVENT_LONG_PRESSED:
-      drv.setWaveform(0, 34);
-      drv.setWaveform(1, 0);
-      drv.go();
-      break;
+    switch(e)
+    {
+      case LV_EVENT_CLICKED:
+        drv.setWaveform(0, 24);
+        drv.setWaveform(1, 0);
+        drv.go();
+        break;
+      case LV_EVENT_FOCUSED:
+        drv.setWaveform(0, 26);
+        drv.setWaveform(1, 0);
+        drv.go();
+        break;
+      case LV_EVENT_LONG_PRESSED:
+        drv.setWaveform(0, 34);
+        drv.setWaveform(1, 0);
+        drv.go();
+        break;
+    }
   }
+  xSemaphoreGive(I2CSemaphore);
 }
 
 
@@ -892,8 +907,6 @@ void i2c_scan(){
     }
 }
 
-size_t freeMemBefore;
-
 void setup()
 {
   pinMode(PIN_BUTTON1, INPUT_PULLUP);
@@ -927,9 +940,7 @@ void setup()
   delay(1000);
   maxim_max30102_read_reg(REG_INTR_STATUS_1, &uch_dummy);
   maxim_max30102_init();
-  old_n_spo2=0.0;
-
-  
+  old_n_spo2=0.0; 
 
   SEGGER_RTT_WriteString(0, "Init MAX30105\n");
   
@@ -939,7 +950,6 @@ void setup()
     icm20948.init(icmSettings);
   }
   SEGGER_RTT_WriteString(0, "Init ICM-20948");
-
 
   Bluefruit.begin(1, 1);
   Bluefruit.setTxPower(0);
