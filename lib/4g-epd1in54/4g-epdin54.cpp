@@ -181,7 +181,7 @@ void EPD_4::CopyFrameBufferToRAM(const unsigned char* image_buffer, int x, int y
                                 int image_width, int image_height)
   
   {
-    
+
 
 
   }
