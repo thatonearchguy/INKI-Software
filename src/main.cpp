@@ -12,6 +12,7 @@
 #include "max30102.h"
 #include "algorithm_by_RF.h"
 #include "Arduino-ICM20948.h"
+#include <Adafruit_GPS.h>
 #include <stack>
 
 #define SCK        27
@@ -44,6 +45,8 @@ uint8_t batteryPercentage = 100;
 
 TaskHandle_t Handle_maxData;
 TaskHandle_t Handle_imuData;
+TaskHandle_t Handle_gpsData;
+
 
 float n_spo2,ratio,correl;  //SPO2 value
 int8_t ch_spo2_valid;  //indicator to show if the SPO2 calculation is valid
@@ -62,7 +65,6 @@ uint8_t uch_dummy,k;
 Adafruit_DRV2605 drv;
 
 
-RTC_DS1307 rtc;
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 //static const nrf_drv_rtc_config_t m_rtc_config = NRF_DRV_RTC_DEFAULT_CONFIG;
@@ -86,6 +88,8 @@ static uint8_t buf_1[ screenWidth * screenHeight / 8 ];
 
 TaskHandle_t Handle_GUIUpdate;
 SemaphoreHandle_t GuiSemaphore;
+
+SemaphoreHandle_t I2CSemaphore;
 
 #define MY_RUN_SYMBOL "\xEF\x9C\x8C"
 #define MY_HEART_SYMBOL "\xEF\x88\x9E"
@@ -130,9 +134,8 @@ bool ICM_found = false;
 char icm_activity;
 unsigned long icm_steps;
 
-
-
-
+Adafruit_GPS PA1010D(&Wire);
+uint32_t timer = millis();
 
 typedef enum
 {
@@ -168,6 +171,7 @@ static void rtc_config(void)
     nrfx_rtc_tick_enable(&m_rtc,true);
     //Power on RTC instance
     nrfx_rtc_enable(&m_rtc);
+    PA1010D.latitude;
 }
 
 static void event_handler(lv_event_t * e)
@@ -181,6 +185,8 @@ static void event_handler(lv_event_t * e)
         LV_LOG_USER("Toggled");
     }
 }
+
+#define GPSECHO false;
 
 
 
@@ -448,9 +454,8 @@ const char* days[7] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "
 
 void time_label_updater_timer(lv_timer_t* timer)
 {
-  RTCTime = rtc.now();
   char timeBuf[10];
-  sprintf(timeBuf, "%02u\n%02u", RTCTime.hour(), RTCTime.minute());
+  sprintf(timeBuf, "%02u\n%02u", PA1010D.hour, PA1010D.minute);
   if(!(timeBuf==lv_label_get_text(time_label)))
   {
     lv_label_set_text(time_label, timeBuf);
@@ -458,9 +463,11 @@ void time_label_updater_timer(lv_timer_t* timer)
 }
 void date_label_update_timer(lv_timer_t* timer)
 {
-  RTCTime = rtc.now();
   char dateBuf[20];
-  sprintf(dateBuf, "%.3s %02u", days[RTCTime.dayOfTheWeek()], RTCTime.day());
+  uint8_t d = PA1010D.day;
+  uint8_t m = PA1010D.month;
+  uint8_t y = PA1010D.year;
+  sprintf(dateBuf, "%.3s %02u", days[(d+=m < 3 ? y-- : y-2, 23*m/9+d+4+y/4-y/100+y/400)%7], RTCTime.day());
   lv_label_set_text(date_label, dateBuf);
   if(!(dateBuf==lv_label_get_text(date_label)))
   {
@@ -595,6 +602,7 @@ static void guiTask(void *pvParameter)
 {
   (void) pvParameter;
   GuiSemaphore = xSemaphoreCreateMutex();
+  I2CSemaphore = xSemaphoreCreateMutex();
   lv_init();
   if (epd.Init(lut_full_update) != 0) {
     SEGGER_RTT_WriteString(0, "e-Paper init failure");
@@ -644,9 +652,8 @@ static void guiTask(void *pvParameter)
 
   //lv_example_btn_1(indev);
 
-  DateTime now = rtc.now();
   char date[100];
-  sprintf(date, "%d:%d:%d\n", now.hour(), now.minute(), now.second());
+  sprintf(date, "%d:%d:%d\n", PA1010D.hour, PA1010D.minute, PA1010D.seconds);
   SEGGER_RTT_WriteString(0, date);
   SEGGER_RTT_WriteString(0,  "Setup done" );
   rtc_config();
@@ -687,12 +694,16 @@ static void getMAXData(void* pvParameters)
   {
     char out[75];
     //read the first 100 samples, and determine the signal range
-    for(i=0;i<BUFFER_SIZE;i++)
+    if(pdTRUE==xSemaphoreTake(I2CSemaphore, portMAX_DELAY))
     {
-      while(digitalRead(oxiInt)==1);  //wait until the interrupt pin asserts
-      maxim_max30102_read_fifo((aun_ir_buffer+i), (aun_red_buffer+i));  //read from MAX30102 FIFO
-      //sprintf(out, "red:%li, ir:%li\n", aun_red_buffer[i], aun_ir_buffer[i]);
-      //SEGGER_RTT_WriteString(0, out);
+      for(i=0;i<BUFFER_SIZE;i++)
+      {
+        while(digitalRead(oxiInt)==1);  //wait until the interrupt pin asserts
+        maxim_max30102_read_fifo((aun_ir_buffer+i), (aun_red_buffer+i));  //read from MAX30102 FIFO
+        //sprintf(out, "red:%li, ir:%li\n", aun_red_buffer[i], aun_ir_buffer[i]);
+        //SEGGER_RTT_WriteString(0, out);
+      }
+      xSemaphoreGive(I2CSemaphore);
     }
     //calculate heart rate and SpO2 after BUFFER_SIZE samples (ST seconds of samples) using Robert's method
     rf_heart_rate_and_oxygen_saturation(aun_ir_buffer, BUFFER_SIZE, aun_red_buffer, &n_spo2, &ch_spo2_valid, &n_heart_rate, &ch_hr_valid, &ratio, &correl); 
@@ -707,10 +718,14 @@ static void getIMUData(void* pvParameters)
   while(1)
   {
     char out[50];
-    icm20948.task();
-    if(icm20948.stepsDataIsReady())
+    if(pdTRUE==xSemaphoreTake(I2CSemaphore, portMAX_DELAY))
     {
-      icm20948.readStepsData(&icm_steps);
+      icm20948.task();
+      if(icm20948.stepsDataIsReady())
+      {
+        icm20948.readStepsData(&icm_steps);
+      }
+      xSemaphoreGive(I2CSemaphore);
     }
     sprintf(out, "Steps: %li\n", icm_steps);
     SEGGER_RTT_WriteString(0, out);
@@ -718,7 +733,30 @@ static void getIMUData(void* pvParameters)
   }
 }
 
-//TODO - debug & fix for better performance
+static void getGPSData(void* pvParameters)
+{
+  while(1)
+  {
+    if(pdTRUE==xSemaphoreTake(I2CSemaphore, portMAX_DELAY))
+    {
+      char c = PA1010D.read();
+      // if a sentence is received, we can check the checksum, parse it...
+      if (PA1010D.newNMEAreceived()) {
+        // a tricky thing here is if we print the NMEA sentence, or data
+        // we end up not listening and catching other sentences!
+        // so be very wary if using OUTPUT_ALLDATA and trying to print out data
+        SEGGER_RTT_WriteString(0, PA1010D.lastNMEA()); // this also sets the newNMEAreceived() flag to false
+        if (!PA1010D.parse(PA1010D.lastNMEA())) // this also sets the newNMEAreceived() flag to false
+          SEGGER_RTT_WriteString(0, "GPS Parse failed!");
+      }
+      xSemaphoreGive(I2CSemaphore);
+    }
+    delay(30);
+  }
+}
+
+//MONOCHROME ONLY
+
 void epd_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p )
 {
   uint8_t *buf = (uint8_t*) color_p;
@@ -726,10 +764,11 @@ void epd_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p 
   if(lv_disp_flush_is_last(disp))
   {
     epd.MixedRefresh(10);
-    //epd.WaitUntilIdle();
   }
   lv_disp_flush_ready(disp);
 }
+
+
 
 void epd_set_px_cb(lv_disp_drv_t *disp, uint8_t *buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa) 
 {
@@ -746,19 +785,10 @@ void epd_set_px_cb(lv_disp_drv_t *disp, uint8_t *buf, lv_coord_t buf_w, lv_coord
   }
 }
 
-
-
-
-//DEBUG AND FIX
 void epd_rounder( lv_disp_drv_t *disp, lv_area_t *area)
-{
-  
-  //area->x1 = area->x1 & ~(0x7);
-  //area->x2 = (area->x2 | 0x7)+1;
-  
+{ 
  area->x1 = 0;
  area->x2 = 200;
- 
 }
 
 uint8_t button_interface()
@@ -824,24 +854,28 @@ void button_reader(lv_indev_drv_t* drv, lv_indev_data_t* data)
 
 void button_feedback(lv_indev_drv_t* indev, uint8_t e)
 {
-  switch(e)
+  if(pdTRUE==xSemaphoreTake(GuiSemaphore, portMAX_DELAY))
   {
-    case LV_EVENT_CLICKED:
-      drv.setWaveform(0, 24);
-      drv.setWaveform(1, 0);
-      drv.go();
-      break;
-    case LV_EVENT_FOCUSED:
-      drv.setWaveform(0, 26);
-      drv.setWaveform(1, 0);
-      drv.go();
-      break;
-    case LV_EVENT_LONG_PRESSED:
-      drv.setWaveform(0, 34);
-      drv.setWaveform(1, 0);
-      drv.go();
-      break;
+    switch(e)
+    {
+      case LV_EVENT_CLICKED:
+        drv.setWaveform(0, 24);
+        drv.setWaveform(1, 0);
+        drv.go();
+        break;
+      case LV_EVENT_FOCUSED:
+        drv.setWaveform(0, 26);
+        drv.setWaveform(1, 0);
+        drv.go();
+        break;
+      case LV_EVENT_LONG_PRESSED:
+        drv.setWaveform(0, 34);
+        drv.setWaveform(1, 0);
+        drv.go();
+        break;
+    }
   }
+  xSemaphoreGive(I2CSemaphore);
 }
 
 
@@ -892,8 +926,6 @@ void i2c_scan(){
     }
 }
 
-size_t freeMemBefore;
-
 void setup()
 {
   pinMode(PIN_BUTTON1, INPUT_PULLUP);
@@ -901,59 +933,49 @@ void setup()
   pinMode(PIN_BUTTON3, INPUT_PULLUP);
   pinMode(PIN_BUTTON4, INPUT_PULLUP);
   pinMode(PIN_LED1, OUTPUT);
-  //Serial.begin( 9600 ); /* prepare for possible serial debug */
-  //while ( !Serial ) delay(10);
   Wire.begin();
   delay(1000);
   SEGGER_RTT_WriteString(0, "Welcome to InkWatchOS\n" );
   SEGGER_RTT_WriteString(0,  "LVGL V8.0.X\n" );
-  rtc.begin();
-  SEGGER_RTT_WriteString(0,  "Init rtc \n");
-  if(!rtc.isrunning())
-  {
-    SEGGER_RTT_WriteString(0, "Setting time to build date:\n");
-    SEGGER_RTT_WriteString(0, __DATE__);
-    SEGGER_RTT_WriteString(0, " ");
-    SEGGER_RTT_WriteString(0, __TIME__);
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  }
-  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   drv.begin();
   //SEGGER_RTT_WriteString(0, "Init drv\n");
   drv.selectLibrary(1);
   drv.setMode(DRV2605_MODE_INTTRIG);
-
+  SEGGER_RTT_WriteString(0,  "Init DRV \n");
   maxim_max30102_reset();
   delay(1000);
   maxim_max30102_read_reg(REG_INTR_STATUS_1, &uch_dummy);
   maxim_max30102_init();
-  old_n_spo2=0.0;
-
-  
-
+  old_n_spo2=0.0; 
   SEGGER_RTT_WriteString(0, "Init MAX30105\n");
-  
   i2c_scan();
   if(ICM_found)
   {
     icm20948.init(icmSettings);
   }
   SEGGER_RTT_WriteString(0, "Init ICM-20948");
-
-
+  PA1010D.begin(0x10);
+  PA1010D.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+  PA1010D.sendCommand(PMTK_SET_NMEA_UPDATE_2HZ);
+  PA1010D.sendCommand(PGCMD_ANTENNA);
+  delay(1000);
+  PA1010D.println(PMTK_Q_RELEASE);
+  SEGGER_RTT_WriteString(0, "Init GPS");
   Bluefruit.begin(1, 1);
   Bluefruit.setTxPower(0);
   startAdv();
   beacon.setManufacturer(0x0059);
+  SEGGER_RTT_WriteString(0, "Init BLE");
+  xTaskCreate(getGPSData, "pa1010d", 4096, NULL, tskIDLE_PRIORITY+1, &Handle_gpsData);
   xTaskCreate(guiTask, "gui", 4096*2, NULL, tskIDLE_PRIORITY+2, &Handle_GUIUpdate);
-  /* Scheduling MAX Data collection so it doesn't just suck up all the CPU cycles lmao */
+  //Allow time for guiTask to initialise display hardware and start LVGL
   delay(8000);
-  //xTaskCreate(getMAXData, "max30105", 4096*2, NULL, tskIDLE_PRIORITY+1, &Handle_maxData);
+  //Begin concurrent i2C tasks:
+  //HR monitor
+  xTaskCreate(getMAXData, "max30105", 4096*2, NULL, tskIDLE_PRIORITY+1, &Handle_maxData);
+  //Accelerometer for step data
   xTaskCreate(getIMUData, "icm20948", 4096*2, NULL, tskIDLE_PRIORITY+1, &Handle_imuData);
 }
-
-
-
 
 void loop()
 {
