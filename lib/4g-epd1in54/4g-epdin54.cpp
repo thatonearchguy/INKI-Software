@@ -6,11 +6,22 @@
 #include "nrf_svc.h"
 #include "nrf_nvic.h"
 
+//Documentation says I need the following """C""" snippet to use NVIC. Not going to make a separate C file!! 
+//I really hope this works.
 extern "C"
 {
-  nrf_nvic_state_t nrf_nvic_state = {0};
+  nrf_nvic_state_t nrf_nvic_state = {0}; 
 }
-
+/**
+ * Creates EPD driver instance for SSD1681 GDEH0154D67 display.
+ * @param epd_busy: MCU pin that EPD busy is connected to.
+ * @param epd_reset: MCU pin that EPD reset is connected to.
+ * @param epd_cs: MCU pin that EPD chip select (CS) is connected to.
+ * @param epd_mosi: MCU pin that EPD Master Out/Slave In (MOSI) is connected to.
+ * @param epd_miso: MCU pin that EPD Master In/Slave OUT (MISO) is connected to.
+ * @param epd_sck: MCU pin that EPD Serial Clock (SCK) is connected to.
+ * @param debug: Unused parameter - may introduce SEGGER_RTT debug logs in later revision.
+ */
 EPD_4::EPD_4(int epd_busy, int epd_reset, int epd_dc, 
             int epd_cs, int epd_mosi, int epd_miso, int epd_sck, bool debug)
 {
@@ -21,17 +32,32 @@ EPD_4::EPD_4(int epd_busy, int epd_reset, int epd_dc,
   _spi_miso = epd_miso;
   _spi_mosi = epd_mosi;
   _spi_sck = epd_sck;
-  _epd_spi = new SPIClass(NRF_SPIM2, _spi_miso, _spi_sck, _spi_mosi);
+  _epd_spi = new SPIClass(NRF_SPIM2, _spi_miso, _spi_sck, _spi_mosi); //I do not want this instance to be destroyed unless I say so, so using "new"
   _epd_spi_settings = SPISettings(4000000, MSBFIRST, SPI_MODE0);
 }
 
-int EPD_4::Init(const unsigned char* lut, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity))
+/**
+ * Unloads the SPI instance for destruction, removes the GPIOTE instance from the defined busy pin.
+ */
+EPD_4::~EPD_4()
+{
+  _epd_spi->end();
+  nrfx_gpiote_in_event_disable(_busy_pin);
+  nrfx_gpiote_in_uninit(_busy_pin);
+}
+
+/**
+ * Runs initialisation routine on EPD. Use this function to wake up EPD after running Sleep().
+ * @param busy_cb Reference to ISR handler which will be called after Partial or Full refresh.
+ * @param pin polarity - ISR handler should input the pin, and the polarity, which will tell your handler what the busy line has done. 
+ */
+int EPD_4::Init(void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity))
 {
   uint32_t err_code;
   if(first_init)
   {
     pinMode(_cs_pin, OUTPUT);
-    pinMode(_busy_pin, INPUT);
+    //pinMode(_busy_pin, INPUT); Unncessary, will conflict with GPIOTE use of _busy_pin.
     pinMode(_dc_pin, OUTPUT);
     pinMode(_reset_pin, OUTPUT);
     _busy_cb = busy_cb; 
@@ -44,13 +70,14 @@ int EPD_4::Init(const unsigned char* lut, void (*busy_cb)(uint32_t pin, nrf_gpio
     }
   }
   //Hardware Reset
-  digitalWrite(RST_PIN, 0);
+  digitalWrite(_reset_pin, 0);
   delay(10);
-  digitalWrite(RST_PIN, 1);
+  digitalWrite(_reset_pin, 1);
   delay(10);
   BusyWait();
   SendCommand(SW_RESET);
   BusyWait();
+  asleep = false;
   /*
   WARNING, THESE COMMANDS ARE UNDEFINED FOR SSD1681!!
   SendCommand(0x74); //set analog block control       
@@ -62,38 +89,41 @@ int EPD_4::Init(const unsigned char* lut, void (*busy_cb)(uint32_t pin, nrf_gpio
   SendData(0xC7);
   SendData(0x00);
   SendData(0x00);
-  SendCommand(DATA_ENTRY_MODE_SETTING); //data entry mode       
-  SendData(0x01);
-  SendCommand(SET_RAM_X_ADDRESS_START_END_POS); //set Ram-X address start/end position   
+  SendCommand(DATA_ENTRY_MODE_SETTING);   
+  SendData(0x03);
+  SendCommand(SET_RAM_X_ADDRESS_START_END_POS); 
   SendData(0x00);
-  SendData(0x18);    //0x0C-->(18+1)*8=200
-  SendCommand(SET_RAM_Y_ADDRESS_START_END_POS); //set Ram-Y address start/end position          
-  SendData(0xC7);    //0xC7-->(199+1)=200
+  SendData(EPD_WIDTH /8 - 1);   //EPD width / 8 - 1
+  SendCommand(SET_RAM_Y_ADDRESS_START_END_POS);         
+  SendData(0x00);   
   SendData(0x00);
-  SendData(0x00);
-  SendData(0x00); 
-  SendCommand(BORDER_WAVEFORM_CONTROL); //BorderWavefrom
+  SendData(EPD_HEIGHT - 1);
+  SendData((EPD_HEIGHT - 1) >> 8); 
+  SendCommand(BORDER_WAVEFORM_CONTROL); 
   SendData(0x00);  
-  SendCommand(VCOM_REG_WRITE);     //VCOM Voltage
-  SendData(_lut_4_gray[158]);    //0x1C
-  SendCommand(END_OPTION); //EOPQ    
+  SendCommand(VCOM_REG_WRITE);     //Setting VCOM Voltage
+  SendData(_lut_4_gray[158]);    
+  SendCommand(END_OPTION);    
   SendData(_lut_4_gray[153]);
-  SendCommand(GATE_DRIVE_VOLTAGE_CONTROL); //VGH      
+  SendCommand(GATE_DRIVE_VOLTAGE_CONTROL);       
   SendData(_lut_4_gray[154]);
   SendCommand(SOURCE_DRIVE_VOLTAGE_CONTROL); //      
-  SendData(_lut_4_gray[155]); //VSH1   
-  SendData(_lut_4_gray[156]); //VSH2   
-  SendData(_lut_4_gray[157]); //VSL   
-  SetLookUpTable(_lut_4_gray); //LUT 
-  SendCommand(SET_RAM_X_ADDRESS_COUNTER);   // set RAM x address count to 0;
+  SendData(_lut_4_gray[155]);    
+  SendData(_lut_4_gray[156]);   
+  SendData(_lut_4_gray[157]);   
+  SetLookUpTable(_lut_4_gray); //Write 4 grayscale waveform 
+  SendCommand(SET_RAM_X_ADDRESS_COUNTER);   // set RAM x address count to denary 0;
   SendData(0x00);
-  SendCommand(SET_RAM_Y_ADDRESS_COUNTER);   // set RAM y address count to 0X199;    
+  SendCommand(SET_RAM_Y_ADDRESS_COUNTER);   // set RAM y address count to denary 199;    
   SendData(0xC7);
   SendData(0x00);
   BusyWait();
   return err_code;
 }
-
+/**
+ * Sends a hex command to the EPD. See Solomon SSD1681 datasheet for command table.
+ * @param command 8 bit hex value representing command - e.g 0x10.
+ */
 void EPD_4::SendCommand(unsigned char command)
 {
   digitalWrite(_dc_pin, LOW);
@@ -101,6 +131,10 @@ void EPD_4::SendCommand(unsigned char command)
   _epd_spi->transfer(command);
   digitalWrite(_cs_pin, HIGH);  
 }
+/**
+ * Sends data to the EPD. See Solomon SSD1681 datasheet for valid commands and expected data.
+ * @param command 8 bit hex value representing data - e.g 0x10.
+ */
 void EPD_4::SendData(unsigned char data)
 {
   digitalWrite(_dc_pin, HIGH);
@@ -108,6 +142,9 @@ void EPD_4::SendData(unsigned char data)
   _epd_spi->transfer(data);
   digitalWrite(_cs_pin, HIGH);
 }
+/**
+ * Waits for BUSY line to become low indicating EPD is no longer busy and is ready for command input by blocking main thread.
+ */
 void EPD_4::BusyWait(void)
 {
   while(digitalRead(_busy_pin) == HIGH)
@@ -115,7 +152,10 @@ void EPD_4::BusyWait(void)
     delay(10);
   }
 }
-
+/**
+ * Writes the 153 byte OTP waveform data to the EPD. Done automatically during Init().
+ * @param lut 159 byte char array with waveform and key lookup values.
+ */
 void EPD_4::SetLookUpTable(const unsigned char* lut)
 {
   SendCommand(WRITE_LUT_REGISTER);
@@ -124,12 +164,16 @@ void EPD_4::SetLookUpTable(const unsigned char* lut)
     SendData(lut[count]);
   }
 }
-
+/**
+ * Waits for the EPD to refresh without blocking main thread. Enables GPIOTE interrupt that will call interrupt handler specified by busy_cb in Init(). Callback function should disable interrupt once serviced to prevent erroneous interrupts.
+ */
 nrfx_err_t EPD_4::BusyCallBack(void)
 {
   nrfx_gpiote_in_event_enable(_busy_pin, true);
 }
-
+/**
+ * Initialises interrupt that will call busy_cb when BUSY line goes to LOW.  
+ */
 nrfx_err_t EPD_4::CallBackInit(void)
 {
   //Assuming GPIOTE driver is already loaded.
@@ -156,7 +200,9 @@ nrfx_err_t EPD_4::CallBackInit(void)
   err_code = nrfx_gpiote_in_init(_busy_pin, &cb_int_config, (nrfx_gpiote_evt_handler_t) _busy_cb);
   return err_code;
 }
-
+/**
+ * Full EPD refresh - takes ~2 seconds. Calls ISR handler specified in Init()
+ */
 void EPD_4::FullUpdate(void)
 {   
   SendCommand(DISPLAY_UPDATE_CONTROL_2); //Display Update Control
@@ -164,250 +210,136 @@ void EPD_4::FullUpdate(void)
   SendCommand(MASTER_ACTIVATION); //Activate Display Update Sequence
   BusyCallBack();
 }
+/**
+ * Partial EPD refresh - takes ~300 milliseconds. Calls ISR handler specified in Init()
+ */
 void EPD_4::PartUpdate(void)
 {
-  SendCommand(DISPLAY_UPDATE_CONTROL_2);//Display Update Control 
+  SendCommand(DISPLAY_UPDATE_CONTROL_2); //Display Update Control 
   SendData(0xFF);   
   SendCommand(MASTER_ACTIVATION); //Activate Display Update Sequence
   BusyCallBack();      
 }
+/**
+ * Hybrid EPD refresh - will perform "threshold" number of partial EPD refreshes before a Full EPD refresh. Calls ISR handler specified in Init().
+ * @param threshold Number of partial refreshes to perform before cleaning display with full refresh.
+ */
+void EPD_4::HybridRefresh(int threshold)
+{
+  if(threshold < _partial_refreshes)
+  {
+    PartUpdate();
+    _partial_refreshes++;
+  }
+  else 
+  {
+    FullUpdate();
+    _partial_refreshes = 0;
+  }
+}
+/**
+ * Puts EPD in deep sleep mode 1 (1uA typical consumption) Use Init() to wake EPD.
+ */
 void EPD_4::Sleep(void)
 {  
   SendCommand(DEEP_SLEEP_MODE); //enter deep sleep
-  SendData(0x01); //Deep sleep mode 1 - retains RAM data.
+  SendData(0x01); //Deep sleep mode 1 - retains RAM data, can try Deep Sleep Mode 2...
+  digitalWrite(_reset_pin, LOW); 
+  asleep = true;
 }
-
-void EPD_4::CopyFrameBufferToRAM(const unsigned char* image_buffer, int x, int y, 
-                                int image_width, int image_height)
-  
-  {
-
-
-
+/**
+ *   Takes in hex 2-bit colour pattern and turns the entire screen that colour. 
+ *   Note: Uses Full refresh!
+ * @param  color Hex char - 0x00 = Black, 0x02 = Dark Gray, 0x01 = Light Gray, 0x03 = White
+ * 
+ */  
+void EPD_4::BlanketBomb(unsigned char color)
+{
+  SetMemoryWindow(0, 0, 199, 199);
+  SendCommand(WRITE_RAM_1);
+  for (int j = 0; j < 200; j++) {
+    for (int i = 0; i < 200 / 8; i++) {
+      SendData(color<<1);
+    }
   }
-///////////////////////////Part update//////////////////////////////////////////////
-void EPD_Dis_Part(unsigned int x_start,unsigned int y_start,const unsigned char * datas,unsigned int PART_COLUMN,unsigned int PART_LINE)
-{
-  unsigned int i;  
-  unsigned int x_end,y_start1,y_start2,y_end1,y_end2;
-  x_start=x_start/8;//
-  x_end=x_start+PART_LINE/8-1; 
-  
-  y_start1=0;
-  y_start2=y_start;
-  if(y_start>=256)
-  {
-    y_start1=y_start2/256;
-    y_start2=y_start2%256;
+  SetMemoryWindow(0, 0, 199, 199);
+  SendCommand(WRITE_RAM_2);
+  for (int j = 0; j < 200; j++) {
+    for (int i = 0; i < 200 / 8; i++) {
+      SendData(color&0x01);
+      //This bitwise operation will set the second bit to zero, and leave the first bit
+      //if it is 1.
+    }
   }
-  y_end1=0;
-  y_end2=y_start+PART_COLUMN-1;
-  if(y_end2>=256)
+}
+/**
+ *    Copies split buffers for 4 grayscale into display RAM. Does not update display. Calling thread is responsible for sorting colour information into the buffers!. Coordinates are ZERO-BASED!
+ *    @param ram1_buffer Split data buffer for RAM1
+ *    @param ram2_buffer Split data buffer for RAM2
+ *    @param x Starting x-coordinate
+ *    @param y Starting y-coordinate 
+ *    @param x_end End x-coordinate
+ *    @param y_end End y-coordinate
+ * 
+ */
+
+void EPD_4::CopyFrameBufferToRAM(const unsigned char* ram1_buffer, const unsigned char* ram2_buffer, 
+                                int x, int y, int x_end, int y_end)
+  
+{
+  /*
+  4 Grayscale operation:
+  RAM 1 |  RAM 2   Colour
+  ______|__________________
+  0     |  0       Black
+  1     |  0       Dark Gray
+  0     |  1       Light Gray
+  1     |  1       White
+  */
+  if (ram1_buffer == NULL || ram2_buffer == NULL || x < 0 
+      || x_end > EPD_WIDTH - 1 || y < 0 || y_end > EPD_HEIGHT - 1) 
   {
-    y_end1=y_end2/256;
-    y_end2=y_end2%256;    
-  }   
-//Reset
-  EPD_W21_RST_0;  // Module reset   
-  delay(10);//At least 10ms delay 
-  EPD_W21_RST_1;
-  delay(10); //At least 10ms delay 
-    
-  SendCommand(0x3C); //BorderWavefrom
-  SendData(0x80);  
-//  
-  SendCommand(0x44);       // set RAM x address start/end, in page 35
-  SendData(x_start);    // RAM x address start at 00h;
-  SendData(x_end);    // RAM x address end at 0fh(15+1)*8->128 
-  SendCommand(0x45);       // set RAM y address start/end, in page 35
-  SendData(y_start2);    // RAM y address start at 0127h;
-  SendData(y_start1);    // RAM y address start at 0127h;
-  SendData(y_end2);    // RAM y address end at 00h;
-  SendData(y_end1);    // ????=0 
+    return;
+  }
 
-
-  SendCommand(0x4E);   // set RAM x address count to 0;
-  SendData(x_start); 
-  SendCommand(0x4F);   // set RAM y address count to 0X127;    
-  SendData(y_start2);
-  SendData(y_start1);
+  x &= 0xF8;
+  x_end &= 0xF8;
+  if(asleep)
+  {
+    Init(_busy_cb);
+  }
+  SetMemoryWindow(x, y, x_end, y_end);
+  //Writing RAM Contents!
+  SendCommand(WRITE_RAM_1);
+  for (int j = 0; j < y_end - y + 1; j++) {
+      for (int i = 0; i < (x_end - x + 1) / 8; i++) {
+          SendData(ram1_buffer[i + j * ((x_end - x) / 8)]);
+      }
+  }
+  SetMemoryWindow(x, y, x_end, y_end); //This might be unnecessary - test this.
+  SendCommand(WRITE_RAM_1);
+  for (int j = 0; j < y_end - y + 1; j++) {
+      for (int i = 0; i < (x_end - x + 1) / 8; i++) {
+          SendData(ram2_buffer[i + j * ((x_end - x) / 8)]);
+      }
+  }
   
-  
-   SendCommand(0x24);   //Write Black and White image to RAM
-   for(i=0;i<PART_COLUMN*PART_LINE/8;i++)
-   {                         
-     SendData(pgm_read_byte(&datas[i]));
-   } 
-   EPD_Part_Update();
-
 }
 
-
-
-void EPD_HW_Init_4GRAY(void)
+void EPD_4::SetMemoryWindow(int x_start, int y_start, int x_end, int y_end)
 {
-  EPD_W21_RST_0;     
-  delay(10); 
-  EPD_W21_RST_1; //hard reset  
-  delay(10);  
-
-  Epaper_READBUSY();
-  SendCommand(0x12); // soft reset
-  Epaper_READBUSY();
-
-  SendCommand(0x74); //set analog block control       
-  SendData(0x54);
-  SendCommand(0x7E); //set digital block control          
-  SendData(0x3B);
-  
-  SendCommand(0x01); //Driver output control      
-  SendData(0xC7);
-  SendData(0x00);
-  SendData(0x00);
-
-  SendCommand(0x11); //data entry mode       
-  SendData(0x01);
-
-  SendCommand(0x44); //set Ram-X address start/end position   
-  SendData(0x00);
-  SendData(0x18);    //0x0C-->(18+1)*8=200
-
-  SendCommand(0x45); //set Ram-Y address start/end position          
-  SendData(0xC7);    //0xC7-->(199+1)=200
-  SendData(0x00);
-  SendData(0x00);
-  SendData(0x00); 
-
-  SendCommand(0x3C); //BorderWavefrom
-  SendData(0x00);  
-
-
-  SendCommand(0x2C);     //VCOM Voltage
-  SendData(LUT_DATA_4Gray[158]);    //0x1C
-
-
-  SendCommand(0x3F); //EOPQ    
-  SendData(LUT_DATA_4Gray[153]);
-  
-  SendCommand(0x03); //VGH      
-  SendData(LUT_DATA_4Gray[154]);
-
-  SendCommand(0x04); //      
-  SendData(LUT_DATA_4Gray[155]); //VSH1   
-  SendData(LUT_DATA_4Gray[156]); //VSH2   
-  SendData(LUT_DATA_4Gray[157]); //VSL   
-   
-  EPD_select_LUT(LUT_DATA_4Gray); //LUT 
-  
-  SendCommand(0x4E);   // set RAM x address count to 0;
-  SendData(0x00);
-  SendCommand(0x4F);   // set RAM y address count to 0X199;    
-  SendData(0xC7);
-  SendData(0x00);
-  Epaper_READBUSY();
+  SendCommand(SET_RAM_X_ADDRESS_START_END_POS);
+  SendData((x_start >> 3) & 0xFF); //Generating memory unit
+  SendData((x_end >> 3) & 0xFF);
+  SendCommand(SET_RAM_Y_ADDRESS_START_END_POS);
+  SendData(y_start & 0xFF);
+  SendData((y_start >> 8) & 0xFF);
+  SendData(y_end & 0xFF);
+  SendData((y_end >> 8) & 0xFF);
+  SendCommand(SET_RAM_X_ADDRESS_COUNTER);
+  SendData((x_start >> 3) & 0xFF);
+  SendCommand(SET_RAM_Y_ADDRESS_COUNTER);
+  SendData(y_start & 0xFF);
+  SendData((y_start >> 8) & 0xFF);
+  BusyWait();
 }
-unsigned char In2bytes_Out1byte_RAM1(unsigned char data1,unsigned char data2)
-{
-  unsigned int i; 
-  unsigned char TempData1,TempData2;
-  unsigned char outdata=0x00;
-  TempData1=data1;
-  TempData2=data2;
-  
-    for(i=0;i<4;i++)
-     { 
-        outdata=outdata<<1;
-        if( ((TempData1&0xC0)==0xC0) || ((TempData1&0xC0)==0x40))
-           outdata=outdata|0x01;
-        else 
-          outdata=outdata|0x00;
-
-        TempData1=TempData1<<2;
-
-        //delay_us(5) ; 
-     }
-
-    for(i=0;i<4;i++)
-     { 
-        outdata=outdata<<1;
-         if((TempData2&0xC0)==0xC0||(TempData2&0xC0)==0x40)
-           outdata=outdata|0x01;
-        else 
-          outdata=outdata|0x00;
-
-        TempData2=TempData2<<2;
-
-       // delay_us(5) ; 
-     }
-     return outdata;
-}
-unsigned char In2bytes_Out1byte_RAM2(unsigned char data1,unsigned char data2)
-{
-  unsigned int i; 
-  unsigned char TempData1,TempData2;
-  unsigned char outdata=0x00;
-TempData1=data1;
-TempData2=data2;
-  
-    for(i=0;i<4;i++)
-     { 
-        outdata=outdata<<1;
-        if( ((TempData1&0xC0)==0xC0) || ((TempData1&0xC0)==0x80))
-           outdata=outdata|0x01;
-        else 
-          outdata=outdata|0x00;
-
-        TempData1=TempData1<<2;
-
-       // delay_us(5) ; 
-     }
-
-    for(i=0;i<4;i++)
-     { 
-        outdata=outdata<<1;
-         if((TempData2&0xC0)==0xC0||(TempData2&0xC0)==0x80)
-           outdata=outdata|0x01;
-        else 
-          outdata=outdata|0x00;
-
-        TempData2=TempData2<<2;
-
-        //delay_us(5) ; 
-     }
-     return outdata;
-}
-//296*128
-void EPD_WhiteScreen_ALL_4GRAY(const unsigned char *datas)
-{
-   unsigned int i;
-   unsigned char tempOriginal;   
-  
-  
-    SendCommand(0x24);   //write RAM for black(0)/white (1)
-   for(i=0;i<5000*2;i+=2)
-   {               
-    tempOriginal= In2bytes_Out1byte_RAM1( *(datas+i),*(datas+i+1));
-     SendData(~tempOriginal); 
-   }
-   
-   SendCommand(0x26);   //write RAM for black(0)/white (1)
-   for(i=0;i<5000*2;i+=2)
-   {               
-    tempOriginal= In2bytes_Out1byte_RAM2( *(datas+i),*(datas+i+1));
-     SendData(~tempOriginal); 
-   }
-   EPD_Update_4GRAY();   
-}
-void EPD_Update_4GRAY(void)
-{   
-  SendCommand(0x22); 
-  SendData(0xC7);   
-  SendCommand(0x20); 
-  Epaper_READBUSY();  
-
-}
-
-
-
-
-//////////////////////////////////END//////////////////////////////////////////////////

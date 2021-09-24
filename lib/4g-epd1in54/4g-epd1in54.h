@@ -1,9 +1,13 @@
 #include <Arduino.h>
-#include "4g-epdif.h"
+
 /**
- * @brief: Some parts of this code will be similar to Yehui's waveshare code
- *         as explained in 4g-epdif.h's header. This is the main driver function for
- *         GDE0H154D67 SSD1681 200x200 4 grayscale display.
+*  @brief   :   Parts of this driver are built in the same way as 
+*               the Waveshare EPD driver by Yehui as there are many identical operations
+*               between my driver and the Waveshare one, despite the different display controllers.
+*               These controllers are so similar that I have no choice but to duplicate some code. 
+*               I decided to change a few things to improve the driver for this EPD, hence I have written this code.
+*  @author  :   Yuvraj Dubey, with help from GoodDisplay's sample code for GDEH0154D67 for initialisation routine and Yehui from Waveshare's code for SSD1608.
+*
 */
 #ifndef EPDIN54_H_4G
 #define EPDIN54_H_4G
@@ -62,32 +66,22 @@
 #define SET_RAM_Y_ADDRESS_COUNTER       0x4F    //Set initial address counter for RAM Y addresses
 #define NOP                             0x7F    //No operation
 
-/*
 
-4 Grayscale operation:
 
-RAM 1 |  RAM 2   Colour
-______|__________________
-0     |  0       Black
-1     |  0       Dark Gray
-0     |  1       Light Gray
-1     |  1       White
-      |
-*/
-
-class EPD_4 : EPDInterface_4 {
+class EPD_4 {
 public:
     EPD_4(int epd_busy, int epd_reset, int epd_dc, 
           int epd_cs, int epd_mosi, int epd_miso, int epd_sck, bool debug);
     ~EPD_4();
-    int Init(const unsigned char* lut, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity));
+    int Init(void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity));
     void SendCommand(unsigned char command);
     void SendData(unsigned char data);
     void BusyWait(void);
     nrfx_err_t BusyCallBack(void);
     void Reset(void);
     void CopyFrameBufferToRAM(
-        const unsigned char* image_buffer,
+        const unsigned char* ram1_buffer,
+        const unsigned char* ram2_buffer,
         int x,
         int y,
         int image_width,
@@ -104,6 +98,7 @@ private:
     nrfx_err_t CallBackInit(void);
     void SetLookUpTable(const unsigned char* lut);
     unsigned int _reset_pin;
+    unsigned int _partial_refreshes;
     unsigned int _dc_pin;
     unsigned int _cs_pin;
     unsigned int _busy_pin;
@@ -111,7 +106,8 @@ private:
     unsigned int _spi_mosi;
     unsigned int _spi_sck;
     bool first_init = true;
-    const unsigned char* _lut_mono;
+    bool asleep = false;
+    void SetMemoryWindow(int x_start, int y_start, int x_end, int y_end);
     const unsigned char _lut_4_gray[159] = {
     0x40, 0x48, 0x80, 0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,
     0x8,  0x48, 0x10, 0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,
@@ -133,64 +129,4 @@ private:
     SPISettings _epd_spi_settings;
 };
 
-#endif 
-
-
-#define EPD_W21_MOSI_0  digitalWrite(SDI_Pin,LOW)
-#define EPD_W21_MOSI_1  digitalWrite(SDI_Pin,HIGH) 
-
-#define EPD_W21_CLK_0 digitalWrite(SCK_Pin,LOW)
-#define EPD_W21_CLK_1 digitalWrite(SCK_Pin,HIGH)
-
-#define EPD_W21_CS_0 digitalWrite(CS_Pin,LOW)
-#define EPD_W21_CS_1 digitalWrite(CS_Pin,HIGH)
-
-#define EPD_W21_DC_0  digitalWrite(DC_Pin,LOW)
-#define EPD_W21_DC_1  digitalWrite(DC_Pin,HIGH)
-#define EPD_W21_RST_0 digitalWrite(RES_Pin,LOW)
-#define EPD_W21_RST_1 digitalWrite(RES_Pin,HIGH)
-#define isEPD_W21_BUSY digitalRead(BUSY_Pin)
-//296*128///////////////////////////////////////
-
-#define MONOMSB_MODE 1
-#define MONOLSB_MODE 2 
-#define RED_MODE     3
-
-#define MAX_LINE_BYTES 25// =200/8
-#define MAX_COLUMN_BYTES 200
-
-#define ALLSCREEN_GRAGHBYTES 5000
-
-////////FUNCTION//////
-void driver_delay_us(unsigned int xus);
-void driver_delay(unsigned long xms);
-void DELAY_S(unsigned int delaytime);     
-void SPI_Delay(unsigned char xrate);
-
-
-//EPD
-void Epaper_READBUSY(void);
-void SPI_Write(unsigned char value);
-
-void EPD_HW_Init(void); //Electronic paper initialization
-void EPD_Part_Init(void); //Local refresh initialization
-
-void EPD_Part_Update(void); 
-void EPD_Update(void);
-
-void EPD_WhiteScreen_White(void);
-void EPD_DeepSleep(void);
-//Display 
-void EPD_WhiteScreen_ALL(const unsigned char * datas);
-void EPD_SetRAMValue_BaseMap(const unsigned char * datas);
-void EPD_Dis_Part(unsigned int x_start,unsigned int y_start,const unsigned char * datas,unsigned int PART_COLUMN,unsigned int PART_LINE);
-void EPD_Dis_Part_myself(unsigned int x_startA,unsigned int y_startA,const unsigned char * datasA,
-                         unsigned int x_startB,unsigned int y_startB,const unsigned char * datasB,
-                         unsigned int x_startC,unsigned int y_startC,const unsigned char * datasC,
-                         unsigned int x_startD,unsigned int y_startD,const unsigned char * datasD,
-                         unsigned int x_startE,unsigned int y_startE,const unsigned char * datasE,
-                         unsigned int PART_COLUMN,unsigned int PART_LINE
-                        );
-void EPD_HW_Init_4GRAY(void);    
-void EPD_Update_4GRAY(void);                         
-void EPD_WhiteScreen_ALL_4GRAY(const unsigned char *datas);
+#endif
