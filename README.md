@@ -1,4 +1,6 @@
-![](art/INKI.gif)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/thatonearchguy/INKI-Software/devel/art/INKI.gif?token=AQAJB2RGNWGSEYRCZWIL5ALBK54I2" />
+</p>
 
 ## What is INKI? :thought_balloon:
 **INKI** Mark One is a premium open source smartwatch, born out of a desire to create a usable watch that could last 30 days on a single charge.  
