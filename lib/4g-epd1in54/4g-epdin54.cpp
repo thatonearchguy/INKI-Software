@@ -51,10 +51,10 @@ EPD_4::~EPD_4()
  * @param busy_cb Reference to ISR handler which will be called after Partial or Full refresh.
  * @param pin polarity - ISR handler should input the pin, and the polarity, which will tell your handler what the busy line has done. 
  */
-int EPD_4::Init(void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity))
+int EPD_4::Init(bool gray, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity))
 {
   uint32_t err_code;
-  if(first_init)
+  if(_first_init)
   {
     pinMode(_cs_pin, OUTPUT);
     //pinMode(_busy_pin, INPUT); Unncessary, will conflict with GPIOTE use of _busy_pin.
@@ -66,7 +66,7 @@ int EPD_4::Init(void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity))
     err_code = CallBackInit();
     if(err_code == NRF_SUCCESS)
     {
-      first_init = false;
+      _first_init = false;
     }
   }
   //Hardware Reset
@@ -77,7 +77,8 @@ int EPD_4::Init(void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity))
   BusyWait();
   SendCommand(SW_RESET);
   BusyWait();
-  asleep = false;
+  _asleep = false;
+  _gray = gray;
   /*
   WARNING, THESE COMMANDS ARE UNDEFINED FOR SSD1681!!
   SendCommand(0x74); //set analog block control       
@@ -101,17 +102,27 @@ int EPD_4::Init(void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity))
   SendData((EPD_HEIGHT - 1) >> 8); 
   SendCommand(BORDER_WAVEFORM_CONTROL); 
   SendData(0x00);  
-  SendCommand(VCOM_REG_WRITE);     //Setting VCOM Voltage
-  SendData(_lut_4_gray[158]);    
-  SendCommand(END_OPTION);    
-  SendData(_lut_4_gray[153]);
-  SendCommand(GATE_DRIVE_VOLTAGE_CONTROL);       
-  SendData(_lut_4_gray[154]);
-  SendCommand(SOURCE_DRIVE_VOLTAGE_CONTROL); //      
-  SendData(_lut_4_gray[155]);    
-  SendData(_lut_4_gray[156]);   
-  SendData(_lut_4_gray[157]);   
-  SetLookUpTable(_lut_4_gray); //Write 4 grayscale waveform 
+  if(gray)
+  {
+    SendCommand(VCOM_REG_WRITE);     //Setting VCOM Voltage
+    SendData(_lut_4_gray[158]);    
+    SendCommand(END_OPTION);    
+    SendData(_lut_4_gray[153]);
+    SendCommand(GATE_DRIVE_VOLTAGE_CONTROL);       
+    SendData(_lut_4_gray[154]);
+    SendCommand(SOURCE_DRIVE_VOLTAGE_CONTROL); //      
+    SendData(_lut_4_gray[155]);    
+    SendData(_lut_4_gray[156]);   
+    SendData(_lut_4_gray[157]);   
+    SetLookUpTable(_lut_4_gray); //Write 4 grayscale waveform 
+  }
+  else
+  {
+    SendCommand(BORDER_WAVEFORM_CONTROL);
+    SendData(0x05);
+    SendCommand(TEMPERATURE_SENSOR_CONTROL);
+    SendData(0x80);
+  }
   SendCommand(SET_RAM_X_ADDRESS_COUNTER);   // set RAM x address count to denary 0;
   SendData(0x00);
   SendCommand(SET_RAM_Y_ADDRESS_COUNTER);   // set RAM y address count to denary 199;    
@@ -245,7 +256,7 @@ void EPD_4::Sleep(void)
   SendCommand(DEEP_SLEEP_MODE); //enter deep sleep
   SendData(0x01); //Deep sleep mode 1 - retains RAM data, can try Deep Sleep Mode 2...
   digitalWrite(_reset_pin, LOW); 
-  asleep = true;
+  _asleep = true;
 }
 /**
  *   Takes in hex 2-bit colour pattern and turns the entire screen that colour. 
@@ -282,7 +293,6 @@ void EPD_4::BlanketBomb(unsigned char color)
  *    @param y_end End y-coordinate
  * 
  */
-
 void EPD_4::CopyFrameBufferToRAM(const unsigned char* ram1_buffer, const unsigned char* ram2_buffer, 
                                 int x, int y, int x_end, int y_end)
   
@@ -304,9 +314,9 @@ void EPD_4::CopyFrameBufferToRAM(const unsigned char* ram1_buffer, const unsigne
 
   x &= 0xF8;
   x_end &= 0xF8;
-  if(asleep)
+  if(_asleep)
   {
-    Init(_busy_cb);
+    Init(_gray, _busy_cb);
   }
   SetMemoryWindow(x, y, x_end, y_end);
   //Writing RAM Contents!
@@ -316,13 +326,17 @@ void EPD_4::CopyFrameBufferToRAM(const unsigned char* ram1_buffer, const unsigne
           SendData(ram1_buffer[i + j * ((x_end - x) / 8)]);
       }
   }
-  SetMemoryWindow(x, y, x_end, y_end); //This might be unnecessary - test this.
-  SendCommand(WRITE_RAM_1);
-  for (int j = 0; j < y_end - y + 1; j++) {
-      for (int i = 0; i < (x_end - x + 1) / 8; i++) {
-          SendData(ram2_buffer[i + j * ((x_end - x) / 8)]);
-      }
+  if(_gray)
+  {
+    SetMemoryWindow(x, y, x_end, y_end); //This might be unnecessary - test this.
+    SendCommand(WRITE_RAM_2);
+    for (int j = 0; j < y_end - y + 1; j++) {
+        for (int i = 0; i < (x_end - x + 1) / 8; i++) {
+            SendData(ram2_buffer[i + j * ((x_end - x) / 8)]);
+        }
+    }
   }
+  
   
 }
 

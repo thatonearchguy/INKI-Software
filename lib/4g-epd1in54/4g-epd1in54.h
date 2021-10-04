@@ -73,7 +73,7 @@ public:
     EPD_4(int epd_busy, int epd_reset, int epd_dc, 
           int epd_cs, int epd_mosi, int epd_miso, int epd_sck, bool debug);
     ~EPD_4();
-    int Init(void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity));
+    int Init(bool gray, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity));
     void SendCommand(unsigned char command);
     void SendData(unsigned char data);
     void BusyWait(void);
@@ -105,8 +105,9 @@ private:
     unsigned int _spi_miso;
     unsigned int _spi_mosi;
     unsigned int _spi_sck;
-    bool first_init = true;
-    bool asleep = false;
+    bool _first_init = true;
+    bool _asleep = false;
+    bool _gray;
     void SetMemoryWindow(int x_start, int y_start, int x_end, int y_end);
     const unsigned char _lut_4_gray[159] = {
     0x40, 0x48, 0x80, 0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,

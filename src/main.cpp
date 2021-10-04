@@ -1,5 +1,6 @@
 #include "Wire.h"
 #include "lvgl.h"
+#include "4g-epd1in54.h"
 #include "epd1in54.h"
 #include "gpio.h"
 #include "Adafruit_DRV2605.h"
@@ -15,14 +16,6 @@
 #include <Adafruit_GPS.h>
 #include <stack>
 
-#define SCK        27
-#define MISO       26
-#define MOSI       40
-#define EPD_CS     39
-#define EPD_DC     38
-#define SRAM_CS    37
-#define EPD_RESET  36 // can set to -1 and share with microcontroller Reset!
-#define EPD_BUSY   35 // can set to -1 to not use a pin (will wait a fixed delay)
 #define GUI_RTC_CC 0
 #define GUI_RTC 2
 #define GUI_RTC_TICKS (RTC_US_TO_TICKS(500000ULL, RTC_DEFAULT_CONFIG_FREQUENCY))
@@ -71,7 +64,16 @@ char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursd
 static const nrfx_rtc_t m_rtc = NRFX_RTC_INSTANCE(2);
 
 /* E P a p e r   D i s p l a y  <3  L V G L */
-Epd epd;
+#define SCK        27
+#define MISO       26
+#define MOSI       40
+#define EPD_CS     39
+#define EPD_DC     38
+#define SRAM_CS    37
+#define EPD_RESET  36 // can set to -1 and share with microcontroller Reset!
+#define EPD_BUSY   35 // can set to -1 to not use a pin (will wait a fixed delay)
+
+EPD_4 epd(EPD_BUSY, EPD_RESET, EPD_DC, EPD_CS, MOSI, MISO, SCK, false);
 void epd_flush( lv_disp_drv_t*, const lv_area_t*, lv_color_t* ); //Memory update function
 void epd_set_px_cb(lv_disp_drv_t*, uint8_t*, lv_coord_t, lv_coord_t, lv_coord_t, lv_color_t, lv_opa_t); //Pixel painter
 void epd_rounder( lv_disp_drv_t*, lv_area_t*); //Coordinate rounder
@@ -83,7 +85,7 @@ static const uint8_t screenWidth  = 200;
 static const uint8_t screenHeight = 200;
 
 static lv_disp_draw_buf_t draw_buf;
-static uint8_t buf_1[ screenWidth * screenHeight / 8 ];
+static uint8_t buf_1[ screenWidth * screenHeight / 4];
 //static uint8_t buf_2[ screenWidth * screenHeight / 8 ];
 
 TaskHandle_t Handle_GUIUpdate;
@@ -589,6 +591,7 @@ void init_watchface_scr(lv_indev_t* indev)
   
 }
 
+static lv_disp_drv_t disp_drv;
 
 void my_print(const char *);
 
@@ -604,16 +607,16 @@ static void guiTask(void *pvParameter)
   GuiSemaphore = xSemaphoreCreateMutex();
   I2CSemaphore = xSemaphoreCreateMutex();
   lv_init();
-  if (epd.Init(lut_full_update) != 0) {
+  if (epd.Init(false, &epd_driver_callback) != NRF_SUCCESS) {
     SEGGER_RTT_WriteString(0, "e-Paper init failure");
     return;
   }
   SEGGER_RTT_WriteString(0, "e-Paper init");
-  epd.ClearFrameMemory(0xFF);
-  epd.DisplayFrame();
-  epd.ClearFrameMemory(0xFF);
-  epd.DisplayFrame();
-  epd.SetLut(lut_partial_update);
+  epd.BlanketBomb(0x00);
+  epd.FullUpdate();
+  epd.BlanketBomb(0xFF);
+  epd.FullUpdate();
+  //epd.SetLut(lut_partial_update); unnecessary, as LUT for partial is built into SSD1681
   digitalWrite(PIN_LED1, LOW);
   
   
@@ -626,7 +629,6 @@ static void guiTask(void *pvParameter)
   lv_disp_draw_buf_init( &draw_buf, buf_1, NULL, screenWidth * screenHeight / 8 );
 
   /*Initialising display*/
-  static lv_disp_drv_t disp_drv;
   lv_disp_drv_init( &disp_drv );
   disp_drv.draw_buf = &draw_buf;
   disp_drv.flush_cb = epd_flush;
@@ -651,7 +653,6 @@ static void guiTask(void *pvParameter)
   lv_disp_set_theme(disp, theme);
 
   //lv_example_btn_1(indev);
-
   char date[100];
   sprintf(date, "%d:%d:%d\n", PA1010D.hour, PA1010D.minute, PA1010D.seconds);
   SEGGER_RTT_WriteString(0, date);
@@ -769,7 +770,13 @@ void epd_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p 
 }
 
 
+void epd_driver_callback()
+{
+  lv_disp_
+  lv_disp_flush_ready()
+}
 
+//Color logic goes here:
 void epd_set_px_cb(lv_disp_drv_t *disp, uint8_t *buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa) 
 {
   unsigned char bitIndex, a;
