@@ -1,5 +1,10 @@
 #include <Arduino.h>
-
+#include "SEGGER_RTT.h"
+#include "nrfx_config.h"
+#include "SPI.h"
+#include "nrfx_gpiote.h"
+#include "nrf_svc.h"
+#include "nrf_nvic.h"
 /**
 *  @brief   :   Parts of this driver are built in the same way as 
 *               the Waveshare EPD driver by Yehui as there are many identical operations

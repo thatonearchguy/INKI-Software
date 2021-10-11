@@ -1,18 +1,20 @@
 #include "Wire.h"
 #include "lvgl.h"
 #include "4g-epd1in54.h"
-#include "epd1in54.h"
+//#include "epd1in54.h"
 #include "gpio.h"
 #include "Adafruit_DRV2605.h"
 #include "bluefruit.h"
 #include "nrfx_rtc.h"
-#include "RTClib.h"
 #include <SEGGER_RTT.h>
 #include <vector>
 #include <string>
 #include "max30102.h"
 #include "algorithm_by_RF.h"
 #include "Arduino-ICM20948.h"
+#include "nrfx_gpiote.h"
+#include "nrf_svc.h"
+#include "nrf_nvic.h"
 #include <Adafruit_GPS.h>
 #include <stack>
 
@@ -64,14 +66,14 @@ char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursd
 static const nrfx_rtc_t m_rtc = NRFX_RTC_INSTANCE(2);
 
 /* E P a p e r   D i s p l a y  <3  L V G L */
-#define SCK        27
-#define MISO       26
-#define MOSI       40
-#define EPD_CS     39
-#define EPD_DC     38
-#define SRAM_CS    37
-#define EPD_RESET  36 // can set to -1 and share with microcontroller Reset!
-#define EPD_BUSY   35 // can set to -1 to not use a pin (will wait a fixed delay)
+#define SCK        44
+#define MISO       43
+#define MOSI       42 
+#define EPD_CS     40
+#define EPD_DC     39
+#define SRAM_CS    0
+#define EPD_RESET  38  // can set to -1 and share with microcontroller Reset!
+#define EPD_BUSY   37 // can set to -1 to not use a pin (will wait a fixed delay)
 
 EPD_4 epd(EPD_BUSY, EPD_RESET, EPD_DC, EPD_CS, MOSI, MISO, SCK, false);
 void epd_flush( lv_disp_drv_t*, const lv_area_t*, lv_color_t* ); //Memory update function
@@ -173,7 +175,6 @@ static void rtc_config(void)
     nrfx_rtc_tick_enable(&m_rtc,true);
     //Power on RTC instance
     nrfx_rtc_enable(&m_rtc);
-    PA1010D.latitude;
 }
 
 static void event_handler(lv_event_t * e)
@@ -190,9 +191,6 @@ static void event_handler(lv_event_t * e)
 
 #define GPSECHO false;
 
-
-
-static DateTime RTCTime;
 
 struct Notification
 {
@@ -469,7 +467,7 @@ void date_label_update_timer(lv_timer_t* timer)
   uint8_t d = PA1010D.day;
   uint8_t m = PA1010D.month;
   uint8_t y = PA1010D.year;
-  sprintf(dateBuf, "%.3s %02u", days[(d+=m < 3 ? y-- : y-2, 23*m/9+d+4+y/4-y/100+y/400)%7], RTCTime.day());
+  sprintf(dateBuf, "%.3s %02u", days[(d+=m < 3 ? y-- : y-2, 23*m/9+d+4+y/4-y/100+y/400)%7], d);
   lv_label_set_text(date_label, dateBuf);
   if(!(dateBuf==lv_label_get_text(date_label)))
   {
@@ -591,7 +589,6 @@ void init_watchface_scr(lv_indev_t* indev)
   
 }
 
-static lv_disp_drv_t disp_drv;
 
 void my_print(const char *);
 
@@ -599,6 +596,12 @@ void my_print(const char* buf)
 {
   SEGGER_RTT_WriteString(0, buf);
   SEGGER_RTT_WriteString(0, "\n");
+}
+
+void epd_driver_callback(uint32_t pin, nrf_gpiote_polarity_t polarity)
+{
+  lv_disp_drv_t* disp = (lv_disp_drv_t*) lv_disp_get_default();
+  lv_disp_flush_ready(disp);
 }
 
 static void guiTask(void *pvParameter)
@@ -629,6 +632,8 @@ static void guiTask(void *pvParameter)
   lv_disp_draw_buf_init( &draw_buf, buf_1, NULL, screenWidth * screenHeight / 8 );
 
   /*Initialising display*/
+  static lv_disp_drv_t disp_drv;
+
   lv_disp_drv_init( &disp_drv );
   disp_drv.draw_buf = &draw_buf;
   disp_drv.flush_cb = epd_flush;
@@ -639,6 +644,7 @@ static void guiTask(void *pvParameter)
 
   lv_disp_t* disp;
   disp = lv_disp_drv_register( &disp_drv );
+  lv_disp_set_default(disp);
   //KEYPAD Initialisation. ToDo - refactor into nice methods once eInk operational.
   static lv_indev_drv_t indev_drv;
   lv_indev_drv_init( &indev_drv );
@@ -761,20 +767,16 @@ static void getGPSData(void* pvParameters)
 void epd_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p )
 {
   uint8_t *buf = (uint8_t*) color_p;
-  epd.SetFrameMemory(buf, area->x1, area->y1, area->x2 - area->x1+1, area->y2-area->y1+1);
+  epd.CopyFrameBufferToRAM(buf, NULL, area->x1, area->y1, area->x2, area->y2);
   if(lv_disp_flush_is_last(disp))
   {
-    epd.MixedRefresh(10);
+    epd.HybridRefresh(10);
   }
   lv_disp_flush_ready(disp);
 }
 
 
-void epd_driver_callback()
-{
-  lv_disp_
-  lv_disp_flush_ready()
-}
+
 
 //Color logic goes here:
 void epd_set_px_cb(lv_disp_drv_t *disp, uint8_t *buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa) 

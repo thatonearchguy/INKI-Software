@@ -1,10 +1,5 @@
 #include "4g-epd1in54.h"
-#include "SEGGER_RTT.h"
-#include "nrfx_config.h"
-#include "SPI.h"
-#include "nrfx_gpiote.h"
-#include "nrf_svc.h"
-#include "nrf_nvic.h"
+
 
 //Documentation says I need the following """C""" snippet to use NVIC. Not going to make a separate C file!! 
 //I really hope this works.
@@ -306,7 +301,7 @@ void EPD_4::CopyFrameBufferToRAM(const unsigned char* ram1_buffer, const unsigne
   0     |  1       Light Gray
   1     |  1       White
   */
-  if (ram1_buffer == NULL || ram2_buffer == NULL || x < 0 
+  if (ram1_buffer == NULL || ((ram2_buffer == NULL&&(_gray==true))) || x < 0 
       || x_end > EPD_WIDTH - 1 || y < 0 || y_end > EPD_HEIGHT - 1) 
   {
     return;
