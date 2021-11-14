@@ -1,4 +1,15 @@
-.pio/
+!.pio/
+.pio/*
+.pio/libdeps/*
+.pio/libdeps/nrf52840_dk_adafruit/lvgl/*
+.pio/libdeps/nrf52840_dk_adafruit/lvgl/src/*
+
+!.pio/libdeps/
+!.pio/libdeps/nrf52840_dk_adafruit/
+!.pio/libdeps/nrf52840_dk_adafruit/lvgl/lv_conf.h
+!.pio/libdeps/nrf52840_dk_adafruit/lvgl/lv_demo_conf.h
+!.pio/libdeps/nrf52840_dk_adafruit/lvgl/src/font/*
+
 .vscode/.browse.c_cpp.db*
 .vscode/c_cpp_properties.json
 .vscode/launch.json
