@@ -157,16 +157,19 @@ bool Adafruit_I2CDevice::write(const uint8_t *buffer, size_t len, bool stop,
  *    @return True if read was successful, otherwise false.
  */
 bool Adafruit_I2CDevice::read(uint8_t *buffer, size_t len, bool stop) {
-  if (len > maxBufferSize()) {
-    // currently not guaranteed to work if more than 32 bytes!
-    // we will need to find out if some platforms have larger
-    // I2C buffer sizes :/
-#ifdef DEBUG_SERIAL
-    DEBUG_SERIAL.println(F("\tI2CDevice could not read such a large buffer"));
-#endif
-    return false;
+  size_t pos = 0;
+  while (pos < len) {
+    size_t read_len =
+        ((len - pos) > maxBufferSize()) ? maxBufferSize() : (len - pos);
+    bool read_stop = (pos < (len - read_len)) ? false : stop;
+    if (!_read(buffer + pos, read_len, read_stop))
+      return false;
+    pos += read_len;
   }
+  return true;
+}
 
+bool Adafruit_I2CDevice::_read(uint8_t *buffer, size_t len, bool stop) {
 #if defined(TinyWireM_h)
   size_t recv = _wire->requestFrom((uint8_t)_addr, (uint8_t)len);
 #else
