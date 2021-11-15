@@ -82,7 +82,7 @@ public:
     void SendCommand(unsigned char command);
     void SendData(unsigned char data);
     void BusyWait(void);
-    nrfx_err_t BusyCallBack(void);
+    void BusyCallBack(void);
     void Reset(void);
     void CopyFrameBufferToRAM(
         const unsigned char* ram1_buffer,
@@ -96,7 +96,7 @@ public:
     void FullUpdate(void);
     void PartUpdate(void);
     void Sleep(void);
-    void HybridRefresh(int threshold);
+    void HybridRefresh(uint8_t threshold);
 
 private:
     void (*_busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity);

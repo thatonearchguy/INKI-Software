@@ -66,14 +66,15 @@ char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursd
 static const nrfx_rtc_t m_rtc = NRFX_RTC_INSTANCE(2);
 
 /* E P a p e r   D i s p l a y  <3  L V G L */
-#define SCK        44
-#define MISO       43
-#define MOSI       42 
-#define EPD_CS     40
-#define EPD_DC     39
-#define SRAM_CS    0
-#define EPD_RESET  38  // can set to -1 and share with microcontroller Reset!
-#define EPD_BUSY   37 // can set to -1 to not use a pin (will wait a fixed delay)
+#define SCK        47
+#define MISO       46
+#define MOSI       45 
+#define EPD_CS     44
+#define EPD_DC     43
+#define SRAM_CS    42
+#define EPD_RESET  39  // can set to -1 and share with microcontroller Reset!
+#define EPD_BUSY   38 // can set to -1 to not use a pin (will wait a fixed delay)
+#define EPD_ENABLE 37
 
 EPD_4 epd(EPD_BUSY, EPD_RESET, EPD_DC, EPD_CS, MOSI, MISO, SCK, false);
 void epd_flush( lv_disp_drv_t*, const lv_area_t*, lv_color_t* ); //Memory update function
@@ -608,19 +609,18 @@ static void guiTask(void *pvParameter)
 {
   (void) pvParameter;
   GuiSemaphore = xSemaphoreCreateMutex();
-  I2CSemaphore = xSemaphoreCreateMutex();
   lv_init();
   if (epd.Init(false, &epd_driver_callback) != NRF_SUCCESS) {
-    SEGGER_RTT_WriteString(0, "e-Paper init failure");
+    SEGGER_RTT_WriteString(0, "e-Paper init failure\n");
     return;
   }
-  SEGGER_RTT_WriteString(0, "e-Paper init");
+  SEGGER_RTT_WriteString(0, "e-Paper init\n");
   epd.BlanketBomb(0x00);
-  epd.FullUpdate();
+  //epd.FullUpdate(); WRONG FUNCTION - CALLS ISR HANDLER, BUSY WAIT REQUIRED HERE!
   epd.BlanketBomb(0xFF);
-  epd.FullUpdate();
+  //epd.FullUpdate();
   //epd.SetLut(lut_partial_update); unnecessary, as LUT for partial is built into SSD1681
-  digitalWrite(PIN_LED1, LOW);
+  digitalWrite(PIN_LED3, LOW);
   
   
   lv_init();
@@ -713,10 +713,8 @@ static void getMAXData(void* pvParameters)
       xSemaphoreGive(I2CSemaphore);
     }
     //calculate heart rate and SpO2 after BUFFER_SIZE samples (ST seconds of samples) using Robert's method
-    rf_heart_rate_and_oxygen_saturation(aun_ir_buffer, BUFFER_SIZE, aun_red_buffer, &n_spo2, &ch_spo2_valid, &n_heart_rate, &ch_hr_valid, &ratio, &correl); 
-    sprintf(out, "spo2:%f, hr:%ld\n", n_spo2, n_heart_rate);
-    SEGGER_RTT_WriteString(0, out);
-    delay(20);
+    SEGGER_RTT_WriteString(0, "max success\n");
+    delay(200);
   }
 }
 
@@ -736,7 +734,7 @@ static void getIMUData(void* pvParameters)
     }
     sprintf(out, "Steps: %li\n", icm_steps);
     SEGGER_RTT_WriteString(0, out);
-    delay(20);
+    delay(1000);
   }
 }
 
@@ -770,9 +768,9 @@ void epd_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p 
   epd.CopyFrameBufferToRAM(buf, NULL, area->x1, area->y1, area->x2, area->y2);
   if(lv_disp_flush_is_last(disp))
   {
-    epd.HybridRefresh(10);
+    epd.FullUpdate();
   }
-  lv_disp_flush_ready(disp);
+  lv_disp_flush_ready(disp); 
 }
 
 
@@ -944,7 +942,7 @@ void setup()
   pinMode(PIN_LED1, OUTPUT);
   Wire.begin();
   delay(1000);
-  SEGGER_RTT_WriteString(0, "Welcome to InkWatchOS\n" );
+  SEGGER_RTT_WriteString(0, "\n\n\nWelcome to INKIOS\n" );
   SEGGER_RTT_WriteString(0,  "LVGL V8.0.X\n" );
   drv.begin();
   //SEGGER_RTT_WriteString(0, "Init drv\n");
@@ -957,24 +955,21 @@ void setup()
   maxim_max30102_init();
   old_n_spo2=0.0; 
   SEGGER_RTT_WriteString(0, "Init MAX30105\n");
-  i2c_scan();
-  if(ICM_found)
-  {
-    icm20948.init(icmSettings);
-  }
-  SEGGER_RTT_WriteString(0, "Init ICM-20948");
+  icm20948.init(icmSettings);
+  SEGGER_RTT_WriteString(0, "Init ICM-20948\n");
   PA1010D.begin(0x10);
   PA1010D.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
   PA1010D.sendCommand(PMTK_SET_NMEA_UPDATE_2HZ);
   PA1010D.sendCommand(PGCMD_ANTENNA);
   delay(1000);
   PA1010D.println(PMTK_Q_RELEASE);
-  SEGGER_RTT_WriteString(0, "Init GPS");
+  SEGGER_RTT_WriteString(0, "Init GPS\n");
   Bluefruit.begin(1, 1);
   Bluefruit.setTxPower(0);
   startAdv();
   beacon.setManufacturer(0x0059);
-  SEGGER_RTT_WriteString(0, "Init BLE");
+  SEGGER_RTT_WriteString(0, "Init BLE\n");
+  I2CSemaphore = xSemaphoreCreateMutex();
   xTaskCreate(getGPSData, "pa1010d", 4096, NULL, tskIDLE_PRIORITY+1, &Handle_gpsData);
   xTaskCreate(guiTask, "gui", 4096*2, NULL, tskIDLE_PRIORITY+2, &Handle_GUIUpdate);
   //Allow time for guiTask to initialise display hardware and start LVGL
@@ -989,7 +984,6 @@ void setup()
 void loop()
 {
   char taskReport[300];
-  char memReport[50];
   vTaskList(taskReport);
   SEGGER_RTT_SetTerminal(1);
   SEGGER_RTT_WriteString(0, "**********************************\n");

@@ -43,7 +43,7 @@ EPD_4::~EPD_4()
 
 /**
  * Runs initialisation routine on EPD. Use this function to wake up EPD after running Sleep().
- * @param busy_cb Reference to ISR handler which will be called after Partial or Full refresh.
+ * @param busy_cb Reference to ISR handler which will be called after Partial or Full refresh. Your function will be passed the pin, and polarity (direction) of the interrupt. 
  * @param pin polarity - ISR handler should input the pin, and the polarity, which will tell your handler what the busy line has done. 
  */
 int EPD_4::Init(bool gray, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity))
@@ -59,7 +59,7 @@ int EPD_4::Init(bool gray, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t p
     _epd_spi->begin();
     _epd_spi->beginTransaction(_epd_spi_settings);
     err_code = CallBackInit();
-    if(err_code == NRF_SUCCESS)
+    if(err_code == NRFX_SUCCESS)
     {
       _first_init = false;
     }
@@ -76,6 +76,7 @@ int EPD_4::Init(bool gray, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t p
   _gray = gray;
   /*
   WARNING, THESE COMMANDS ARE UNDEFINED FOR SSD1681!!
+  Update :: Spoke to GoodDisplay, it is safe to comment out these lines. 
   SendCommand(0x74); //set analog block control       
   SendData(0x54);
   SendCommand(0x7E); //set digital block control          
@@ -124,6 +125,7 @@ int EPD_4::Init(bool gray, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t p
   SendData(0xC7);
   SendData(0x00);
   BusyWait();
+  err_code = NRF_SUCCESS;
   return err_code;
 }
 /**
@@ -173,7 +175,7 @@ void EPD_4::SetLookUpTable(const unsigned char* lut)
 /**
  * Waits for the EPD to refresh without blocking main thread. Enables GPIOTE interrupt that will call interrupt handler specified by busy_cb in Init(). Callback function should disable interrupt once serviced to prevent erroneous interrupts.
  */
-nrfx_err_t EPD_4::BusyCallBack(void)
+void EPD_4::BusyCallBack(void)
 {
   nrfx_gpiote_in_event_enable(_busy_pin, true);
 }
@@ -191,7 +193,7 @@ nrfx_err_t EPD_4::CallBackInit(void)
   if(!nrfx_gpiote_is_init())
   {
     err_code = nrfx_gpiote_init(2);
-    if(err_code != NRF_SUCCESS)
+    if(err_code != NRFX_SUCCESS)
     {
       return err_code;
     }
@@ -214,7 +216,8 @@ void EPD_4::FullUpdate(void)
   SendCommand(DISPLAY_UPDATE_CONTROL_2); //Display Update Control
   SendData(0xF7);   
   SendCommand(MASTER_ACTIVATION); //Activate Display Update Sequence
-  BusyCallBack();
+  //BusyCallBack();
+  delay(500);
 }
 /**
  * Partial EPD refresh - takes ~300 milliseconds. Calls ISR handler specified in Init()
@@ -224,13 +227,14 @@ void EPD_4::PartUpdate(void)
   SendCommand(DISPLAY_UPDATE_CONTROL_2); //Display Update Control 
   SendData(0xFF);   
   SendCommand(MASTER_ACTIVATION); //Activate Display Update Sequence
-  BusyCallBack();      
+  //BusyCallBack();
+  BusyWait();      
 }
 /**
  * Hybrid EPD refresh - will perform "threshold" number of partial EPD refreshes before a Full EPD refresh. Calls ISR handler specified in Init().
  * @param threshold Number of partial refreshes to perform before cleaning display with full refresh.
  */
-void EPD_4::HybridRefresh(int threshold)
+void EPD_4::HybridRefresh(uint8_t threshold)
 {
   if(threshold < _partial_refreshes)
   {
@@ -277,6 +281,10 @@ void EPD_4::BlanketBomb(unsigned char color)
       //if it is 1.
     }
   }
+  SendCommand(DISPLAY_UPDATE_CONTROL_2); //Display Update Control
+  SendData(0xF7);   
+  SendCommand(MASTER_ACTIVATION); //Activate Display Update Sequence
+  BusyWait();
 }
 /**
  *    Copies split buffers for 4 grayscale into display RAM. Does not update display. Calling thread is responsible for sorting colour information into the buffers!. Coordinates are ZERO-BASED!
