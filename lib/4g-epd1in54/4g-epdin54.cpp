@@ -76,7 +76,7 @@ int EPD_4::Init(bool gray, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t p
   _gray = gray;
   /*
   WARNING, THESE COMMANDS ARE UNDEFINED FOR SSD1681!!
-  Update :: Spoke to GoodDisplay, it is safe to comment out these lines. 
+  Update :: Spoke to GoodDisplay, it is safe to comment out the next four lines. 
   SendCommand(0x74); //set analog block control       
   SendData(0x54);
   SendCommand(0x7E); //set digital block control          
@@ -216,8 +216,7 @@ void EPD_4::FullUpdate(void)
   SendCommand(DISPLAY_UPDATE_CONTROL_2); //Display Update Control
   SendData(0xF7);   
   SendCommand(MASTER_ACTIVATION); //Activate Display Update Sequence
-  //BusyCallBack();
-  delay(500);
+  BusyWait();
 }
 /**
  * Partial EPD refresh - takes ~300 milliseconds. Calls ISR handler specified in Init()
@@ -236,7 +235,7 @@ void EPD_4::PartUpdate(void)
  */
 void EPD_4::HybridRefresh(uint8_t threshold)
 {
-  if(threshold < _partial_refreshes)
+  if(threshold > _partial_refreshes)
   {
     PartUpdate();
     _partial_refreshes++;
@@ -309,8 +308,7 @@ void EPD_4::CopyFrameBufferToRAM(const unsigned char* ram1_buffer, const unsigne
   0     |  1       Light Gray
   1     |  1       White
   */
-  if (ram1_buffer == NULL || ((ram2_buffer == NULL&&(_gray==true))) || x < 0 
-      || x_end > EPD_WIDTH - 1 || y < 0 || y_end > EPD_HEIGHT - 1) 
+  if (ram1_buffer == NULL || ((ram2_buffer == NULL)&&(_gray==true)) || x < 0 || y < 0) 
   {
     return;
   }

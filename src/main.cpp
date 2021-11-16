@@ -733,7 +733,7 @@ static void getIMUData(void* pvParameters)
       xSemaphoreGive(I2CSemaphore);
     }
     sprintf(out, "Steps: %li\n", icm_steps);
-    SEGGER_RTT_WriteString(0, out);
+    //SEGGER_RTT_WriteString(0, out);
     delay(1000);
   }
 }
@@ -768,7 +768,7 @@ void epd_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p 
   epd.CopyFrameBufferToRAM(buf, NULL, area->x1, area->y1, area->x2, area->y2);
   if(lv_disp_flush_is_last(disp))
   {
-    epd.FullUpdate();
+    epd.HybridRefresh(10);
   }
   lv_disp_flush_ready(disp); 
 }
@@ -861,7 +861,7 @@ void button_reader(lv_indev_drv_t* drv, lv_indev_data_t* data)
 
 void button_feedback(lv_indev_drv_t* indev, uint8_t e)
 {
-  if(pdTRUE==xSemaphoreTake(GuiSemaphore, portMAX_DELAY))
+  if(pdTRUE==xSemaphoreTake(I2CSemaphore, portMAX_DELAY))
   {
     switch(e)
     {
@@ -949,12 +949,14 @@ void setup()
   drv.selectLibrary(1);
   drv.setMode(DRV2605_MODE_INTTRIG);
   SEGGER_RTT_WriteString(0,  "Init DRV \n");
+  /*
   maxim_max30102_reset();
   delay(1000);
   maxim_max30102_read_reg(REG_INTR_STATUS_1, &uch_dummy);
   maxim_max30102_init();
   old_n_spo2=0.0; 
   SEGGER_RTT_WriteString(0, "Init MAX30105\n");
+  */
   icm20948.init(icmSettings);
   SEGGER_RTT_WriteString(0, "Init ICM-20948\n");
   PA1010D.begin(0x10);
@@ -976,7 +978,7 @@ void setup()
   delay(8000);
   //Begin concurrent i2C tasks:
   //HR monitor
-  xTaskCreate(getMAXData, "max30105", 4096*2, NULL, tskIDLE_PRIORITY+1, &Handle_maxData);
+  //xTaskCreate(getMAXData, "max30105", 4096*2, NULL, tskIDLE_PRIORITY+1, &Handle_maxData);
   //Accelerometer for step data
   xTaskCreate(getIMUData, "icm20948", 4096*2, NULL, tskIDLE_PRIORITY+1, &Handle_imuData);
 }

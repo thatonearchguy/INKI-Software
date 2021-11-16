@@ -125,6 +125,10 @@ void _lv_inv_area(lv_disp_t * disp, const lv_area_t * area_p)
     bool suc;
 
     suc = _lv_area_intersect(&com_area, area_p, &scr_area);
+    com_area.x1 = 0;
+    com_area.y1 = 0;
+    com_area.x2 = LV_HOR_RES - 1;
+    com_area.y2 = LV_VER_RES - 1;
     if(suc == false)  return; /*Out of the screen*/
 
     /*If there were at least 1 invalid area in full refresh mode, redraw the whole screen*/

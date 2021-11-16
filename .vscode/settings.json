@@ -2,6 +2,7 @@
     "restructuredtext.confPath": "${workspaceFolder}/docs/source",
     "files.associations": {
         "nrfx.h": "c",
-        "nrfx_gpiote.h": "c"
+        "nrfx_gpiote.h": "c",
+        "lv_font_fmt_txt.h": "c"
     }
 }
