@@ -745,18 +745,31 @@ static void getGPSData(void* pvParameters)
     if(pdTRUE==xSemaphoreTake(I2CSemaphore, portMAX_DELAY))
     {
       char c = PA1010D.read();
+      SEGGER_RTT_PutChar(0, c);
       // if a sentence is received, we can check the checksum, parse it...
       if (PA1010D.newNMEAreceived()) {
         // a tricky thing here is if we print the NMEA sentence, or data
         // we end up not listening and catching other sentences!
         // so be very wary if using OUTPUT_ALLDATA and trying to print out data
-        SEGGER_RTT_WriteString(0, PA1010D.lastNMEA()); // this also sets the newNMEAreceived() flag to false
+        char* lastNMEA = PA1010D.lastNMEA();
+        SEGGER_RTT_WriteString(0, lastNMEA); // this also sets the newNMEAreceived() flag to false
         if (!PA1010D.parse(PA1010D.lastNMEA())) // this also sets the newNMEAreceived() flag to false
           SEGGER_RTT_WriteString(0, "GPS Parse failed!");
       }
       xSemaphoreGive(I2CSemaphore);
     }
-    delay(30);
+    SEGGER_RTT_SetTerminal(2);
+    SEGGER_RTT_WriteString(0, "GPS task ran\n");
+    if(PA1010D.fix == true)
+    {
+      SEGGER_RTT_WriteString(0, "FIX FOUND!!\n");
+    }
+    else
+    {
+      SEGGER_RTT_WriteString(0, "No Fix Yet\n");
+    }
+    SEGGER_RTT_SetTerminal(0);
+    delay(70);
   }
 }
 
@@ -972,15 +985,15 @@ void setup()
   beacon.setManufacturer(0x0059);
   SEGGER_RTT_WriteString(0, "Init BLE\n");
   I2CSemaphore = xSemaphoreCreateMutex();
-  xTaskCreate(getGPSData, "pa1010d", 4096, NULL, tskIDLE_PRIORITY+1, &Handle_gpsData);
   xTaskCreate(guiTask, "gui", 4096*2, NULL, tskIDLE_PRIORITY+2, &Handle_GUIUpdate);
   //Allow time for guiTask to initialise display hardware and start LVGL
-  delay(8000);
+  delay(16000);
   //Begin concurrent i2C tasks:
   //HR monitor
   //xTaskCreate(getMAXData, "max30105", 4096*2, NULL, tskIDLE_PRIORITY+1, &Handle_maxData);
   //Accelerometer for step data
   xTaskCreate(getIMUData, "icm20948", 4096*2, NULL, tskIDLE_PRIORITY+1, &Handle_imuData);
+  xTaskCreate(getGPSData, "pa1010d", 4096*4, NULL, tskIDLE_PRIORITY+2, &Handle_gpsData);
 }
 
 void loop()
