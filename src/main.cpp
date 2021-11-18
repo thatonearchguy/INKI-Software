@@ -66,15 +66,15 @@ char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursd
 static const nrfx_rtc_t m_rtc = NRFX_RTC_INSTANCE(2);
 
 /* E P a p e r   D i s p l a y  <3  L V G L */
-#define SCK        47
-#define MISO       46
-#define MOSI       45 
-#define EPD_CS     44
-#define EPD_DC     43
-#define SRAM_CS    42
-#define EPD_RESET  39  // can set to -1 and share with microcontroller Reset!
-#define EPD_BUSY   38 // can set to -1 to not use a pin (will wait a fixed delay)
-#define EPD_ENABLE 37
+#define SCK        40
+#define MISO       39
+#define MOSI       38 
+#define EPD_CS     37
+#define EPD_DC     36
+#define SRAM_CS    35
+#define EPD_RESET  34  // can set to -1 and share with microcontroller Reset!
+#define EPD_BUSY   33 // can set to -1 to not use a pin (will wait a fixed delay)
+#define EPD_ENABLE 32
 
 EPD_4 epd(EPD_BUSY, EPD_RESET, EPD_DC, EPD_CS, MOSI, MISO, SCK, false);
 void epd_flush( lv_disp_drv_t*, const lv_area_t*, lv_color_t* ); //Memory update function
@@ -140,7 +140,6 @@ char icm_activity;
 unsigned long icm_steps;
 
 Adafruit_GPS PA1010D(&Wire);
-uint32_t timer = millis();
 
 typedef enum
 {
@@ -451,8 +450,6 @@ lv_obj_t* battery_label;
 lv_obj_t* status_above;
 lv_obj_t* icon_bar;
 
-const char* days[7] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"};
-
 void time_label_updater_timer(lv_timer_t* timer)
 {
   char timeBuf[10];
@@ -462,13 +459,31 @@ void time_label_updater_timer(lv_timer_t* timer)
     lv_label_set_text(time_label, timeBuf);
   }
 }
+
+char* zellersAlgorithm(int day, int month, int year){
+  char* days[7] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"};
+  int mon;
+  if(month > 2)
+    mon = month; //for march to december month code is same as month
+  else{
+    mon = (12+month); //for Jan and Feb, month code will be 13 and 14
+    year--; //decrease year for month Jan and Feb
+  }
+  int y = year % 100; //last two digit
+  int c = year / 100; //first two digit
+  int w = (day + floor((13*(mon+1))/5) + y + floor(y/4) + floor(c/4) + (5*c));
+  w = w % 7;
+  return days[w];
+}
+
 void date_label_update_timer(lv_timer_t* timer)
 {
-  char dateBuf[20];
+  char dateBuf[25];
   uint8_t d = PA1010D.day;
   uint8_t m = PA1010D.month;
   uint8_t y = PA1010D.year;
-  sprintf(dateBuf, "%.3s %02u", days[(d+=m < 3 ? y-- : y-2, 23*m/9+d+4+y/4-y/100+y/400)%7], d);
+  sprintf(dateBuf, "%.3s %02u", zellersAlgorithm(d, m, y), PA1010D.day);
+  SEGGER_RTT_WriteString(0, dateBuf);
   lv_label_set_text(date_label, dateBuf);
   if(!(dateBuf==lv_label_get_text(date_label)))
   {
@@ -665,10 +680,10 @@ static void guiTask(void *pvParameter)
   SEGGER_RTT_WriteString(0,  "Setup done" );
   rtc_config();
   init_watchface_scr(indev_lvgl);
-  lv_timer_create(time_label_updater_timer, 20000, NULL);
-  lv_timer_create(date_label_update_timer, 2.88e7, NULL);
+  lv_timer_create(time_label_updater_timer, 10000, NULL);
+  lv_timer_create(date_label_update_timer, 10000, NULL);
   lv_timer_create(steps_label_update_timer, 10000, NULL);
-  lv_timer_create(battery_label_update_timer, 600000, NULL);
+  lv_timer_create(battery_label_update_timer, 60000, NULL);
   init_home_scr(indev_lvgl);
   load_watchface(NULL);
 
@@ -745,9 +760,10 @@ static void getGPSData(void* pvParameters)
     if(pdTRUE==xSemaphoreTake(I2CSemaphore, portMAX_DELAY))
     {
       char c = PA1010D.read();
-      SEGGER_RTT_PutChar(0, c);
+      //SEGGER_RTT_PutChar(0, c);
       // if a sentence is received, we can check the checksum, parse it...
       if (PA1010D.newNMEAreceived()) {
+        SEGGER_RTT_WriteString(0, "NMEA Received\n");
         // a tricky thing here is if we print the NMEA sentence, or data
         // we end up not listening and catching other sentences!
         // so be very wary if using OUTPUT_ALLDATA and trying to print out data
@@ -948,6 +964,8 @@ void i2c_scan(){
 
 void setup()
 {
+  //hile(!Serial);
+  Serial.begin(115200);
   pinMode(PIN_BUTTON1, INPUT_PULLUP);
   pinMode(PIN_BUTTON2, INPUT_PULLUP);
   pinMode(PIN_BUTTON3, INPUT_PULLUP);
@@ -974,7 +992,7 @@ void setup()
   SEGGER_RTT_WriteString(0, "Init ICM-20948\n");
   PA1010D.begin(0x10);
   PA1010D.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
-  PA1010D.sendCommand(PMTK_SET_NMEA_UPDATE_2HZ);
+  PA1010D.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
   PA1010D.sendCommand(PGCMD_ANTENNA);
   delay(1000);
   PA1010D.println(PMTK_Q_RELEASE);

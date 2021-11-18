@@ -259,6 +259,7 @@ void EPD_4::Sleep(void)
 /**
  *   Takes in hex 2-bit colour pattern and turns the entire screen that colour. 
  *   Note: Uses Full refresh!
+ *   Note: Dark Gray and Light Gray ignored if display not in GRAY mode!
  * @param  color Hex char - 0x00 = Black, 0x02 = Dark Gray, 0x01 = Light Gray, 0x03 = White
  * 
  */  
@@ -268,16 +269,19 @@ void EPD_4::BlanketBomb(unsigned char color)
   SendCommand(WRITE_RAM_1);
   for (int j = 0; j < 200; j++) {
     for (int i = 0; i < 200 / 8; i++) {
-      SendData(color<<1);
+      SendData(color>>1);
     }
   }
-  SetMemoryWindow(0, 0, 199, 199);
-  SendCommand(WRITE_RAM_2);
-  for (int j = 0; j < 200; j++) {
-    for (int i = 0; i < 200 / 8; i++) {
-      SendData(color&0x01);
-      //This bitwise operation will set the second bit to zero, and leave the first bit
-      //if it is 1.
+  if(_gray)
+  {
+    SetMemoryWindow(0, 0, 199, 199);
+    SendCommand(WRITE_RAM_2);
+    for (int j = 0; j < 200; j++) {
+      for (int i = 0; i < 200 / 8; i++) {
+        SendData(color&0x01);
+        //This bitwise operation will set the second bit to zero, and leave the first bit
+        //if it is 1.
+      }
     }
   }
   SendCommand(DISPLAY_UPDATE_CONTROL_2); //Display Update Control
