@@ -19,6 +19,10 @@
 
 #define EPD_WIDTH 200
 #define EPD_HEIGHT 200
+#define EPD_WHITE 0xFFFF
+#define EPD_BLACK 0x0000
+#define EPD_LGRAY 0x00FF
+#define EPD_DGRAY 0xFF00
 
 //EPD COMMAND TABLE - taken from SSD1681 datasheet
 #define DRIVER_OUTPUT_CONTROL           0x01
@@ -92,7 +96,7 @@ public:
         int image_width,
         int image_height
     );
-    void BlanketBomb(unsigned char color);
+    void BlanketBomb(uint16_t);
     void FullUpdate(void);
     void PartUpdate(void);
     void Sleep(void);

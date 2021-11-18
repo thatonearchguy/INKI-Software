@@ -461,7 +461,7 @@ void time_label_updater_timer(lv_timer_t* timer)
 }
 
 char* zellersAlgorithm(int day, int month, int year){
-  char* days[7] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"};
+  char* days[7] = {"SATURDAY", "SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"};
   int mon;
   if(month > 2)
     mon = month; //for march to december month code is same as month
@@ -482,7 +482,7 @@ void date_label_update_timer(lv_timer_t* timer)
   uint8_t d = PA1010D.day;
   uint8_t m = PA1010D.month;
   uint8_t y = PA1010D.year;
-  sprintf(dateBuf, "%.3s %02u", zellersAlgorithm(d, m, y), PA1010D.day);
+  sprintf(dateBuf, "%.3s %02u", zellersAlgorithm(d, m, y), d);
   SEGGER_RTT_WriteString(0, dateBuf);
   lv_label_set_text(date_label, dateBuf);
   if(!(dateBuf==lv_label_get_text(date_label)))
@@ -630,9 +630,9 @@ static void guiTask(void *pvParameter)
     return;
   }
   SEGGER_RTT_WriteString(0, "e-Paper init\n");
-  epd.BlanketBomb(0x00);
+  epd.BlanketBomb(EPD_BLACK);
   //epd.FullUpdate(); WRONG FUNCTION - CALLS ISR HANDLER, BUSY WAIT REQUIRED HERE!
-  epd.BlanketBomb(0xFF);
+  epd.BlanketBomb(EPD_WHITE);
   //epd.FullUpdate();
   //epd.SetLut(lut_partial_update); unnecessary, as LUT for partial is built into SSD1681
   digitalWrite(PIN_LED3, LOW);
@@ -684,6 +684,7 @@ static void guiTask(void *pvParameter)
   lv_timer_create(date_label_update_timer, 10000, NULL);
   lv_timer_create(steps_label_update_timer, 10000, NULL);
   lv_timer_create(battery_label_update_timer, 60000, NULL);
+  delay(500);
   init_home_scr(indev_lvgl);
   load_watchface(NULL);
 

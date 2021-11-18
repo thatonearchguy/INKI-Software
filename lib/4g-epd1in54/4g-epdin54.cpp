@@ -263,22 +263,26 @@ void EPD_4::Sleep(void)
  * @param  color Hex char - 0x00 = Black, 0x02 = Dark Gray, 0x01 = Light Gray, 0x03 = White
  * 
  */  
-void EPD_4::BlanketBomb(unsigned char color)
+void EPD_4::BlanketBomb(uint16_t color)
 {
   SetMemoryWindow(0, 0, 199, 199);
   SendCommand(WRITE_RAM_1);
+  uint16_t twobyte1 = (color>>8);
+  uint8_t ram1repeat = twobyte1;
   for (int j = 0; j < 200; j++) {
     for (int i = 0; i < 200 / 8; i++) {
-      SendData(color>>1);
+      SendData(ram1repeat);
     }
   }
   if(_gray)
   {
+    uint16_t twobyte2 = (color<<8)>>8;
+    uint8_t ram2repeat = twobyte2;
     SetMemoryWindow(0, 0, 199, 199);
     SendCommand(WRITE_RAM_2);
     for (int j = 0; j < 200; j++) {
       for (int i = 0; i < 200 / 8; i++) {
-        SendData(color&0x01);
+        SendData(ram2repeat);
         //This bitwise operation will set the second bit to zero, and leave the first bit
         //if it is 1.
       }
