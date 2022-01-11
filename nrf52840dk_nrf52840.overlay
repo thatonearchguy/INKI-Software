@@ -1,0 +1,96 @@
+/delete-node/ &slot1_partition;
+/delete-node/ &scratch_partition;
+/delete-node/ &storage_partition;
+
+/ {
+	fstab {
+		compatible = "zephyr,fstab";
+		lfs1: lfs1 {
+			compatible = "zephyr,fstab,littlefs";
+			mount-point = "/int";
+			partition = <&lfs1_part>;
+			automount;
+			read-size = <16>;
+			prog-size = <16>;
+			cache-size = <64>;
+			lookahead-size = <32>;
+			block-cycles = <512>;
+		};
+        lfs2: lfs2 {
+			compatible = "zephyr,fstab,littlefs";
+			mount-point = "/ext";
+			partition = <&lfs2_part>;
+			automount;
+			read-size = <16>;
+			prog-size = <16>;
+			cache-size = <64>;
+			lookahead-size = <32>;
+			block-cycles = <512>;
+		};
+	};
+};
+
+
+&flash0 {
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x000000000 0x0000C000>;
+		};
+		slot0_partition: partition@c000 {
+			label = "image-0";
+			reg = <0x0000C000 0x000B5960>;
+		};
+		scratch_partition: partition@c1960 {
+			label = "override-scratch";
+			reg = <0x000c1960 0x0001e000>;
+		};
+
+		/*
+		 * The flash starting at 0x000f8000 and ending at
+		 * 0x000fffff is reserved for use by the application.
+		 */
+
+		/*
+		 * Storage partition will be used by FCB/LittleFS/NVS
+		 * if enabled.
+		 */
+		lfs1_part: partition@df960 {
+			label = "int_storage";
+			reg = <0x000df960 0x000206A0>;
+		};
+	};
+};
+
+&mx25r64 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+        slot1_partition: partition@0 {
+            label = "flash-image-1";
+			reg = <0x000000000 0x000B5960>;
+        };
+        lfs2_part: partition@b5960 {
+            label = "ext_storage";
+            reg = <0x000B5960 0x03F4A6A0>;
+        };
+    };
+};
+
+&spi3 {
+	status = "okay";
+	cs-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+	sdhc0: sdhc@0 {
+		compatible = "zephyr,mmc-spi-slot";
+		reg = <0>;
+		status = "okay";
+		label = "SDHC0";
+		spi-max-frequency = <24000000>;
+	};
+};
