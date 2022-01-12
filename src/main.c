@@ -19,14 +19,25 @@
 
 
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
-INT_FLASH_DEFINE(inki_int);
-EXT_FLASH_DEFINE(inki_ext);
+INT_FLASH_DEFINE(inki_flash);
+INT_QSPIFLASH_DEFINE(inki_qflash);
+
+static struct baseDisk* inki_flash_ptr = (struct baseDisk *)&inki_flash;
+static struct baseDisk* inki_qflash_ptr = (struct baseDisk *)&inki_qflash;
+
 
 void main(void)
 {
 	LOG_INF("Reached main.c");
 	LOG_INF("Initialising internal flash");
-	//INKI.vtable->init(&INKI, "/int", 3);
-	
-	
+	intFlash_setup(&inki_flash);
+	intQSPIFlash_setup(&inki_qflash);
+
+	base_init(inki_flash_ptr, NULL);	
+	base_init(inki_qflash_ptr, NULL);	
+
+	//TODO NEXT - TEST AND DEBUG DISK API.
+
+
+
 }
