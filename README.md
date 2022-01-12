@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/thatonearchguy/INKI-Software/devel/art/INKI.gif?token=AQAJB2RGNWGSEYRCZWIL5ALBK54I2" />
+  <img src="https://raw.githubusercontent.com/thatonearchguy/INKI-Software/zephyr/art/INKI.gif?token=GHSAT0AAAAAABQJV74XUJWJG2CDJ4EBXHQ2YPH2ITQ" />
 </p>
 
 ## What is INKI? :thought_balloon:
