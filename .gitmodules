@@ -1,6 +1,6 @@
 [submodule "lvgl"]
 	path = lvgl
-	url = https://github.com/lvgl/lvgl.git
+	url = https://github.com/thatonearchguy/lvgl.git
 [submodule "wasm-micro-runtime"]
 	path = wasm
 	url = https://github.com/bytecodealliance/wasm-micro-runtime
