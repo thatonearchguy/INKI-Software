@@ -11,9 +11,9 @@
 
 LOG_LEVEL_SET(LOG_LEVEL_INF);
 
-int base_init(struct baseDisk *b, char* label, int type)
+int base_init(struct baseDisk *b, char* label)
 {
-	int retcode = b->vtable->init(b, label, type);
+	int retcode = b->vtable->init(b, label);
 	LOG_INST_INF(b->log, "Initialised."); //ignore Z_FOR_LOOP_1 - Intellisense is confused
 	return retcode;
 }
@@ -40,7 +40,7 @@ int intFlash_deinit(struct intFlash *i)
 	return rc;
 }
 
-int intFlash_init(struct intFlash *i, char* label, int type)
+int intFlash_init(struct intFlash *i, char* label)
 {
 	int rc;
 	LOG_INST_INF(i->super.log, "Initialising lfs internal flash");
@@ -92,16 +92,16 @@ int intFlash_init(struct intFlash *i, char* label, int type)
 
 struct baseDisk_vtable intFlash_vtable = 
 {
-	(int (*)(void *, char *, int))&intFlash_init,
+	(int (*)(void *, char *))&intFlash_init,
 	(int (*)(void *))&intFlash_deinit,
 };
 
-void intFlash_setup(struct intFlash *i, char* label, int type)
+void intFlash_setup(struct intFlash *i)
 {
 	i->super.vtable = &intFlash_vtable;
 }
 
-int intQSPIFlash_init(struct intQSPIFlash *q, char* label, int type)
+int intQSPIFlash_init(struct intQSPIFlash *q, char* label)
 {
 	int rc;
 	LOG_INST_INF(q->super.log, "Initialising lfs QSPI internal flash");
@@ -170,11 +170,11 @@ int intQSPIFlash_deinit(struct intQSPIFlash *q)
 
 struct baseDisk_vtable intQSPIFlash_vtable = 
 {
-	(int (*)(void *, char *, int))&intQSPIFlash_init,
+	(int (*)(void *, char *))&intQSPIFlash_init,
 	(int (*)(void *))&intQSPIFlash_deinit,
 };
 
-void intQSPIFlash_setup(struct intQSPIFlash *q, char* label, int type)
+void intQSPIFlash_setup(struct intQSPIFlash *q)
 {
 	q->super.vtable = &intQSPIFlash_vtable;
 }
@@ -196,7 +196,7 @@ bool check(char* arr[], char* val)
 
 //Must use drive-names specified in _VOLUME_STRS, otherwise 
 //function will return ENOTDIR (20)
-int extSPIFlash_init(struct extSPIFlash *e, char* label, int type)
+int extSPIFlash_init(struct extSPIFlash *e, char* label)
 {
 	int rc;
 	char* mountpath;
@@ -267,11 +267,11 @@ int extSPIFlash_deinit(struct extSPIFlash *e)
 
 struct baseDisk_vtable extSPIFlash_vtable = 
 {
-	(int (*)(void *, char *, int))&intQSPIFlash_init,
+	(int (*)(void *, char *))&intQSPIFlash_init,
 	(int (*)(void *))&intQSPIFlash_deinit,
 };
 
-void extSPIFlash_setup(struct extSPIFlash *e, char* label, int type)
+void extSPIFlash_setup(struct extSPIFlash *e)
 {
 	e->super.vtable = &extSPIFlash_vtable;
 }

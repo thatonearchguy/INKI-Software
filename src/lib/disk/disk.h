@@ -11,6 +11,7 @@
 #include <storage/flash_map.h> //TODO - Find out whether this is required
 #include <logging/log_instance.h>
 #include <stdio.h>
+#include <kernel.h>
 
 #ifndef INKI_DISK_API
 #define INKI_DISK_API
@@ -42,7 +43,7 @@
 
 struct baseDisk_vtable
 {
-    int (*init)(void *self, char* label, int type);
+    int (*init)(void *self, char* label);
     int (*deinit)(void *self);
 };
 
@@ -64,7 +65,7 @@ struct baseDisk _name = {  \
 }   
                                                             
 
-int base_init(struct baseDisk *b, char* label, int type);
+int base_init(struct baseDisk *b, char* label);
 int base_deinit(struct baseDisk *b);
 
 
@@ -80,8 +81,9 @@ struct intFlash _name = { \
     .super LOG_INSTANCE_PTR_INIT(log, INTFLASH_NAME, _name)    \
 };
 
-int intFlash_init(struct intFlash *i, char* label, int type);
+int intFlash_init(struct intFlash *i, char* label);
 int intFlash_deinit(struct intFlash *i);
+void intFlash_setup(struct intFlash *i);
 
 
 struct intQSPIFlash
@@ -99,8 +101,10 @@ struct intQSPIFlash _name = {  \
                                                              
 
 
-int intQSPIFlash_init(struct intQSPIFlash *q, char* label, int type);
+int intQSPIFlash_init(struct intQSPIFlash *q, char* label);
 int intQSPIFlash_deinit(struct intQSPIFlash *q);
+void intQSPIFlash_setup(struct intQSPIFlash *q);
+
 
 struct extSPIFlash
 {
@@ -119,8 +123,9 @@ struct extSPIFlash _name = {  \
 };  
 
 
-int extSPIFlash_init(struct extSPIFlash *e, char* label, int type);
+int extSPIFlash_init(struct extSPIFlash *e, char* label);
 int extSPIFlash_deinit(struct extSPIFlash *e);
+void extSPIFlash_setup(struct extSPIFlash *e);
 
 
 #endif
