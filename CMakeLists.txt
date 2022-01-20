@@ -36,4 +36,8 @@ target_sources(app PRIVATE ${app_sources})
 file(GLOB_RECURSE disk_lib src/lib/*/*.c src/lib/*/*.h)
 target_sources(app PRIVATE ${disk_lib})
 
+list(APPEND ZEPHYR_EXTRA_MODULES
+  ${CMAKE_CURRENT_SOURCE_DIR}/lib/display
+)
+
 target_link_libraries(app PUBLIC lvgl -lgcc)

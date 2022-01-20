@@ -60,9 +60,9 @@
 		 * Storage partition will be used by FCB/LittleFS/NVS
 		 * if enabled.
 		 */
-		lfs1_part: partition@df960 {
+		lfs1_part: partition@e0000 {
 			label = "int_storage";
-			reg = <0x000df960 0x000206A0>;
+			reg = <0x000e0000 0x00020000>;
 		};
 	};
 };
@@ -74,11 +74,11 @@
         #size-cells = <1>;
         slot1_partition: partition@0 {
             label = "flash-image-1";
-			reg = <0x000000000 0x000B5960>;
+			reg = <0x000000000 0x000B6000>;
         };
-        lfs2_part: partition@b5960 {
+        lfs2_part: partition@b6000 {
             label = "ext_storage";
-            reg = <0x000B5960 0x03F4A6A0>;
+            reg = <0x000B6000 0x03F4A000>;
         };
     };
 };
@@ -86,11 +86,40 @@
 &spi3 {
 	status = "okay";
 	cs-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+	sck-pin = <44>;
+    miso-pin = <46>;
+    mosi-pin = <45>;
 	sdhc0: sdhc@0 {
 		compatible = "zephyr,mmc-spi-slot";
 		reg = <0>;
 		status = "okay";
 		label = "SDHC0";
 		spi-max-frequency = <24000000>;
+	};
+};
+
+&spi2 {
+	status = "okay";
+	compatible = "nordic,nrf-spim";
+	sck-pin = <35>;
+	mosi-pin = <36>;
+	miso-pin = <37>;
+	inki,ssd16xxfb@0 {
+		compatible = "inki,ssd16xxfb";
+		pp-height-bits = <16>;
+		pp-width-bits = <8>;
+		gdv = [00];
+		sdv = [41 a8 32];
+		vcom = <0x00>;
+		border-waveform = <0x05>;
+		reset-gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;	
+		busy-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+		tssv = <0x80>;
+		height = <200>;
+		width = <200>;
+		dc-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
+		label = "GDEH0154D67";
+		spi-max-frequency = <4000000>;
+		reg = <0>;
 	};
 };
