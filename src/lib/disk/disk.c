@@ -6,7 +6,27 @@
 
 #include "disk.h"
 
-#define INT_FSTAB_PARTITION_NODE DT_NODELABEL(lfs1)
+//HORRIBLE HACK, I HATE PARTITION MANAGER!!!!!!!!! WON'T LET ME DEFINE MY PARTITIONS HOW I WANT THEM IN MY OWN 
+//FREAKING DTS AAAAAAAAAAAAAAAAAAAAAAAAAAA
+FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(littlefs_storage);
+static struct fs_mount_t int_storage_mnt = {
+	.type = FS_LITTLEFS,
+	.fs_data = &littlefs_storage,
+	.storage_dev = (void *)FLASH_AREA_ID(littlefs_storage),
+	.mnt_point = "/int",
+};
+
+FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(ext_storage);
+static struct fs_mount_t ext_storage_mnt = {
+	.type = FS_LITTLEFS,
+	.fs_data = &ext_storage,
+	.storage_dev = (void *)FLASH_AREA_ID(ext_storage),
+	.mnt_point = "/ext",
+};
+
+//This method is better as I have more direct control over the hardware, while automounting is cool and convenient it works
+//terribly with a custom defined pm_static.yml file!! All the addresses and partitions are swapped and messed up!!
+
 #define EXT_FSTAB_PARTITION_NODE DT_NODELABEL(lfs2)
 
 LOG_LEVEL_SET(LOG_LEVEL_INF);
@@ -44,41 +64,42 @@ int intFlash_init(struct intFlash *i, char* label)
 {
 	int rc;
 	LOG_INST_INF(i->super.log, "Initialising lfs internal flash");
-	if(DT_NODE_EXISTS(INT_FSTAB_PARTITION_NODE)==1)
+	i->super.mnt_p = &int_storage_mnt;
+	i->super.id = (uintptr_t)i->super.mnt_p->storage_dev;
+	rc = flash_area_open(i->super.id, &i->pfa);
+	if(rc < 0)
 	{
-		FS_FSTAB_DECLARE_ENTRY(INT_FSTAB_PARTITION_NODE);
-		i->super.mnt_p = &FS_FSTAB_ENTRY(INT_FSTAB_PARTITION_NODE);
-		LOG_INST_INF(i->super.log, "Internal flash FSTAB reference found");
-		i->super.id = (uintptr_t)i->super.mnt_p->storage_dev;
-		rc = flash_area_open(i->super.id, &i->pfa);
-		if(rc < 0)
-		{
-			LOG_INST_ERR(i->super.log, "FAILED: Could not find flash area %u: %d\n", i->super.id, rc);
-			return rc;
-		}
-		else
-		{
-			LOG_INST_INF(i->super.log, "Area %u at 0x%x on %s for %u bytes", i->super.id, (unsigned int)i->pfa->fa_off, i->pfa->fa_dev_name, (unsigned int)i->pfa->fa_size);
-			if (IS_ENABLED(CONFIG_APP_INT_WIPE_STORAGE))
-			{
-				LOG_INST_WRN(i->super.log, "Erasing flash area ...");
-				rc = flash_area_erase(i->pfa, 0, i->pfa->fa_size);
-				LOG_INST_WRN(i->super.log, "Code: %d", rc);
-			}
-			flash_area_close(i->pfa);
-		}
-		const char* mountpoint = (char*) k_malloc(10);
-		rc = fs_readmount((int*)i->super.mnt_p->mnt_point, &mountpoint);
-		if(mountpoint==NULL || rc == ENOENT)
-		{
-			LOG_INST_ERR(i->super.log, "FAILED: Could not mount id %u at %s: %d", (unsigned int)i->super.mnt_p->storage_dev, i->super.mnt_p->mnt_point, rc);
-		}
-		LOG_INST_INF(i->super.log, "%s automount successful!", i->super.mnt_p->mnt_point);
-		k_free((char*)mountpoint);
+		LOG_INST_ERR(i->super.log, "FAILED: Could not find flash area %u: %d", i->super.id, rc);
+		return rc;
 	}
 	else
 	{
-		return -1; /* //internal flash MUST be in FSTAB!! NO EXCEPTIONS!!
+		LOG_INST_INF(i->super.log, "Area %u at 0x%x on %s for %u bytes", i->super.id, (unsigned int)i->pfa->fa_off, i->pfa->fa_dev_name, (unsigned int)i->pfa->fa_size);
+		if (IS_ENABLED(CONFIG_APP_INT_WIPE_STORAGE))
+		{
+			LOG_INST_WRN(i->super.log, "Erasing flash area ...");
+			rc = flash_area_erase(i->pfa, 0, i->pfa->fa_size);
+			LOG_INST_WRN(i->super.log, "Code: %d", rc);
+		}
+		flash_area_close(i->pfa);
+	}
+	LOG_INST_INF(i->super.log, "Attempting to mount id %u at %s", (unsigned int)i->super.mnt_p->storage_dev, i->super.mnt_p->mnt_point);
+	rc = fs_mount(i->super.mnt_p);
+	if (rc < 0) {
+		LOG_INST_ERR(i->super.log, "FAIL: mount id %u at %s: %d",
+		       (unsigned int)i->super.mnt_p->storage_dev, i->super.mnt_p->mnt_point,
+		       rc);
+		return rc;
+	}
+	LOG_INST_INF(i->super.log, "%s mounted: %d!", i->super.mnt_p->mnt_point, rc);
+	rc = fs_register(FS_LITTLEFS, i->super.mnt_p->fs);
+	if (rc < 0) {
+		LOG_INST_ERR(i->super.log, "FAIL: register id %u at %s: %d",
+		       (unsigned int)i->super.mnt_p->storage_dev, i->super.mnt_p->mnt_point,
+		       rc);
+		return rc;
+	}
+	/* //internal flash MUST be in FSTAB!! NO EXCEPTIONS!!
 			Thinking ahead to newer models and revisions, possibly even
 			different architectures and eventual end products, everything
 			must be extensified using devicetree tables to keep consistency.
@@ -86,7 +107,6 @@ int intFlash_init(struct intFlash *i, char* label)
 			will result in significant issues while debugging later revisions
 			with the same library!
 		*/
-	}
 	return 0;
 }
 
@@ -104,42 +124,43 @@ void intFlash_setup(struct intFlash *i)
 int intQSPIFlash_init(struct intQSPIFlash *q, char* label)
 {
 	int rc;
-	LOG_INST_INF(q->super.log, "Initialising lfs QSPI internal flash");
-	if(DT_NODE_EXISTS(EXT_FSTAB_PARTITION_NODE)==1)
+	LOG_INST_INF(q->super.log, "Initialising lfs internal flash");
+	q->super.mnt_p = &ext_storage_mnt;
+	q->super.id = (uintptr_t)q->super.mnt_p->storage_dev;
+	rc = flash_area_open(q->super.id, &q->pfa);
+	if(rc < 0)
 	{
-		FS_FSTAB_DECLARE_ENTRY(EXT_FSTAB_PARTITION_NODE);
-		q->super.mnt_p = &FS_FSTAB_ENTRY(EXT_FSTAB_PARTITION_NODE);
-		LOG_INST_INF(q->super.log, "Internal QSPI flash FSTAB reference found");
-		q->super.id = (uintptr_t)q->super.mnt_p->storage_dev;
-		rc = flash_area_open(q->super.id, &q->pfa);
-		if(rc < 0)
-		{
-			LOG_INST_ERR(q->super.log, "FAILED: Could not find flash area %u: %d\n", q->super.id, rc);
-			return rc;
-		}
-		else
-		{
-			LOG_INST_INF(q->super.log, "Area %u at 0x%x on %s for %u bytes", q->super.id, (unsigned int)q->pfa->fa_off, q->pfa->fa_dev_name, (unsigned int)q->pfa->fa_size);
-			if (IS_ENABLED(CONFIG_APP_EXT_WIPE_STORAGE))
-			{
-				LOG_INST_WRN(q->super.log, "Erasing flash area ...");
-				rc = flash_area_erase(q->pfa, 0, q->pfa->fa_size);
-				LOG_INST_WRN(q->super.log, "Code: %d", rc);
-			}
-			flash_area_close(q->pfa);
-		}
-		const char* mountpoint = (char*) k_malloc(10);
-		rc = fs_readmount((int*)q->super.mnt_p->mnt_point, &mountpoint);
-		if(mountpoint==NULL || rc == ENOENT)
-		{
-			LOG_INST_ERR(q->super.log, "FAILED: Could not mount id %u at %s: %d", (unsigned int)q->super.mnt_p->storage_dev, q->super.mnt_p->mnt_point, rc);
-		}
-		LOG_INST_INF(q->super.log, "%s automount successful!", q->super.mnt_p->mnt_point);
-		k_free((char*)mountpoint);
+		LOG_INST_ERR(q->super.log, "FAILED: Could not find flash area %u: %d", q->super.id, rc);
+		return rc;
 	}
 	else
 	{
-		return -1; /* //internal flash MUST be in FSTAB!! NO EXCEPTIONS!!
+		LOG_INST_INF(q->super.log, "Area %u at 0x%x on %s for %u bytes", q->super.id, (unsigned int)q->pfa->fa_off, q->pfa->fa_dev_name, (unsigned int)q->pfa->fa_size);
+		if (IS_ENABLED(CONFIG_APP_EXT_WIPE_STORAGE))
+		{
+			LOG_INST_WRN(q->super.log, "Erasing flash area ...");
+			rc = flash_area_erase(q->pfa, 0, q->pfa->fa_size);
+			LOG_INST_WRN(q->super.log, "Code: %d", rc);
+		}
+		flash_area_close(q->pfa);
+	}
+	LOG_INST_INF(q->super.log, "Attempting to mount id %u at %s", (unsigned int)q->super.mnt_p->storage_dev, q->super.mnt_p->mnt_point);
+	rc = fs_mount(q->super.mnt_p);
+	if (rc < 0) {
+		LOG_INST_ERR(q->super.log, "FAIL: mount id %u at %s: %d",
+		       (unsigned int)q->super.mnt_p->storage_dev, q->super.mnt_p->mnt_point,
+		       rc);
+		return rc;
+	}
+	LOG_INST_INF(q->super.log, "%s mounted: %d!", q->super.mnt_p->mnt_point, rc);
+	rc = fs_register(FS_LITTLEFS, q->super.mnt_p->fs);
+	if (rc < 0) {
+		LOG_INST_ERR(q->super.log, "FAIL: register id %u at %s: %d",
+		       (unsigned int)q->super.mnt_p->storage_dev, q->super.mnt_p->mnt_point,
+		       rc);
+		return rc;
+	}
+	/* //internal flash MUST be in FSTAB!! NO EXCEPTIONS!!
 			Thinking ahead to newer models and revisions, possibly even
 			different architectures and eventual end products, everything
 			must be extensified using devicetree tables to keep consistency.
@@ -147,7 +168,6 @@ int intQSPIFlash_init(struct intQSPIFlash *q, char* label)
 			will result in significant issues while debugging later revisions
 			with the same library!
 		*/
-	}
 	return 0;
 
 }

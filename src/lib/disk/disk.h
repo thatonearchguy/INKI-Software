@@ -8,10 +8,12 @@
 #include <fs/littlefs.h>
 #include <ff.h>
 #include <storage/disk_access.h>
-#include <storage/flash_map.h> //TODO - Find out whether this is required
+#include <storage/flash_map.h> //TODO DONE -> YES IT IS REQUIRED
 #include <logging/log_instance.h>
+#include <logging/log.h>
 #include <stdio.h>
 #include <kernel.h>
+#include <string.h>
 
 #ifndef INKI_DISK_API
 #define INKI_DISK_API
@@ -22,7 +24,7 @@
 #define TYPE_EXTERNAL_SPI_FLASH 3
 #define TYPE_EXTERNAL_USB_FAT 4 //LONG TERM TODO
 #define TYPE_EXTERNAL_USB_NTFS 5 //LONG TERM TODO (after production probably!!)
-
+#define FS_MOUNT_FLAG_USE_DISK_ACCESS 1
 //*************************************************************************************************************************************************
 //Straight C POLYMORPHISM GO BRRRRRRRRR (no access protection though without opaque pointers, which are pointless 
 //because I want to allow 3rd party devs and myself to manipulate the Zephyr FileSystem (FS) structs directly for full access over the hardware.)
