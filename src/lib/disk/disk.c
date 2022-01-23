@@ -71,9 +71,9 @@ int intFlash_init(struct intFlash *i, char* label)
 		rc = fs_readmount((int*)i->super.mnt_p->mnt_point, &mountpoint);
 		if(mountpoint==NULL || rc == ENOENT)
 		{
-			LOG_INST_ERR(i->super.log, "FAILED: Could not mount id %u at %s: %d", (unsigned int)i->super.mnt_p->storage_dev, i->super.mnt_p->mnt_point, rc);
+			LOG_INST_ERR(i->super.log, "id %u at %s: %d not registered", (unsigned int)i->super.mnt_p->storage_dev, i->super.mnt_p->mnt_point, rc);
 		}
-		LOG_INST_INF(i->super.log, "%s automount successful!", i->super.mnt_p->mnt_point);
+		LOG_INST_INF(i->super.log, "%s automount probably successful!", i->super.mnt_p->mnt_point);
 		k_free((char*)mountpoint);
 	}
 	else
@@ -132,9 +132,9 @@ int intQSPIFlash_init(struct intQSPIFlash *q, char* label)
 		rc = fs_readmount((int*)q->super.mnt_p->mnt_point, &mountpoint);
 		if(mountpoint==NULL || rc == ENOENT)
 		{
-			LOG_INST_ERR(q->super.log, "FAILED: Could not mount id %u at %s: %d", (unsigned int)q->super.mnt_p->storage_dev, q->super.mnt_p->mnt_point, rc);
+			LOG_INST_WRN(q->super.log, "id %u at %s: %d not registered", (unsigned int)q->super.mnt_p->storage_dev, q->super.mnt_p->mnt_point, rc);
 		}
-		LOG_INST_INF(q->super.log, "%s automount successful!", q->super.mnt_p->mnt_point);
+		LOG_INST_INF(q->super.log, "%s automount probably successful!", q->super.mnt_p->mnt_point);
 		k_free((char*)mountpoint);
 	}
 	else

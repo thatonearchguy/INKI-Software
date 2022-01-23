@@ -10,8 +10,10 @@
 #include <storage/disk_access.h>
 #include <storage/flash_map.h> //TODO - Find out whether this is required
 #include <logging/log_instance.h>
+#include <logging/log.h>
 #include <stdio.h>
 #include <kernel.h>
+#include <string.h>
 
 #ifndef INKI_DISK_API
 #define INKI_DISK_API
