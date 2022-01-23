@@ -4,4 +4,4 @@
 build:
   name: inki_display
   cmake: .
-  kconfig: Kconfig
+  kconfig: ./Kconfig

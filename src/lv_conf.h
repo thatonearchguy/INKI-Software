@@ -419,7 +419,7 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
 /*-----------
  * Widgets
  *----------*/
-#define LV_USE_CALENDAR     1
+#define LV_USE_CALENDAR     0
 #if LV_USE_CALENDAR
 # define LV_CALENDAR_WEEK_STARTS_MONDAY 0
 # if LV_CALENDAR_WEEK_STARTS_MONDAY
@@ -437,11 +437,11 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
 
 #define LV_USE_COLORWHEEL   0
 
-#define LV_USE_IMGBTN       1
+#define LV_USE_IMGBTN       0
 
 #define LV_USE_KEYBOARD     0
 
-#define LV_USE_LED          1
+#define LV_USE_LED          0
 
 #define LV_USE_LIST         1
 
@@ -476,7 +476,7 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
 # define LV_THEME_DEFAULT_DARK     0
 
 /*1: Enable grow on press*/
-# define LV_THEME_DEFAULT_GROW              1
+# define LV_THEME_DEFAULT_GROW              0
 
 /*Default transition time in [ms]*/
 # define LV_THEME_DEFAULT_TRANSITON_TIME    80

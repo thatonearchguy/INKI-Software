@@ -1,6 +1,14 @@
 /delete-node/ &slot1_partition;
 /delete-node/ &scratch_partition;
 /delete-node/ &storage_partition;
+/delete-node/ &slot0_partition;
+
+/ {
+	chosen {
+		nordic,pm-ext-flash = &mx25r64;
+	};
+};
+
 
 / {
 	fstab {
@@ -9,7 +17,6 @@
 			compatible = "zephyr,fstab,littlefs";
 			mount-point = "/int";
 			partition = <&lfs1_part>;
-			automount;
 			read-size = <16>;
 			prog-size = <16>;
 			cache-size = <64>;
@@ -20,7 +27,6 @@
 			compatible = "zephyr,fstab,littlefs";
 			mount-point = "/ext";
 			partition = <&lfs2_part>;
-			automount;
 			read-size = <16>;
 			prog-size = <16>;
 			cache-size = <64>;
@@ -40,29 +46,23 @@
 
 		boot_partition: partition@0 {
 			label = "mcuboot";
-			reg = <0x000000000 0x0000C000>;
+			reg = <0x00000000 0x00010000>;
 		};
-		slot0_partition: partition@c000 {
+		mcuboot_pad: partition@10000 {
+			label = "mcuboot-pad";
+			reg = <0x00010000 0x00001000>;
+		};
+		slot0_partition: partition@11000 {
 			label = "image-0";
-			reg = <0x0000C000 0x000B5960>;
+			reg = <0x00011000 0x00080000>;
 		};
-		scratch_partition: partition@c1960 {
-			label = "override-scratch";
-			reg = <0x000c1960 0x0001e000>;
-		};
-
-		/*
-		 * The flash starting at 0x000f8000 and ending at
-		 * 0x000fffff is reserved for use by the application.
-		 */
-
 		/*
 		 * Storage partition will be used by FCB/LittleFS/NVS
 		 * if enabled.
 		 */
-		lfs1_part: partition@e0000 {
+		lfs1_part: partition@91000 {
 			label = "int_storage";
-			reg = <0x000e0000 0x00020000>;
+			reg = <0x00091000 0x0006F000>;
 		};
 	};
 };
@@ -72,13 +72,13 @@
         compatible = "fixed-partitions";
         #address-cells = <1>;
         #size-cells = <1>;
-        slot1_partition: partition@0 {
-            label = "flash-image-1";
-			reg = <0x000000000 0x000B6000>;
-        };
-        lfs2_part: partition@b6000 {
+		lfs2_part: partition@00000 {
             label = "ext_storage";
-            reg = <0x000B6000 0x03F4A000>;
+            reg = <0x00000000 0x00780000>;
+        };
+        slot1_partition: partition@780000 {
+            label = "flash-image-1";
+			reg = <0x00780000 0x0080000>;
         };
     };
 };
