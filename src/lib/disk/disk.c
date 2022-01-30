@@ -44,6 +44,62 @@ int base_deinit(struct baseDisk *b)
 	return retcode;
 }
 
+int base_get_file_path(struct baseDisk *b, const char* filename)
+{
+	LOG_INST_INF(b->log, "Finding file path");
+	int retcode = b->vtable->get_file_path(b, filename);
+	return retcode;
+}
+
+//TODO - Add this to disk api -> Yes shall do. Great idea. Should take an extension as well
+//so we can just do straight up strcmp without any strtok_r invocations.
+//Place the starting path inside the struct's fname, this function will set fname to the path if found, otherwise NULL. 
+//Function not defined in header, therefore technically encapsulated away!
+int base_find_file_from_path(struct baseDisk* b, const char* filename)
+{
+    struct fs_dir_t* dir;
+	fs_dir_t_init(dir);
+
+    static struct fs_dirent dirent;
+
+    if (fs_opendir(dir, b->fname) < 0)
+	{
+		return -ENOTDIR;
+	}
+    while (&dirent.name[0] != 0) {
+		if(fs_readdir(dir, &dirent) < 0)
+			break;
+		//This is safe because there can never be directories inside files on LittleFS.
+		//Would be unnecessary to set filepath back to original as this function is purely looking for FILES, not searching inside a zip for instance.
+		if(dirent.type == FS_DIR_ENTRY_FILE)
+		{
+			if(strcmp(&dirent.name[0], filename) == 0)
+			{
+				snprintf(b->fname, sizeof(b->fname), "%s/%s", b->fname, dirent.name);
+				LOG_INST_INF(b->log, "Found at %s, joe!", b->fname);
+				fs_closedir(dir);
+				return 1;
+			}
+		}
+		if(dirent.type == FS_DIR_ENTRY_DIR)
+		{
+			snprintf(b->fname, sizeof(b->fname), "%s/%s", b->fname, dirent.name);
+			LOG_INST_INF(b->log, "Going to %s", b->fname);
+			return base_find_file_from_path(b, filename);
+			fs_closedir(dir);
+		}
+    }
+	return 0;
+}
+
+int general_get_file_path(struct baseDisk *b, const char* filename)
+{
+	memset(b->fname, 0, MAX_FS_PATH_LENGTH);
+	snprintf(b->fname, sizeof(b->fname), "%s", b->mnt_p->mnt_point);
+	if(base_find_file_from_path(b, filename) == 1) return 1;
+	else return -ENFILE;
+}
+
 int intFlash_deinit(struct intFlash *i)
 {
 	int rc = 1;
@@ -114,6 +170,7 @@ struct baseDisk_vtable intFlash_vtable =
 {
 	(int (*)(void *, char *))&intFlash_init,
 	(int (*)(void *))&intFlash_deinit,
+	(int (*)(void *, const char *))&general_get_file_path,
 };
 
 void intFlash_setup(struct intFlash *i)
@@ -192,6 +249,7 @@ struct baseDisk_vtable intQSPIFlash_vtable =
 {
 	(int (*)(void *, char *))&intQSPIFlash_init,
 	(int (*)(void *))&intQSPIFlash_deinit,
+	(int (*)(void *, const char *))&general_get_file_path,
 };
 
 void intQSPIFlash_setup(struct intQSPIFlash *q)
@@ -201,6 +259,7 @@ void intQSPIFlash_setup(struct intQSPIFlash *q)
 
 //https://stackoverflow.com/questions/25661925/quickly-find-whether-a-value-is-present-in-a-c-array 
 //One-branch instruction optimised linear search (modified)
+//Again technically encapsulated away as not exposed in header file.
 bool check(char* arr[], char* val)
 {
     uint16_t i;
@@ -289,6 +348,7 @@ struct baseDisk_vtable extSPIFlash_vtable =
 {
 	(int (*)(void *, char *))&intQSPIFlash_init,
 	(int (*)(void *))&intQSPIFlash_deinit,
+	(int (*)(void *, const char *))&general_get_file_path,
 };
 
 void extSPIFlash_setup(struct extSPIFlash *e)

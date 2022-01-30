@@ -43,10 +43,12 @@
 #define INTQSPIFLASH_NAME qDisk
 #define EXTSPIFLASH_NAME eDisk
 
+
 struct baseDisk_vtable
 {
     int (*init)(void *self, char* label);
     int (*deinit)(void *self);
+    int (*get_file_path) (void *self, const char* filename);
 };
 
 struct baseDisk
@@ -69,6 +71,7 @@ struct baseDisk _name = {  \
 
 int base_init(struct baseDisk *b, char* label);
 int base_deinit(struct baseDisk *b);
+
 
 
 struct intFlash
