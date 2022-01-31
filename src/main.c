@@ -29,11 +29,11 @@ typedef struct AppThread {
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 INT_FLASH_DEFINE(inki_flash);
 INT_QSPIFLASH_DEFINE(inki_qflash);
+VECTOR_INIT(disk_vector);
 
 static struct baseDisk* inki_flash_ptr = (struct baseDisk *)&inki_flash;
 static struct baseDisk* inki_qflash_ptr = (struct baseDisk *)&inki_qflash;
-
-VECTOR_INIT(disk_vector);
+static struct vector* disk_vector_ptr = &disk_vector;
 
 #if DT_NODE_HAS_STATUS(DT_INST(0, inki_ssd16xxfb), okay)
 #define DISPLAY_DEV_NAME DT_LABEL(DT_INST(0, inki_ssd16xxfb))
@@ -105,6 +105,9 @@ void main(void)
 	base_init(inki_flash_ptr, NULL);	
 	base_init(inki_qflash_ptr, NULL);
 
+	vector_init(disk_vector_ptr, , sizeof(inki_flash_ptr)); 
+	vector_push_back(disk_vector_ptr, inki_flash_ptr);
+	vector_push_back(disk_vector_ptr, inki_qflash_ptr);
 
 	//Soon(TM) -> autodiscover and add more disks to array. Maximum disks shall be 5 for now. 
 
@@ -116,6 +119,7 @@ void main(void)
 	//TODO - Figure out why USB MASS STORAGE CONFLICTS WITH USB DFU?? -> I am blind and can't read docs - can't act as both at the same time!
 	//TODO - Get USB MASS WORKING AND MOUNTED ON LINUX -> DONE YAY!!
 	//TODO - WAMR INTEGRATION -> DONEISH YAY!!
+	//TODO NEXT - UNIT TESTS FOR VECTOR CLASS, AND LOOK INTO BEHAVIOR OF MEMCPY AND MEMSET WITH ONLY POINTERS.
 	//TODO NEXT - PORT LVGL TO WAMR (EXPOSE METHODS SOMEHOW) AND PORT MENU & WATCHFACE CODE -> Sorta know how, time to do it!
 
 	LOG_INF("Initialising USB Mass Storage");
