@@ -76,9 +76,54 @@ int exp(int x, int n)
 static char sandboxed_memory[128 * 1000] = { 0 };
 
 //For now, code execution and storage only possible from external or internal flash
+
+static uint8_t* get_file(const char* filename)
+{
+	int rc;
+	uint8_t* ret_buf;
+	for (int i = 0; i < vector_length(disk_vector_ptr); i ++)
+	{
+		struct baseDisk* temp_ptr = (struct baseDisk*) vector_get(disk_vector_ptr, i);
+		if(base_get_file_path(temp_ptr, filename)==1)
+		{
+			struct fs_dirent dirent;
+			rc = fs_stat(temp_ptr->fname, &dirent);
+			if(rc < 0)
+			{
+				LOG_ERR("Filepath read error");
+				return rc;
+			}
+			struct fs_file_t file;
+			fs_file_t_init(&file);
+			rc = fs_open(&file, temp_ptr->fname, FS_O_READ);
+			if(rc < 0)
+			{
+				LOG_ERR("File read error");
+				return rc;
+			}
+			//Problem: I gotta read the entire file into memory before i can execute it. That limits things slightly.
+			uint8_t* ret_buf = (uint8_t*)malloc(dirent.size);
+			if(!ret_buf)
+			{
+				LOG_ERR("malloc error!");
+				return -ENOMEM;
+			}
+			rc = fs_read(&file, ret_buf, dirent.size);
+			if(rc < 0)
+			{
+				LOG_ERR("IO Error");
+				return -EIO;
+			}
+			return ret_buf;
+		}
+	}
+	return -ENFILE;
+}
+
 static bool module_reader_cb(const char* module_name, uint8_t **p_buffer, uint32_t *p_size)
 {
 	const char filename[MAX_FS_PATH_LENGTH];
+	snprintf(filename, sizeof(filename), "%s.wasm")
 }
 
 void main(void)
@@ -105,7 +150,7 @@ void main(void)
 	base_init(inki_flash_ptr, NULL);	
 	base_init(inki_qflash_ptr, NULL);
 
-	vector_init(disk_vector_ptr, , sizeof(inki_flash_ptr)); 
+	vector_init(disk_vector_ptr, VECTOR_DEFAULT_SIZE, sizeof(inki_flash_ptr)); 
 	vector_push_back(disk_vector_ptr, inki_flash_ptr);
 	vector_push_back(disk_vector_ptr, inki_qflash_ptr);
 
@@ -119,6 +164,7 @@ void main(void)
 	//TODO - Figure out why USB MASS STORAGE CONFLICTS WITH USB DFU?? -> I am blind and can't read docs - can't act as both at the same time!
 	//TODO - Get USB MASS WORKING AND MOUNTED ON LINUX -> DONE YAY!!
 	//TODO - WAMR INTEGRATION -> DONEISH YAY!!
+	//TODO - DYNAMIC ALLOCATION OF SPACE FOR DISK POINTERS -> DONE YAY!!
 	//TODO NEXT - UNIT TESTS FOR VECTOR CLASS, AND LOOK INTO BEHAVIOR OF MEMCPY AND MEMSET WITH ONLY POINTERS.
 	//TODO NEXT - PORT LVGL TO WAMR (EXPOSE METHODS SOMEHOW) AND PORT MENU & WATCHFACE CODE -> Sorta know how, time to do it!
 
