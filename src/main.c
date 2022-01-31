@@ -15,8 +15,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include "lib/disk/disk.h"
+#include "lib/vector/vector.h"
 #include <usb/usb_device.h>	
 #include <drivers/display.h>
+
 
 typedef struct AppThread {
     wasm_exec_env_t exec_env;
@@ -28,10 +30,10 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 INT_FLASH_DEFINE(inki_flash);
 INT_QSPIFLASH_DEFINE(inki_qflash);
 
-
 static struct baseDisk* inki_flash_ptr = (struct baseDisk *)&inki_flash;
 static struct baseDisk* inki_qflash_ptr = (struct baseDisk *)&inki_qflash;
-struct baseDisk* disks[5];
+
+VECTOR_INIT(disk_vector);
 
 #if DT_NODE_HAS_STATUS(DT_INST(0, inki_ssd16xxfb), okay)
 #define DISPLAY_DEV_NAME DT_LABEL(DT_INST(0, inki_ssd16xxfb))
@@ -102,8 +104,7 @@ void main(void)
 
 	base_init(inki_flash_ptr, NULL);	
 	base_init(inki_qflash_ptr, NULL);
-	disks[1] = inki_flash_ptr;
-	disks[2] = inki_qflash_ptr;
+
 
 	//Soon(TM) -> autodiscover and add more disks to array. Maximum disks shall be 5 for now. 
 

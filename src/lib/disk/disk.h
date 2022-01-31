@@ -4,6 +4,9 @@
  * Licensed under GPL 3
  */
 
+#ifndef INKI_DISK_API
+#define INKI_DISK_API
+
 #include <fs/fs.h>
 #include <fs/littlefs.h>
 #include <ff.h>
@@ -15,8 +18,6 @@
 #include <kernel.h>
 #include <string.h>
 
-#ifndef INKI_DISK_API
-#define INKI_DISK_API
 
 #define MAX_FS_PATH_LENGTH 255
 #define TYPE_INTERNAL_FLASH 1
@@ -26,7 +27,7 @@
 #define TYPE_EXTERNAL_USB_NTFS 5 //LONG TERM TODO (after production probably!!)
 #define FS_MOUNT_FLAG_USE_DISK_ACCESS 1
 //*************************************************************************************************************************************************
-//Straight C POLYMORPHISM GO BRRRRRRRRR (no access protection though without opaque pointers, which are pointless 
+//Straight C POLYMORPHISM GO BRRRRRRRRR (no access protection though without opaque pointers, which are semi pointless 
 //because I want to allow 3rd party devs and myself to manipulate the Zephyr FileSystem (FS) structs directly for full access over the hardware.)
 //Protection will most likely be implemented on the WASM sandbox side to prevent apps misbehaving, but I will definitely need TOTAL access.
 //Currently supported types - SPI external (SD card), QSPI internal, FLASH internal
