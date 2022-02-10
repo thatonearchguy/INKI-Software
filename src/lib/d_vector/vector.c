@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2021 INKI-Systems Inc.
+ *
+ * Licensed under GPL 3
+ */
+
 #include "vector.h"
 
 LOG_LEVEL_SET(LOG_LEVEL_INF);
@@ -13,12 +19,24 @@ struct privatevector
     size_t allocated_items;
 };
 
+uint8_t* vector_get_index_pointer(struct vector* v, int index);
+
+
+//It is your responsibility to properly dispose of the generated item by using free!
 void* vector_get(struct vector* v, int index)
 {
     struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
-    void* element;
-    memcpy(element, vector_get_index_pointer(v, index), ptr->item_size);
-    return element;
+    void* element = k_malloc(ptr->item_size);
+    memcpy(&element, (void*)vector_get_index_pointer(v, index), ptr->item_size);
+    return element; 
+}
+
+
+int vector_set(struct vector* v, int index, void* data)
+{
+    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+    memcpy(vector_get_index_pointer(v, index), (void*)data, ptr->item_size);
+    return 1;
 }
 
 int vector_init(struct vector* v, size_t initial_length, size_t item_size)
@@ -44,10 +62,28 @@ int vector_init(struct vector* v, size_t initial_length, size_t item_size)
     return 1;
 }
 
-char* vector_get_index_pointer(struct vector* v, int index)
+int vector_clear(struct vector* v)
 {
     struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
-    return (char*)(ptr->items + (ptr->item_size * index));
+    int rc;
+    for (int i = 0; i < ptr->num_items; i++)
+    {
+        rc = vector_set(v, i, NULL);
+        if(rc < 0)
+        {
+            return rc;
+        }
+    }
+    return 1;
+}
+
+
+
+
+uint8_t* vector_get_index_pointer(struct vector* v, int index)
+{
+    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+    return (uint8_t*)((uint8_t*)ptr->items + (ptr->item_size * index));
 }
 
 
@@ -73,6 +109,7 @@ int vector_push_back(struct vector* v, void* element)
     return vector_insert_at(v, -1, element);
 }
 
+//You must dispose of the return value with free() when you are done!
 void* vector_pop(struct vector* v)
 {
     struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
@@ -121,7 +158,7 @@ int vector_insert_at(struct vector* v, int index, void* element)
         vector_resize(v, ptr->allocated_items*2);
     }
     memmove((void*)vector_get_index_pointer(v, index+1), (void*)vector_get_index_pointer(v, index), ptr->item_size);
-    memcpy(vector_get_index_pointer(v, index), element, ptr->item_size);
+    memcpy((void*)vector_get_index_pointer(v, index), element, ptr->item_size);
     ptr->num_items++;
     return 1;
 }
@@ -132,6 +169,7 @@ int vector_deinit(struct vector* v)
 {
     struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
     free(ptr->items);
+    return 1;
 }
 size_t vector_size(struct vector* v)
 {

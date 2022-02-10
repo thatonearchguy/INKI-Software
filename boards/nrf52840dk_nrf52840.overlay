@@ -23,6 +23,7 @@
 			lookahead-size = <32>;
 			block-cycles = <512>;
 		};
+		/*
         lfs2: lfs2 {
 			compatible = "zephyr,fstab,littlefs";
 			mount-point = "/ext";
@@ -33,6 +34,7 @@
 			lookahead-size = <32>;
 			block-cycles = <512>;
 		};
+		*/
 	};
 };
 
@@ -72,7 +74,7 @@
         compatible = "fixed-partitions";
         #address-cells = <1>;
         #size-cells = <1>;
-		lfs2_part: partition@00000 {
+		xipa1_part: partition@00000 {
             label = "ext_storage";
             reg = <0x00000000 0x00780000>;
         };

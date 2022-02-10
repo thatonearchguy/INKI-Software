@@ -22,7 +22,12 @@ config IFLASH_LOG_LEVEL
 config QFLASH_LOG_LEVEL
 	int "Set log level for Internal QSPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
 
+config VECTOR_LOG_LEVEL
+	int "Set log level for vector api (1 - Critical errors only, 2 - Warnings, 3 - Information)"
 
+config XIPAFS_LOG_LEVEL
+	int "Set log level for eXecute In Place AoT File System (XIPAFS) api (1 - Critical errors only, 2 - Warnings, 3 - Information)"
 
 source "Kconfig.zephyr"
 rsource "src/lib/display/Kconfig"
+rsource "src/lib/fs/Kconfig"

@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <logging/log_instance.h>
 #include <logging/log.h>
+#include <logging/log_ctrl.h>
 
 #define VECTOR_DEFAULT_SIZE 4
 #define VECTOR_NAME iVector
@@ -21,7 +22,7 @@ struct vector
 };
 
 #define VECTOR_INIT(_name)  \
-LOG_INSTANCE_REGISTER(VECTOR_NAME, _name, CONFIG_IFLASH_LOG_LEVEL);  \
+LOG_INSTANCE_REGISTER(VECTOR_NAME, _name, CONFIG_VECTOR_LOG_LEVEL);  \
 struct vector _name = {  \
             LOG_INSTANCE_PTR_INIT(log, VECTOR_NAME, _name)  \
 }
@@ -33,8 +34,10 @@ int vector_remove_at(struct vector* v, int index);
 int vector_insert_at(struct vector* v, int index, void* element);
 int vector_deinit(struct vector* v);
 int vector_log_init(struct vector* v);
+int vector_set(struct vector* v, int index, void* data);
+int vector_clear(struct vector* v);
+void* vector_pop(struct vector* v);
 void* vector_get(struct vector* v, int index);
-char* vector_get_index_pointer(struct vector* v, int index);
 size_t vector_size(struct vector* v);
 size_t vector_length(struct vector* v);
 

@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <kernel.h>
 #include <string.h>
+#include <stdlib.h>
 
 
 #define MAX_FS_PATH_LENGTH 255

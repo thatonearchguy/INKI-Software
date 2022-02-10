@@ -90,6 +90,7 @@ int base_find_file_from_path(struct baseDisk* b, const char* filename)
 		}
     }
 	return 0;
+	//free((void*)dir); //might be dodgy, want to prevent a bunch of dir pointers being left on the stack. 
 }
 
 int general_get_file_path(struct baseDisk *b, const char* filename)

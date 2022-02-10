@@ -53,6 +53,7 @@ set(PM_STATIC_YML_FILE
 
 list(APPEND ZEPHYR_EXTRA_MODULES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/display
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/fs
 )
 
 target_link_libraries(app PUBLIC lvgl -lgcc)

@@ -1,0 +1,9 @@
+# 	Copyright (c) 2021 INKI-Systems Inc.
+#
+#	Licensed under GPL 3
+
+config XIPA_FS_NRF5XX
+	bool "INKI-optimised display Drivers"
+	help
+	  Enable XIPA_FS driver for Nordic's NRF52 and NRF53 series of Bluetooth LE SoCs. 
+	select INKI_XIPA_DRV_EXISTS

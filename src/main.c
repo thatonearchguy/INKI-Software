@@ -15,7 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "lib/disk/disk.h"
-#include "lib/vector/vector.h"
+#include "lib/d_vector/vector.h"
+#include "lib/fs/xipafs.h"
 #include <usb/usb_device.h>	
 #include <drivers/display.h>
 
@@ -75,9 +76,9 @@ int exp(int x, int n)
 
 static char sandboxed_memory[128 * 1000] = { 0 };
 
-//For now, code execution and storage only possible from external or internal flash
-
-static uint8_t* get_file(const char* filename)
+//For now, code execution and storage only possible from external or internal flash -> NOT ANYMORE!! WE CAN ITERATE OVER ANY DISK POINTER
+//AND LOAD FROM ANY MEDIUM INTO RAM YAAAAYYYY!!
+int file_to_int_ram(const char* filename)
 {
 	int rc;
 	uint8_t* ret_buf;
@@ -101,29 +102,31 @@ static uint8_t* get_file(const char* filename)
 				LOG_ERR("File read error");
 				return rc;
 			}
-			//Problem: I gotta read the entire file into memory before i can execute it. That limits things slightly.
+			//Problem: I gotta read the entire file into memory before i can execute it. That limits things a lot.
 			uint8_t* ret_buf = (uint8_t*)malloc(dirent.size);
 			if(!ret_buf)
 			{
 				LOG_ERR("malloc error!");
-				return -ENOMEM;
+				return NULL;
 			}
 			rc = fs_read(&file, ret_buf, dirent.size);
 			if(rc < 0)
 			{
 				LOG_ERR("IO Error");
-				return -EIO;
+				return NULL;
 			}
 			return ret_buf;
 		}
 	}
-	return -ENFILE;
+	return NULL;
 }
 
 static bool module_reader_cb(const char* module_name, uint8_t **p_buffer, uint32_t *p_size)
 {
 	const char filename[MAX_FS_PATH_LENGTH];
-	snprintf(filename, sizeof(filename), "%s.wasm")
+	snprintf(filename, sizeof(filename), "%s.wasm", module_name);
+	//read_wasm_binary_to_buffer
+	
 }
 
 void main(void)
@@ -167,6 +170,7 @@ void main(void)
 	//TODO - DYNAMIC ALLOCATION OF SPACE FOR DISK POINTERS -> DONE YAY!!
 	//TODO NEXT - UNIT TESTS FOR VECTOR CLASS, AND LOOK INTO BEHAVIOR OF MEMCPY AND MEMSET WITH ONLY POINTERS.
 	//TODO NEXT - PORT LVGL TO WAMR (EXPOSE METHODS SOMEHOW) AND PORT MENU & WATCHFACE CODE -> Sorta know how, time to do it!
+	//TODO NEXT - Configure MCU to generate a memory protection fault on write accesses to flash and other execute-only areas - DETECT MEMORY LEAKS/MEMORY CORRUPTION.
 
 	LOG_INF("Initialising USB Mass Storage");
 
