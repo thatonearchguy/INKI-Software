@@ -26,7 +26,6 @@ __subsystem struct xipa_dev_api
     xipa_xip_setoffset setoffset;
     xipa_xip_enable en;
     xipa_xip_disable di;
-
 };
 
 //technically inheritance again? fairly similar but we don't also have 

@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2021 INKI-Systems Inc.
+ *
+ * Licensed under GPL 3
+ */
+
+/*
+   _  __ ________  ___         ___________
+  | |/ //  _/ __ \/   |       / ____/ ___/
+  |   / / // /_/ / /| |      / /_   \__ \ 
+ /   |_/ // ____/ ___ |     / __/  ___/ / 
+/_/|_/___/_/   /_/  |_|____/_/    /____/  
+                     /_____/              
+
+𝗲𝗫𝗲𝗰𝘂𝘁𝗲 𝗜𝗻 𝗣𝗹𝗮𝗰𝗲 𝗔𝗵𝗲𝗮𝗱 𝗼𝗳 𝘁𝗶𝗺𝗲 𝗙𝗶𝗹𝗲 𝗦𝘆𝘀𝘁𝗲𝗺
+
+*/
+
 #include "xipafs.h"
 #include "xipa_dev.h"
 /*
@@ -228,7 +246,7 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
             LOG_INST_INF(x->log, "I/O Error - could not read device");
         }
     }
-    if (strcmp(buf, "XIPA") != 0)
+    if (strcmp(buf, start) != 0)
     {
         LOG_INST_INF(x->log, "Superblock not found! Is filesystem formatted to XIPA?");
         return -ENOENT;
@@ -278,8 +296,22 @@ int xipa_fs_unmount(struct xipafs *x)
     return 1;
 }
 
-//PLEASE ENSURE DEVICE IS ACTIVELY IN XIP MODE!! OTHERWISE MCU WILL CRASH!! YOU MUST REINIT QSPI WHEN SWITCHING FROM DMA-BASED MOUNT TO XIP BASED EXECUTE ON NRF52840
-//PLEASE MOUNT BEFORE YOU TRY TO GET FILE, OR YOU WILL HAVE -ENODEV.
+//https://stackoverflow.com/questions/54964154/is-memcpyvoid-dest-src-n-with-a-volatile-array-safe
+//This function is a volatile safe memcpy for XIP region reads and validation. 
+volatile void *xipa_vol_memcpy(volatile void *restrict dest,
+            const volatile void *restrict src, size_t n) {
+    const volatile unsigned char *src_c = src;
+    volatile unsigned char *dest_c      = dest;
+
+    while (n > 0) {
+        n--;
+        dest_c[n] = src_c[n];
+    }
+    return  dest;
+}
+
+
+//Mount before calling this function - TODO add nice documentation to all the XIPA functions.
 int xipa_fs_get_file(struct xipafs *x, char *filename, char *start, uint32_t size)
 {
     char *fname;
@@ -288,20 +320,43 @@ int xipa_fs_get_file(struct xipafs *x, char *filename, char *start, uint32_t siz
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
     if (!ptr->init)
         return -EINVAL;
-    volatile uint8_t *tableStart = (volatile uint8_t*)(ptr->param->xip_dev_location + 8); //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
+    volatile uint8_t *tableStart = (volatile uint8_t*)(ptr->param->xip_dev_location + sizeof(ptr->num_files) + sizeof(start)); //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
     fname = strtok_r(filename, ".", &context);
     ext = strtok_r(NULL, ".", &context);
     if (fname == NULL || ext == NULL)
     {
-        return -EIO;
+        return -EINVAL;
     }
+    struct stack superblock_locations;
+    volatile struct xipa_superblock_loc
+    {
+        volatile unsigned int record;
+        volatile uint8_t* superblock_start; //with respect to processor address space!
+    };
+    /*
+    We want to use the stack to keep track of where we've gotten up to in the superblock traversal. 
+    If we end up at a record with file extension "ext", we will store the current value of "record" in the stack
+    and start traversing the new superblock at the given location, and so on so forth. 
+    When the function finishes traversing this level of superblock, it will pop a new record off the stack and 
+    resume where it left off. 
+    */
+    stack_init(&superblock_locations, 4, sizeof(struct xipa_superblock_loc*));
     //each journal entry is 64 bytes (#wordaligned gang) so we will iterate through until we find our entry!
     //We maintain the number of files to avoid needessly iterating over the entire 64KB superblock region.
     //This means that there must be no gaps within the entries!!
-    for (volatile unsigned int jso = 0; jso < (volatile unsigned int)ptr->num_files * ptr->param->journal_size; jso += 0x40) 
-    //journal starting offset (jso)
+    char iter_fname[NAME_SIZE];
+    char iter_ext[RUN_SIZE];
+    for (volatile unsigned int record = 0; record < (volatile unsigned int)ptr->num_files * XIPA_JOURNAL_SIZE; record += 0x40) 
     {
-        
+        xipa_vol_memcpy(iter_ext, (volatile uint8_t*)(tableStart + record + ptr->param->run_end_offset - RUN_SIZE), RUN_SIZE);
+        if(strcmp(iter_ext, "ext") == 0)
+        {
+            volatile struct xipa_superblock_loc yeet = {.record = record, .superblock_start = tableStart};
+            stack_push(&superblock_locations, &yeet);
+            uint32_t new_tablestart;
+            xipa_vol_memcpy(new_tablestart, (volatile uint8_t*)(tableStart + record + ptr->param->run_end_offset - RUN_SIZE), RUN_SIZE);
+
+        }
         if (strcmp(ptr->f->name, fname) == 0)
         {
             //populate_record(x);

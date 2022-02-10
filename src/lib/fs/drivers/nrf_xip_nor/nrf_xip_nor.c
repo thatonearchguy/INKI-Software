@@ -22,12 +22,13 @@
 #define drv_name xipa_nrf_qspi
 
 NRF_QSPI_Type nrf_qspi_reg;
+off_t xipo;
 
 static int nrf_qspi_xip_setoffset(const struct xipa_dev* dev, off_t xip_offset)
 {
     //default offset is zero in the zephyr flash drivers, so as long as our storage partition
     //is stored at 0x0 offset we should be fine. 
-    nrf_qspi_xip_offset_set(&nrf_qspi_reg, (uint32_t)xip_offset); 
+    xipo = xip_offset;
     return 1;
 }
 
@@ -40,6 +41,10 @@ static int nrf_qspi_xip_fs_set(const struct xipa_dev* dev, bool en)
             nrf_qspi_xip_set(&qspi_reg, en);
         #endif
 
+    }
+    if(nrf_qspi_reg.XIPOFFSET!=xipo)
+    {
+        nrf_qspi_xip_offset_set(&nrf_qspi_reg, (uint32_t)xipo); 
     }
     return rc;
 }

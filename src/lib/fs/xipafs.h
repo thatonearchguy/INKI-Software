@@ -85,6 +85,9 @@ A: Have a wander through these files and find out! Joking, I will update this se
 #define XIPA_VERS_OFFSET 0x32
 #define XIPA_RUN_OFFSET 0x37
 
+
+char start[4] = "XIPA"; //get rid of null terminator messing up byte sizes. 
+
 struct xipafs
 {
     LOG_INSTANCE_PTR_DECLARE(log);
