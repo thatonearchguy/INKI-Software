@@ -32,19 +32,19 @@ __subsystem struct xipa_dev_api
 //technically inheritance again? fairly similar but we don't also have 
 //inherited data fields, only exposing a set of common methods -> an interface!
 
-static int xip_enable(const struct xipa_dev* dev)
+static inline int xip_enable(const struct xipa_dev* dev)
 {
     return dev->api->en(dev);
 }
 
-static int xip_disable(const struct xipa_dev* dev)
+static inline int xip_disable(const struct xipa_dev* dev)
 {
     return dev->api->di(dev);
 }
 
-static int xip_setoffset(const struct xipa_dev* dev, off_t offset)
+static inline int xip_setoffset(const struct xipa_dev* dev, off_t offset)
 {
     return dev->api->setoffset(dev, offset);
 }
 
-static int xip_init(struct xipa_dev* dev);
+int xip_init(struct xipa_dev* dev);

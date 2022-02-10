@@ -1,5 +1,5 @@
 #include "xipafs.h"
-#include "drivers/xipa_dev.h"
+#include "xipa_dev.h"
 /*
 
 What do we need:
@@ -25,6 +25,13 @@ adding, removing files a composition of granular processes that
 
 LOG_LEVEL_SET(LOG_LEVEL_INF);
 
+#define NAME_SIZE 16
+#define HASH_SIZE 32
+#define LOC_SIZE 4
+#define SIZE_SIZE 4
+#define VER_STR_SIZE 4
+#define RUN_SIZE 4
+
 /*
 
 [||||||||||[(  app 1   )(    app 2     )(     app 3      )     free space     ]|||||||||]
@@ -38,15 +45,16 @@ int populate_record(struct xipafs *x, volatile unsigned int *offset);
 int align(struct xipafs *x);
 int xipa_fs_verifyparams(struct xipafs_params *ptr);
 
+
 struct filerecord
 {
-    //Constant RAM usage - 10+32+8+8+5+1 = 64 bytes
-    char name[16];
-    char hash[32];
+    //Constant RAM usage - 16+32+4+4+4+4 = 64 bytes
+    char name[NAME_SIZE];
+    char hash[HASH_SIZE];
     uint32_t location;
     uint32_t size;
-    char ver_str[4];
-    char run[4];
+    char ver_str[VER_STR_SIZE];
+    char run[RUN_SIZE];
 };
 
 struct privatefs_ptr
@@ -78,6 +86,70 @@ int populate_record_table(struct xipafs *x, volatile unsigned int offset)
     ptr->f->hash = memcpy(ptr->f->name, offset, sizeof(ptr->param->))
 }
 */
+//Call function after verifying params, will take params struct directly from xipafs object.
+
+int arr_contains_int(uint8_t array[], uint8_t value)
+{
+    for(int i = 0; i < sizeof(array); i++)
+    {
+        if(array[i]==value)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+
+//In XIPA_FS, the sizes for the individual fields that make up the 64 bytes are totally fixed.
+//You have control over the location of each field within the filesystem, so this function
+//will check if the offsets you've put in correspond to valid sizes!
+int xipa_fs_check_sizes(uint8_t offsets[6], uint8_t sizes[6])
+{
+    //finding which offset is first - i.e whichever one subtracted by it's size ends up with zero. if we can't find 
+    //one then the offsets are invalid!
+    uint8_t zero_offset = -1;
+    uint8_t inval_size_flag = 0;
+    for(int i = 0; i < sizeof(offsets); i ++)
+    {
+        if((offsets[i]-sizes[i])==0)
+        {
+            zero_offset = i;
+            break;
+        }         
+    }
+    if(zero_offset == -1)
+    {
+        return -EINVAL;
+    }
+    for (int i = 0; i < sizeof(offsets); i ++)
+    {
+        if(i==zero_offset)
+        {
+            i++;
+        }
+        else
+        {
+            int hyp_index = arr_contains_int(offsets, (offsets[i]-sizes[i])); //hypothesized index
+            if(hyp_index == -1 || hyp_index == zero_offset)
+            {
+                return -1;
+            }
+            /*
+            This code works off the idea that every offset, when subtracted from its corresponding size, 
+            should end up with another offset that exists within the array, apart from the very first offset which will end up 
+            at zero. This is why whenever we reach the offset that we computed earlier, we increment i to skip over it. 
+            */
+        }
+    }
+    if(arr_contains_int(offsets, XIPA_JOURNAL_SIZE))
+    {
+        return 1; //theoretically the above check should have checked for this condition, but just to be extra safe
+        //i have explicitly expressed the same check here. 
+    }
+    return -1;
+}
+
 
 int xipa_fs_verifyparams(struct xipafs_params *ptr)
 {
@@ -92,12 +164,9 @@ int xipa_fs_verifyparams(struct xipafs_params *ptr)
     serialisecheck[3] = ptr->size_end_offset;
     serialisecheck[4] = ptr->vers_end_offset;
     serialisecheck[5] = ptr->run_end_offset;
-    serialisecheck[6] = ptr->journal_size;
-    if(serialisecheck[6] == 0)
-    {
-        rc = -EINVAL;
-        return rc;
-    }
+    uint8_t sizes[6] = {NAME_SIZE, HASH_SIZE, LOC_SIZE, SIZE_SIZE, VER_STR_SIZE, RUN_SIZE};
+
+
     for (int i = 0; i < sizeof(serialisecheck) - 2; i++)
     {
             //All offsets must be word aligned   //Offsets cannot be greater than final journal size       //None of the offests can be zero otherwise these fields do not exist.       
@@ -106,22 +175,21 @@ int xipa_fs_verifyparams(struct xipafs_params *ptr)
             rc = -EINVAL;
             return rc;
         }
-        if(serialisecheck[i] == ptr->journal_size)
-        {
-            offeqsize += 1; //if this is greater than one, multiple values are equal and thus is invalid.
-        }
     }
-    if(offeqsize != 1)
+    if(xipa_fs_check_sizes(serialisecheck, sizes) == -1)
     {
         rc = -EINVAL;
+        return rc;
     }
     if(ptr->flash_area_id < 0)
     {
         rc = -EINVAL;
+        return rc;
     }
     if(ptr->path == NULL)
     {
         rc = -EINVAL;
+        return rc;
     }
     return rc;
 }
@@ -150,7 +218,7 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
         flash_area_close(ptr->pfa);
         return rc;
     }
-    const struct device* fdev = flash_area_get_device(ptr->param->flash_area_id);
+    //const struct device* fdev = flash_area_get_device((const struct flash_area*)ptr->param->flash_area_id);
     
     rc = flash_area_read(ptr->pfa, 0, buf, sizeof(buf)); //we can safely use single word read writes according to nordic product specification, so this is fine.
     if (rc < 0)
@@ -166,11 +234,13 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
         return -ENOENT;
     }
     ptr->offset = ptr->pfa->fa_off;
-    rc = flash_area_read(ptr->pfa, 4, (uint32_t)ptr->num_files, 4); //getting number of files on filesystem.
+    char numfiles[4];
+    rc = flash_area_read(ptr->pfa, 4, numfiles, 4); //getting number of files on filesystem.
     if (rc < 0)
     {
         return rc;
     }
+    ptr->num_files = (uint32_t) numfiles;
     LOG_INST_INF(x->log, "Number of files - %d", ptr->num_files);
     flash_area_close(ptr->pfa); //NOP right now, but for future compatibility this is fine.
     ptr->xip = k_malloc(sizeof(struct xipa_dev));
@@ -180,6 +250,11 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
         LOG_INST_ERR(x->log, "Could not init XIP!");
         return rc;
     }
+    rc = xip_setoffset(ptr->xip, ptr->offset);
+    if(rc < 0)
+    {
+        LOG_INST_ERR(x->log, "Could not set offset!");
+    }
     rc = xip_enable(ptr->xip);
     if(rc < 0)
     {
@@ -187,6 +262,7 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
     }
 
     ptr->init = true;
+
     return 1;
 }
 
@@ -198,6 +274,7 @@ int xipa_fs_unmount(struct xipafs *x)
     k_free(ptr->xip); //free xip to prevent further manipulation
     //this should leave QSPI peripheral in a state where standard flash manipulation commands should work perfectly
     //with no XIPA_FS manipulation. 
+    ptr->init = false;
     return 1;
 }
 
@@ -210,9 +287,9 @@ int xipa_fs_get_file(struct xipafs *x, char *filename, char *start, uint32_t siz
     char *context = NULL;
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
     if (!ptr->init)
-        return -ENODEV;
-    volatile unsigned int *tableStart = (volatile unsigned int *)ptr->param->xip_dev_location + 8; //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
-    fname = strtok_r(fname, ".", &context);
+        return -EINVAL;
+    volatile uint8_t *tableStart = (volatile uint8_t*)(ptr->param->xip_dev_location + 8); //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
+    fname = strtok_r(filename, ".", &context);
     ext = strtok_r(NULL, ".", &context);
     if (fname == NULL || ext == NULL)
     {
@@ -221,9 +298,10 @@ int xipa_fs_get_file(struct xipafs *x, char *filename, char *start, uint32_t siz
     //each journal entry is 64 bytes (#wordaligned gang) so we will iterate through until we find our entry!
     //We maintain the number of files to avoid needessly iterating over the entire 64KB superblock region.
     //This means that there must be no gaps within the entries!!
-    for (volatile unsigned int jso = 0; jso < (volatile unsigned int)ptr->num_files * ptr->param->journal_size; jso += 0x40) //journal starting offset (jso)
+    for (volatile unsigned int jso = 0; jso < (volatile unsigned int)ptr->num_files * ptr->param->journal_size; jso += 0x40) 
+    //journal starting offset (jso)
     {
-        memcpy(ptr->f->name, tableStart + jso, sizeof(ptr->f->name));
+        
         if (strcmp(ptr->f->name, fname) == 0)
         {
             //populate_record(x);

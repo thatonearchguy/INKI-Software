@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <hal/nrf_qspi.h>
 #include <nrfx_qspi.h>
-#include "../xipa_dev.h"
+#include "../../xipa_dev.h"
 
 #define mod_name nrf_xip_qspi_xipa_drv
 #define drv_name xipa_nrf_qspi
@@ -31,7 +31,7 @@ static int nrf_qspi_xip_setoffset(const struct xipa_dev* dev, off_t xip_offset)
     return 1;
 }
 
-static int nrf_qspi_xip_fs_set(const struct xip_dev* dev, bool en)
+static int nrf_qspi_xip_fs_set(const struct xipa_dev* dev, bool en)
 {
     int rc = 1;
     if(nrfx_qspi_mem_busy_check()==NRFX_SUCCESS)
@@ -44,14 +44,14 @@ static int nrf_qspi_xip_fs_set(const struct xip_dev* dev, bool en)
     return rc;
 }
 
-static int nrf_qspi_xip_enable(const struct xip_dev* dev)
+static int nrf_qspi_xip_enable(const struct xipa_dev* dev)
 {
     return nrf_qspi_xip_fs_set(dev, true);
 }
 
-static int nrf_qspi_xip_disable(const struct xip_dev* dev)
+static int nrf_qspi_xip_disable(const struct xipa_dev* dev)
 {
-    nrf_qspi_xip_fs_set(dev, false);
+    return nrf_qspi_xip_fs_set(dev, false);
 }
 
 static const struct xipa_dev_api nrf_qspi_xip_api = {
@@ -60,7 +60,7 @@ static const struct xipa_dev_api nrf_qspi_xip_api = {
     .setoffset = nrf_qspi_xip_setoffset,
 };
 
-static int xip_init(struct xipa_dev* dev)
+int xip_init(struct xipa_dev* dev)
 {
     dev->api = &nrf_qspi_xip_api;
     return 1;

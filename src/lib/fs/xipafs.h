@@ -102,10 +102,9 @@ struct xipafs_params
     uint8_t size_end_offset;
     uint8_t vers_end_offset;
     uint8_t run_end_offset;
-    uint8_t journal_size;
     uintptr_t flash_area_id;
     uint32_t xip_device_offset;
-    uint32_t xip_dev_location;
+    uint32_t xip_dev_location; //actual memory address pointer!
     char* path;
 };
 
