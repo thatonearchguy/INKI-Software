@@ -43,6 +43,13 @@ adding, removing files a composition of granular processes that
 
 LOG_LEVEL_SET(LOG_LEVEL_INF);
 
+#define XIPA_ERR_CHECK(logger, message, rc) \
+if(rc < 0) \
+{ \
+    LOG_INST_ERR(logger, message); \
+    return rc; \
+}
+
 #define NAME_SIZE 16
 #define HASH_SIZE 32
 #define LOC_SIZE 4
@@ -60,7 +67,7 @@ LOG_LEVEL_SET(LOG_LEVEL_INF);
 
 
 int populate_record(struct xipafs *x, volatile unsigned int *offset);
-int align(struct xipafs *x);
+int xipa_fs_align(struct xipafs *x);
 int xipa_fs_verifyparams(struct xipafs_params *ptr);
 
 
@@ -251,12 +258,7 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
     char buf[4]; //We are looking for XIPA at the start of the filesystem, effectively a permanent superblock marking a particular
     //storage medium as XIPA_FS.
     int fs_param_ret_code = xipa_fs_verifyparams(params);
-
-    if(fs_param_ret_code < 0)
-    {
-        LOG_INST_ERR(x->log, "Invalid parameters! Check and remount");
-        return fs_param_ret_code;
-    }
+    XIPA_ERR_CHECK(x->log, "Invalid parameters, check and remount!", fs_param_ret_code);
 
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
     ptr->f = k_malloc(sizeof(struct filerecord)); //allocating memory from kernel heap to ensure files can still be traversed in low memory conditions
@@ -295,21 +297,13 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
     flash_area_close(ptr->pfa); //NOP right now, but for future compatibility this is fine.
     ptr->xip = k_malloc(sizeof(struct xipa_dev));
     rc = xip_init(ptr->xip);
-    if(rc < 0)
-    {
-        LOG_INST_ERR(x->log, "Could not init XIP!");
-        return rc;
-    }
+    XIPA_ERR_CHECK(x->log, "Could not init XIP!", rc);
+
     rc = xip_setoffset(ptr->xip, ptr->offset);
-    if(rc < 0)
-    {
-        LOG_INST_ERR(x->log, "Could not set offset!");
-    }
+    XIPA_ERR_CHECK(x->log, "Could not set XIP offset!", rc);
+
     rc = xip_enable(ptr->xip);
-    if(rc < 0)
-    {
-        LOG_INST_ERR(x->log, "Could not enable XIP!");
-    }
+    XIPA_ERR_CHECK(x->log, "Could not enable XIP!", rc);
 
     ptr->init = true;
 
@@ -344,7 +338,7 @@ volatile void *xipa_vol_memcpy(volatile void *restrict dest,
 
 
 //Mount before calling this function - TODO add nice documentation to all the XIPA functions.
-int xipa_fs_get_file(struct xipafs *x, char *filename, volatile uint8_t *loc, size_t size)
+int xipa_fs_get_file(struct xipafs *x, char *filename, volatile uint8_t *loc, size_t size, volatile uint8_t *record_loc)
 {
     char *fname;
     char *ext;
@@ -426,6 +420,7 @@ int xipa_fs_get_file(struct xipafs *x, char *filename, volatile uint8_t *loc, si
                 {
                     loc = found_fileloc;
                     size = found_filesize;
+                    record_loc = tableStart + record;
                     stack_destroy(&superblock_locations);
                     return 1;
                 }
@@ -446,27 +441,19 @@ int xipa_fs_format(struct xipafs* x)
         return -EINVAL;
     }
     int rc = flash_area_open(ptr->pfa->fa_id, ptr->pfa);
-    if(rc < 0)
-    {
-        return rc;
-    }
+    XIPA_ERR_CHECK(x->log, "Could not open flash area", rc);
+
     LOG_INST_WRN(x->super.log, "Formatting filesystem to XIPA!");
 	rc = flash_area_erase(ptr->pfa, 0, ptr->pfa->fa_size);
-	LOG_INST_WRN(i->super.log, "Code: %d", rc);
-    if(rc < 0)
-    {
-        return rc;
-    }
+    XIPA_ERR_CHECK(x->log, "Format failed", rc);
+
     rc = flash_area_write(ptr->pfa, 0, start, sizeof(start)); //writing identifier block
-    if(rc < 0)
-    {
-        return rc;
-    }
+    XIPA_ERR_CHECK(x->log, "Could not write identifier block", rc);
+
     rc = flash_area_write(ptr->pfa, (off_t)sizeof(start), 0, sizeof(0)); //writing file number block
-    if(rc < 0)
-    {
-        return rc;
-    }
+    XIPA_ERR_CHECK(x->log, "Could not write file number block", rc);
+
+    flash_area_close(ptr->pfa);
     return 1;
 } 
 
@@ -485,14 +472,25 @@ int xipa_fs_delete(struct xipafs* x, char* filename)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
     volatile uint8_t* deletion_offset;
+    volatile uint8_t* record_offset;
     size_t size;
-    int rc = xipa_fs_get_file(x, filename, deletion_offset, size);
-    if(rc < 0)
-    {
-        return rc;
-    }
+    int rc = xipa_fs_get_file(x, filename, deletion_offset, size, record_offset);
+    XIPA_ERR_CHECK(x->log, "Could not get file name!", rc);
+
     //switching to xip disable mode and using flash driver to delete the file.
     xip_disable(ptr->xip);
+    rc = flash_area_open(ptr->pfa->fa_id, ptr->pfa);
+    XIPA_ERR_CHECK(x->log, "Could not open flash area!", rc);
+
+    rc = flash_area_erase(ptr->pfa, deletion_offset-ptr->param->xip_dev_location, size);
+    XIPA_ERR_CHECK(x->log, "Could not erase file!", rc);
+    LOG_INST_INF(x->log, "Erased %i byte file data at %i (0-based offset)", size, deletion_offset-ptr->param->xip_dev_location);
+
+    rc = flash_area_erase(ptr->pfa, record_offset-ptr->param->xip_dev_location, XIPA_JOURNAL_SIZE);
+    XIPA_ERR_CHECK(x->log, "Could not erase file record!", rc);
+    LOG_INST_INF(x->log, "Erased %i byte file record at %i (0-based offset)", XIPA_JOURNAL_SIZE, record_offset-ptr->param->xip_dev_location);
+
+    rc = xipa_fs_align(x); //this function will align 
     
 }
 

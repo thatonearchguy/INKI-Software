@@ -119,7 +119,7 @@ struct vector _name = {  \
 
 
 int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params); //Path may be unnecesary, I do not think this will integrate into Zephyr's VFS yet..
-int xipa_fs_get_file(struct xipafs *x, char *filename, volatile uint8_t *loc, size_t size);
+int xipa_fs_get_file(struct xipafs *x, char *filename, volatile uint8_t *loc, size_t size, volatile uint8_t *record_loc);
 int xipa_fs_store(struct xipafs* x, char* filename);
 int xipa_fs_delete(struct xipafs* x, char* filename);
 int xipa_fs_unmount(struct xipafs* x);
