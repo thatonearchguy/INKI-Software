@@ -44,3 +44,10 @@ int stack_destroy(struct stack* s)
     int rc = vector_deinit(vecptr);
     return rc;
 }
+
+size_t stack_length(struct stack* s)
+{
+    struct vector* vecptr = &((struct privatevector*) s->privatevector_ptr)->stackvec;
+    size_t size = vector_length(vecptr);
+    return size;
+}

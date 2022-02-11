@@ -118,6 +118,38 @@ int arr_contains_int(uint8_t array[], uint8_t value)
     return -1;
 }
 
+int arr_contains_string(char* array[], char* value)
+{
+    for(int i = 0; i < sizeof(array); i++)
+    {
+        if(strcmp(array[i], value))
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+const char* xipa_file_extensions[30] =
+{
+    "ext", //superblock pointer
+    "pdf", //pdf
+    "wsm", //wasm binary
+    "bin", //misc binary file
+    "ttf", //font file
+    "txt", //text file
+    "zip", //zip file
+    "png", //PNG image
+    "jpg", //JPG image
+    "svg", //SVG image (vector)
+    "bmp", //Bitmap image
+    "prt", //Part download
+    "jso", //JSON
+    "xml", //XML
+    "htm", //HTML
+    "mp3", //MP3 - but like is this actually going to be used?
+    "wav", //WAV - really?!    
+};
 
 //In XIPA_FS, the sizes for the individual fields that make up the 64 bytes are totally fixed.
 //You have control over the location of each field within the filesystem, so this function
@@ -312,7 +344,7 @@ volatile void *xipa_vol_memcpy(volatile void *restrict dest,
 
 
 //Mount before calling this function - TODO add nice documentation to all the XIPA functions.
-int xipa_fs_get_file(struct xipafs *x, char *filename, char *start, uint32_t size)
+int xipa_fs_get_file(struct xipafs *x, char *filename, volatile uint8_t *loc, size_t size)
 {
     char *fname;
     char *ext;
@@ -340,28 +372,132 @@ int xipa_fs_get_file(struct xipafs *x, char *filename, char *start, uint32_t siz
     When the function finishes traversing this level of superblock, it will pop a new record off the stack and 
     resume where it left off. 
     */
-    stack_init(&superblock_locations, 4, sizeof(struct xipa_superblock_loc*));
+    stack_init(&superblock_locations, 4, sizeof(struct xipa_superblock_loc));
     //each journal entry is 64 bytes (#wordaligned gang) so we will iterate through until we find our entry!
     //We maintain the number of files to avoid needessly iterating over the entire 64KB superblock region.
     //This means that there must be no gaps within the entries!!
     char iter_fname[NAME_SIZE];
     char iter_ext[RUN_SIZE];
-    for (volatile unsigned int record = 0; record < (volatile unsigned int)ptr->num_files * XIPA_JOURNAL_SIZE; record += 0x40) 
+    volatile unsigned int read_to_traverse = (volatile unsigned int) ptr->num_files;
+    volatile unsigned int record = 1;
+    while(read_to_traverse > 1)
     {
-        xipa_vol_memcpy(iter_ext, (volatile uint8_t*)(tableStart + record + ptr->param->run_end_offset - RUN_SIZE), RUN_SIZE);
+        xipa_vol_memcpy(iter_ext, (volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->run_end_offset - RUN_SIZE), RUN_SIZE);
         if(strcmp(iter_ext, "ext") == 0)
         {
             volatile struct xipa_superblock_loc yeet = {.record = record, .superblock_start = tableStart};
             stack_push(&superblock_locations, &yeet);
-            uint32_t new_tablestart;
-            xipa_vol_memcpy(new_tablestart, (volatile uint8_t*)(tableStart + record + ptr->param->run_end_offset - RUN_SIZE), RUN_SIZE);
-
+            volatile uint8_t* new_tablestart;
+            xipa_vol_memcpy((volatile uint8_t*)new_tablestart, (volatile uint8_t*)(tableStart + record + ptr->param->loc_end_offset - LOC_SIZE), LOC_SIZE);
+            tableStart = (volatile uint8_t*) new_tablestart;
+            record = (volatile unsigned int)1;
+            continue;
         }
-        if (strcmp(ptr->f->name, fname) == 0)
+        else if(arr_contains_string(xipa_file_extensions, iter_ext)==-1)
         {
-            //populate_record(x);
-            return 1;
+            if(stack_length(&superblock_locations)>0)
+            {
+                volatile struct xipa_superblock_loc back = *(volatile struct xipa_superblock_loc*)stack_pop(&superblock_locations);
+                volatile unsigned int records_left = read_to_traverse - (record - back.record);
+                tableStart = back.superblock_start;
+                record = back.record;
+                read_to_traverse = record + records_left;
+                if(read_to_traverse > ptr->num_files)
+                {
+                    LOG_INST_ERR(x->log, "IO Error - rtt %i > num_files %i", read_to_traverse, ptr->num_files);
+                    return -EIO;
+                }
+            }
+            else
+            {
+                read_to_traverse = 1;
+            }
         }
+        else
+        {
+            xipa_vol_memcpy(iter_fname, (volatile uint8_t*)(tableStart + record + ptr->param->name_end_offset - NAME_SIZE), NAME_SIZE);
+            if((strcmp(iter_fname, fname) == 0) && (strcmp(iter_ext, ext)==0))
+            {   
+                volatile uint8_t* found_fileloc;
+                xipa_vol_memcpy((volatile uint8_t*)found_fileloc, (volatile uint8_t*)(tableStart + record + ptr->param->loc_end_offset - LOC_SIZE), LOC_SIZE);
+                size_t found_filesize;
+                xipa_vol_memcpy((size_t)found_fileloc, (volatile uint8_t*)(tableStart + record + ptr->param->size_end_offset - SIZE_SIZE), SIZE_SIZE);
+                if(found_fileloc != NULL || found_filesize != NULL)
+                {
+                    loc = found_fileloc;
+                    size = found_filesize;
+                    stack_destroy(&superblock_locations);
+                    return 1;
+                }
+            }
+        }
+        record++;
     }
     return -ENFILE;
+}
+
+//Ensure XIP threads are disabled before calling this!
+int xipa_fs_format(struct xipafs* x)
+{
+    struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+    if(!ptr->init)
+    {
+        LOG_INST_ERR(x->log, "XIPA not initialised!");
+        return -EINVAL;
+    }
+    int rc = flash_area_open(ptr->pfa->fa_id, ptr->pfa);
+    if(rc < 0)
+    {
+        return rc;
+    }
+    LOG_INST_WRN(x->super.log, "Formatting filesystem to XIPA!");
+	rc = flash_area_erase(ptr->pfa, 0, ptr->pfa->fa_size);
+	LOG_INST_WRN(i->super.log, "Code: %d", rc);
+    if(rc < 0)
+    {
+        return rc;
+    }
+    rc = flash_area_write(ptr->pfa, 0, start, sizeof(start)); //writing identifier block
+    if(rc < 0)
+    {
+        return rc;
+    }
+    rc = flash_area_write(ptr->pfa, (off_t)sizeof(start), 0, sizeof(0)); //writing file number block
+    if(rc < 0)
+    {
+        return rc;
+    }
+    return 1;
+} 
+
+
+int xipa_fs_verify(struct xipafs* x)
+{
+    
+}
+int xipa_fs_store(struct xipafs* x, char* filename)
+{
+    return -EOPNOTSUPP;
+}
+
+//Pause XIP apps before calling this unless you love chaos and death.
+int xipa_fs_delete(struct xipafs* x, char* filename)
+{
+    struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+    volatile uint8_t* deletion_offset;
+    size_t size;
+    int rc = xipa_fs_get_file(x, filename, deletion_offset, size);
+    if(rc < 0)
+    {
+        return rc;
+    }
+    //switching to xip disable mode and using flash driver to delete the file.
+    xip_disable(ptr->xip);
+    
+}
+
+
+int xipa_fs_verify(struct xipafs* x)
+{
+
 }

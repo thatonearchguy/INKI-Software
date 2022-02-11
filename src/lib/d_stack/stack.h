@@ -30,6 +30,7 @@ struct stack _name = {  \
 int stack_init(struct stack* s, size_t initial_length, size_t item_size);
 int stack_push(struct stack* s, void* element);
 void* stack_pop(struct stack* s);
+size_t stack_length(struct stack* s);
 int stack_destroy(struct stack* s);
 
 
