@@ -78,6 +78,7 @@ A: Have a wander through these files and find out! Joking, I will update this se
 #define NRF_QSPI_XIP_START_ADDR      0x12000000
 #define XIPA_JOURNAL_SIZE 0x40
 #define DEL_NAME "del"
+#define FREE_NAME "fre"
 //TODO - Add this to mount function to allow for multiple XIPA_FS instances.
 #define NAME_SIZE 16
 #define HASH_SIZE 32
@@ -86,7 +87,8 @@ A: Have a wander through these files and find out! Joking, I will update this se
 #define VER_STR_SIZE 4
 #define RUN_SIZE 4
 
-char xipa_fs_start_block[4] = "XIPA"; //get rid of null terminator messing up byte sizes. 
+#define __LOC (volatile uint8_t*)(volatile intptr_t)*(volatile uint8_t*) //this macro makes the code a little nicer.
+//these are a series of casts that takes the value at a specific pointer, which is actually a pointer itself, 
 
 struct xipafs
 {
@@ -106,7 +108,7 @@ struct filerecord
     size_t size;
     char ver_str[VER_STR_SIZE];
     char run[RUN_SIZE];
-    volatile uint8_t* record_loc
+    volatile uint8_t* record_loc;
 };
 
 struct xipafs_params
@@ -118,12 +120,13 @@ struct xipafs_params
     uint8_t vers_end_offset;
     uint8_t run_end_offset;
     uintptr_t flash_area_id;
-    uint32_t xip_device_offset;
-    uint32_t xip_dev_location; //actual memory address pointer!
+    volatile uint8_t* xip_device_offset;
+    volatile uint8_t* xip_dev_location; //actual memory address pointer!
+    uint32_t dev_size; //size of memory area in bytes
     char* path;
 };
 
-struct xipafs_dir_t
+struct __attribute__((__packed__)) xipafs_dir_t //we are packing this struct so we can safely copy to vector and stack objects.
 {
     volatile unsigned int current_record;
     volatile unsigned int current_records_to_traverse;
@@ -138,13 +141,13 @@ struct vector _name = {  \
 
 int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params); //Path may be unnecesary, I do not think this will integrate into Zephyr's VFS yet..
 int xipa_fs_get_file(struct xipafs *x, char *filename, struct filerecord* f);
-
+int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir);
 int xipa_fs_store(struct xipafs* x, char* filename);
 int xipa_fs_delete(struct xipafs* x, char* filename);
 int xipa_fs_unmount(struct xipafs* x);
 int xipa_fs_format(struct xipafs* x);
 int xipa_fs_verify(struct xipafs* x);
 int xipa_fs_dir_init(struct xipafs* x, struct xipafs_dir_t* dir);
-
+int xipa_fs_dir_deinit(struct xipafs* x, struct xipafs_dir_t* dir);
 
 #endif

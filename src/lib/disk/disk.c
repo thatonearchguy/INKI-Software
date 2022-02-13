@@ -58,7 +58,7 @@ int base_get_file_path(struct baseDisk *b, const char* filename)
 int base_find_file_from_path(struct baseDisk* b, const char* filename)
 {
     struct fs_dir_t* dir;
-	fs_dir_t_init(dir);
+	fs_dir_t_init(dir); //ignore uninitialised error, we are initialising in fs_dir_t_init.
 
     static struct fs_dirent dirent;
 
@@ -75,7 +75,7 @@ int base_find_file_from_path(struct baseDisk* b, const char* filename)
 		{
 			if(strcmp(&dirent.name[0], filename) == 0)
 			{
-				snprintf(b->fname, sizeof(b->fname), "%s/%s", b->fname, dirent.name);
+				snprintf(b->fname, sizeof(b->fname), "%s/%s", b->fname, dirent.name); //ignore warning, we are writing to itself correctly.
 				LOG_INST_INF(b->log, "Found at %s, joe!", b->fname);
 				fs_closedir(dir);
 				return 1;
@@ -83,7 +83,7 @@ int base_find_file_from_path(struct baseDisk* b, const char* filename)
 		}
 		if(dirent.type == FS_DIR_ENTRY_DIR)
 		{
-			snprintf(b->fname, sizeof(b->fname), "%s/%s", b->fname, dirent.name);
+			snprintf(b->fname, sizeof(b->fname), "%s/%s", b->fname, dirent.name); //ignore warning, we are writing to itself correctly.
 			LOG_INST_INF(b->log, "Going to %s", b->fname);
 			return base_find_file_from_path(b, filename);
 			fs_closedir(dir);

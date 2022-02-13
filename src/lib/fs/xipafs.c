@@ -59,9 +59,16 @@ if(rc < 0) \
 */
 
 
-int populate_record(struct xipafs *x, volatile unsigned int *offset);
+int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int record, volatile uint8_t* tableStart);
 int xipa_fs_align(struct xipafs *x);
 int xipa_fs_verifyparams(struct xipafs_params *ptr);
+int arr_contains_int(uint8_t array[], uint8_t value, int len);
+int arr_contains_string(char* array[], char* value, int len);
+int xipa_fs_check_sizes(uint8_t offsets[6], uint8_t sizes[6], int len);
+int xipa_fs_verifyparams(struct xipafs_params *ptr);
+
+
+static char xipa_fs_start_block[4] = "XIPA"; //get rid of null terminator messing up byte sizes. 
 
 
 struct privatefs_ptr
@@ -123,7 +130,8 @@ const char* xipa_file_extensions[] =
     "pdf", //pdf
     "wsm", //wasm binary
     "bin", //misc binary file
-    DEL_NAME, //deleted file for overwriting
+    DEL_NAME, //file marked for deletion
+    FREE_NAME, //freed file after align operation
     "ttf", //font file
     "txt", //text file
     "zip", //zip file
@@ -353,13 +361,13 @@ int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int
     if(ptr->f.run != NULL)
     {
         xipa_vol_memcpy(ptr->f.name, (volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->name_end_offset - NAME_SIZE), NAME_SIZE);
-        ptr->f.file_loc = *(volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE);
-        ptr->f.size =  *(volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->size_end_offset - SIZE_SIZE);
+        ptr->f.file_loc = __LOC(tableStart + ((record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE);
+        ptr->f.size = (size_t)*(volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->size_end_offset - SIZE_SIZE);
         if(ptr->f.file_loc != (volatile uint8_t*)0x0 || ptr->f.size != (size_t)0x0)
         {
             xipa_vol_memcpy(ptr->f.hash, (volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->hash_end_offset - HASH_SIZE), HASH_SIZE);
             xipa_vol_memcpy(ptr->f.ver_str, (volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->vers_end_offset - VER_STR_SIZE), VER_STR_SIZE);
-            ptr->f.record_loc = *(volatile uint8_t*)(tableStart + ((record - 1)<<6));
+            ptr->f.record_loc = __LOC(tableStart + ((record - 1)<<6));
             f = &ptr->f;
             return 1;
         }
@@ -392,7 +400,7 @@ int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t
             //This should be ok, stack_push carries out malloc and copies manually internally rather than just storing pointers.
             stack_push(&ptr->superblock_locations, (struct xipa_superblock_loc*)&yeet);
             //No memcpy required here as we are reading a known datatype.
-            volatile uint8_t* new_tablestart = *(volatile uint8_t*)(tableStart + ((dir->current_record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE);
+            volatile uint8_t* new_tablestart = __LOC(tableStart + ((dir->current_record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE);
             tableStart = new_tablestart;
             dir->current_record = (volatile unsigned int)1;
         }
@@ -457,15 +465,62 @@ int xipa_fs_get_file(struct xipafs *x, char *filename, struct filerecord* f)
     //each journal entry is 64 bytes (#wordaligned gang) so we will iterate through until we find our entry!
     //We maintain the number of files to avoid needessly iterating over the entire 64KB superblock region.
     //This means that there must be no gaps within the entries!!
-
-    while((strcmp(ptr->f.name, fname) == 0) && (strcmp(ptr->f.run, ext)==0))
+    //*.* is just nonsense so we will return EINVAL.
+    if((strcmp(fname, "*")==0) && (strcmp(ext, "*")==0))
     {
-        if(rc = xipa_fs_traverse(x, f, &dir) < 0)
+        return -EINVAL;
+    }
+    else if((strcmp(fname, "*")==0)) //strtok is null terminated
+    //if the file name is *.extension, this will give the first instance of that extension. 
+    {
+        for(int i = 0; i < ptr->num_files; i ++)
         {
-            return rc;
+            rc = xipa_fs_traverse(x, f, &dir);
+            if(rc < 0)
+            {
+                LOG_INST_WRN(x->log, "Code: %i", rc);
+                return rc;
+            }
+            if(strcmp(ptr->f.run, ext)==0)
+            {
+                return 1;
+            }
         }
     }
-    return 1;
+    else if(strcmp(ext, "*")==0) //strtok is null terminated
+    //if the file name is name.*, this will give the first instance of that name. 
+    {
+        for(int i = 0; i < ptr->num_files; i ++)
+        {
+            rc = xipa_fs_traverse(x, f, &dir);
+            if(rc < 0)
+            {
+                LOG_INST_WRN(x->log, "Code: %i", rc);
+                return rc;
+            }
+            if(strcmp(ptr->f.name, fname)==0)
+            {
+                return 1;
+            }
+        }
+    }
+    else
+    {
+        for(int i = 0; i < ptr->num_files; i ++)
+        {
+            rc = xipa_fs_traverse(x, f, &dir);
+            if(rc < 0)
+            {
+                LOG_INST_WRN(x->log, "Code: %i", rc);
+                return rc;
+            }
+            if((strcmp(ptr->f.name, fname) == 0) && (strcmp(ptr->f.run, ext)==0))
+            {
+                return 1;
+            }
+        }
+    }
+    return -ENFILE;
 }
 
 //Ensure XIP threads are disabled before calling this!
@@ -531,7 +586,110 @@ int xipa_fs_delete(struct xipafs* x, char* filename)
     rc = flash_area_write(ptr->pfa, (off_t)ptr->f.record_loc-(off_t)ptr->param->xip_dev_location+(off_t)ptr->param->run_end_offset-(off_t)RUN_SIZE, &DEL_NAME, RUN_SIZE);
     XIPA_ERR_CHECK(x->log, "Could not erase file record!", rc);
     LOG_INST_INF(x->log, "Marked %i byte file record at %i (0-based offset) as erased", XIPA_JOURNAL_SIZE, (off_t)record_offset-(off_t)ptr->param->xip_dev_location);
+    flash_area_close(ptr->pfa);
+    if(ptr->num_files > 1)
+    {
+        rc = xipa_fs_align(x); //this function will align the main memory blocks 
+        if(rc < 0)
+        {
+            return rc;
+        }
+    }
+    xip_enable(ptr->xip);
+    return 1;
+}
 
-    rc = xipa_fs_align(x); //this function will align the main memory blocks 
-    return rc;
+int xipa_fs_align(struct xipafs *x)
+{
+    struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+    /*in align, we want to move everything stored after a deleted file to the start of its offset. 
+    the deleted file's region should be zero.
+    */
+    //ok i am massively overcomplicating this, there will never be more than one deleted record that needs dealing with. . 
+    int del_count;
+    struct vector filerecords;
+    vector_init(&filerecords, 4, sizeof(struct filerecord));
+    struct xipafs_dir_t dir;
+    xipa_fs_dir_init(x, dir);
+    struct filerecord* f;
+    int rc = flash_area_open(ptr->pfa->fa_id, &ptr->pfa);
+    volatile uint8_t* starting_offset = 0;
+    int traverse_rc;
+    int record_inc = 0;
+    //user might have TONNES of files, so we are going to trade RAM for CPU cycles and make the CPU traverse the entire filesystem block to find 
+    //the next record to update. It should be okay for just a few dozen files which is the general intended use case, but 
+    //things might get sticky in the hundreds of thousands of files!!
+    //(but then again this filesystem is NOT intended for processors which can access something large enough to warrant having hundreds of thousands of read only files lmao)
+    xip_enable(ptr->xip);
+    XIPA_ERR_CHECK(x->log, "Could not open flash area during align operation", rc);
+    bool delrecord = false;
+    bool alignrequired = false;
+    while(!delrecord)
+    {
+        traverse_rc = xipa_fs_traverse(x, f, &dir);
+        if(strcmp(f->run, DEL_NAME)==0)
+        {
+            struct xipafs_dir_t checkdir;
+            xipa_fs_dir_init(x, checkdir);
+            struct filerecord f2;
+            for(int i = 0; i < ptr->num_files - 1; i ++)
+            {
+                traverse_rc = xipa_fs_traverse(x, &f2, &checkdir);
+                if(traverse_rc < 0)
+                {
+                    break;
+                }
+                if(f2.file_loc > f->file_loc)
+                {
+                    alignrequired = true; 
+                }
+            }
+            if(alignrequired == false)
+            {
+                LOG_INST_INF(x->log, "File was logically last, no align required!");
+
+            }
+        }
+
+    }
+
+    for(int i = 0; i < ptr->num_files-1; i++)
+    {
+        traverse_rc = xipa_fs_traverse(x, f, &dir);
+        if(strcmp(f->run, DEL_NAME)==0)
+        {
+            del_record_found = true;
+        }
+    }
+    if(del_record_found == false)
+    {
+        xipa_fs_traverse(x, f, &dir);
+        if(strcmpf->run, DEL_NAME)
+        LOG_INST_WRN(x->log, "Deleted record was las")
+    }
+    if(f == NULL)
+    {
+        LOG_INST_ERR(x->log, "Filesystem corrupted! Could not get a valid record");
+        return -ENOENT;
+    }
+    volatile uint8_t* deleted_loc = f->file_loc;
+    volatile uint8_t* deleted_size = (volatile uint8_t*)(f->size)*sizeof(size_t);
+    volatile uint8_t* desired_loc = deleted_loc + deleted_size;
+    volatile uint8_t* add_offset = 0;
+    char* buf[8192]; //a memory intensive process - we will copy and write 8kb at a time.
+    while(f!=NULL)
+    {
+        xip_fs_traverse(x, f, &dir);
+        if(f->file_loc == desired_loc)
+        {
+            while(add_offset<deleted_size)
+            {
+                flash_area_read(ptr->pfa, desired_loc - ptr->param->xip_dev_location, buf, ARRAY_SIZE(buf));
+                
+            }
+        }
+    }
+
+   
+    
 }
