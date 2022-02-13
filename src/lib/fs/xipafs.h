@@ -77,16 +77,16 @@ A: Have a wander through these files and find out! Joking, I will update this se
 #define XIPA_FS_NAME XiPAFS
 #define NRF_QSPI_XIP_START_ADDR      0x12000000
 #define XIPA_JOURNAL_SIZE 0x40
+#define DEL_NAME "del"
 //TODO - Add this to mount function to allow for multiple XIPA_FS instances.
-#define XIPA_NAME_OFFSET 0x0
-#define XIPA_HASH_OFFSET 0x12
-#define XIPA_LOC_OFFSET 0x2A
-#define XIPA_SIZE_OFFSET 0x2E
-#define XIPA_VERS_OFFSET 0x32
-#define XIPA_RUN_OFFSET 0x37
+#define NAME_SIZE 16
+#define HASH_SIZE 32
+#define LOC_SIZE 4
+#define SIZE_SIZE 4
+#define VER_STR_SIZE 4
+#define RUN_SIZE 4
 
-
-char start[4] = "XIPA"; //get rid of null terminator messing up byte sizes. 
+char xipa_fs_start_block[4] = "XIPA"; //get rid of null terminator messing up byte sizes. 
 
 struct xipafs
 {
@@ -95,6 +95,18 @@ struct xipafs
     char* name;
     char* mountpoint;
     uint16_t* id;
+};
+
+struct filerecord
+{
+    //Constant RAM usage - 16+32+4+4+4+4 = 64 bytes
+    char name[NAME_SIZE];
+    char hash[HASH_SIZE];
+    volatile uint8_t* file_loc;
+    size_t size;
+    char ver_str[VER_STR_SIZE];
+    char run[RUN_SIZE];
+    volatile uint8_t* record_loc
 };
 
 struct xipafs_params
@@ -111,6 +123,12 @@ struct xipafs_params
     char* path;
 };
 
+struct xipafs_dir_t
+{
+    volatile unsigned int current_record;
+    volatile unsigned int current_records_to_traverse;
+};
+
 #define XIPAFS_INIT(_name)  \
 LOG_INSTANCE_REGISTER(XIPA_FS_NAME, _name, CONFIG_XIPAFS_LOG_LEVEL);  \
 struct vector _name = {  \
@@ -119,12 +137,14 @@ struct vector _name = {  \
 
 
 int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params); //Path may be unnecesary, I do not think this will integrate into Zephyr's VFS yet..
-int xipa_fs_get_file(struct xipafs *x, char *filename, volatile uint8_t *loc, size_t size, volatile uint8_t *record_loc);
+int xipa_fs_get_file(struct xipafs *x, char *filename, struct filerecord* f);
+
 int xipa_fs_store(struct xipafs* x, char* filename);
 int xipa_fs_delete(struct xipafs* x, char* filename);
 int xipa_fs_unmount(struct xipafs* x);
 int xipa_fs_format(struct xipafs* x);
 int xipa_fs_verify(struct xipafs* x);
+int xipa_fs_dir_init(struct xipafs* x, struct xipafs_dir_t* dir);
 
 
 #endif

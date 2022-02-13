@@ -51,3 +51,10 @@ size_t stack_length(struct stack* s)
     size_t size = vector_length(vecptr);
     return size;
 }
+
+int stack_clear(struct stack* s)
+{
+    struct vector* vecptr = &((struct privatevector*) s->privatevector_ptr)->stackvec;
+    int rc = vector_clear(vecptr);
+    return rc;
+}
