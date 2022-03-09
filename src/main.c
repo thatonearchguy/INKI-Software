@@ -74,7 +74,7 @@ int exp(int x, int n)
 	return 0;
 }
 
-static char sandboxed_memory[128 * 1000] = { 0 };
+static char sandboxedMemory[128 * 1000] = {0 };
 
 //For now, code execution and storage only possible from external or internal flash -> NOT ANYMORE!! WE CAN ITERATE OVER ANY DISK POINTER
 //AND LOAD FROM ANY MEDIUM INTO RAM YAAAAYYYY!!
@@ -102,7 +102,7 @@ int file_to_int_ram(const char* filename)
 				LOG_ERR("File read error");
 				return rc;
 			}
-			//Problem: I gotta read the entire file into memory before i can execute it. That limits things a lot.
+			//Problem: I need to read the entire file into memory before I can execute it. That limits things a lot.
 			uint8_t* ret_buf = (uint8_t*)malloc(dirent.size);
 			if(!ret_buf)
 			{
@@ -166,7 +166,7 @@ void main(void)
 	//TODO - USB DFU TESTING -> DONE AND TESTED YAY!!
 	//TODO - Figure out why USB MASS STORAGE CONFLICTS WITH USB DFU?? -> I am blind and can't read docs - can't act as both at the same time!
 	//TODO - Get USB MASS WORKING AND MOUNTED ON LINUX -> DONE YAY!!
-	//TODO - WAMR INTEGRATION -> DONEISH YAY!!
+	//TODO - WAMR INTEGRATION -> Basically done YAY!!
 	//TODO - DYNAMIC ALLOCATION OF SPACE FOR DISK POINTERS -> DONE YAY!!
 	//TODO NEXT - UNIT TESTS FOR VECTOR CLASS, AND LOOK INTO BEHAVIOR OF MEMCPY AND MEMSET WITH ONLY POINTERS.
 	//TODO NEXT - PORT LVGL TO WAMR (EXPOSE METHODS SOMEHOW) AND PORT MENU & WATCHFACE CODE -> Sorta know how, time to do it!
@@ -197,8 +197,8 @@ void main(void)
     wasm_module_inst_t module_inst = NULL;
 
 	init_args.mem_alloc_type = Alloc_With_Pool;
-    init_args.mem_alloc_option.pool.heap_buf = sandboxed_memory;
-    init_args.mem_alloc_option.pool.heap_size = sizeof(sandboxed_memory);
+    init_args.mem_alloc_option.pool.heap_buf = sandboxedMemory;
+    init_args.mem_alloc_option.pool.heap_size = sizeof(sandboxedMemory);
 
 
 	if(!wasm_runtime_full_init(&init_args))

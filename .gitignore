@@ -8,5 +8,8 @@
 *.swo
 build
 .vscode
+.idea
 debug
+cmake-build-zdebug
+cmake-build-zrelease
 docs/source/_build

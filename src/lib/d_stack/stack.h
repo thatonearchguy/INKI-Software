@@ -32,6 +32,8 @@ int stack_push(struct stack* s, void* element);
 void* stack_pop(struct stack* s);
 size_t stack_length(struct stack* s);
 int stack_destroy(struct stack* s);
+int stack_clear(struct stack* s);
+
 
 
 #endif

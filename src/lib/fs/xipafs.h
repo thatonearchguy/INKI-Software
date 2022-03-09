@@ -77,7 +77,7 @@ A: Have a wander through these files and find out! Joking, I will update this se
 #define XIPA_FS_NAME XiPAFS
 #define NRF_QSPI_XIP_START_ADDR      0x12000000
 #define XIPA_JOURNAL_SIZE 0x40
-#define DEL_NAME "del"
+#define DEL_NAME (char[4]) {0xFF, 0xFF, 0xFF, 0xFF}
 #define FREE_NAME "fre"
 //TODO - Add this to mount function to allow for multiple XIPA_FS instances.
 #define NAME_SIZE 16
@@ -142,7 +142,7 @@ struct vector _name = {  \
 int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params); //Path may be unnecesary, I do not think this will integrate into Zephyr's VFS yet..
 int xipa_fs_get_file(struct xipafs *x, char *filename, struct filerecord* f);
 int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir);
-int xipa_fs_store(struct xipafs* x, char* filename);
+int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size, char* hash, char* ver_str);
 int xipa_fs_delete(struct xipafs* x, char* filename);
 int xipa_fs_unmount(struct xipafs* x);
 int xipa_fs_format(struct xipafs* x);

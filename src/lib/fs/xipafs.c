@@ -60,32 +60,37 @@ if(rc < 0) \
 
 
 int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int record, volatile uint8_t* tableStart);
-int xipa_fs_align(struct xipafs *x);
+int xipa_fs_align(struct xipafs *x, struct filerecord f_del);
 int xipa_fs_verifyparams(struct xipafs_params *ptr);
 int arr_contains_int(uint8_t array[], uint8_t value, int len);
 int arr_contains_string(char* array[], char* value, int len);
 int xipa_fs_check_sizes(uint8_t offsets[6], uint8_t sizes[6], int len);
 int xipa_fs_verifyparams(struct xipafs_params *ptr);
+int xipa_fs_traverse_flash_api(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir);
 
 
-static char xipa_fs_start_block[4] = "XIPA"; //get rid of null terminator messing up byte sizes. 
+static char xipa_fs_start_block[8] = {'X', 'I', 'P', 'A', '\0', '\0', '\0', '\0'}; //get rid of null terminator messing up byte sizes. 
 
 
 struct privatefs_ptr
 {
     //struct vector filerecord_list; //now unnecessary as we are not loading the entire table into memory.
-    bool init;
     uint32_t num_files;
+    uint32_t num_superblocks;
     const struct flash_area *pfa;
     struct xipafs_params *param;
     struct xipa_dev *xip;
-    struct vector operations; //stores pointers to functions in order of atomic operations.
+    struct vector operations; //stores pointers to functions in order of atomic operations. Could help in implementing thread safety.
     struct stack superblock_locations;
+    struct stack superblock_flash_dev_locations;
     struct filerecord f; 
+    unsigned int last_file_end;
     size_t offset;
+    bool init;
+    int64_t storing;
 };
 
-struct xipa_superblock_loc
+struct __attribute__((__packed__)) xipa_superblock_loc //packed to shove into stack safely. is a multiple of 4 bytes so we should be ok.
 {
     volatile unsigned int record;
     volatile uint8_t* superblock_start; //with respect to processor address space!
@@ -244,6 +249,7 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
     int rc;
     char buf[4]; //We are looking for XIPA at the start of the filesystem, effectively a permanent superblock marking a particular
     //storage medium as XIPA_FS.
+    char check[4] = "XIPA";
     int fs_param_ret_code = xipa_fs_verifyparams(params);
     XIPA_ERR_CHECK(x->log, "Invalid parameters, check and remount!", fs_param_ret_code);
 
@@ -267,14 +273,21 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
             LOG_INST_INF(x->log, "I/O Error - could not read device");
         }
     }
-    if (strcmp(buf, xipa_fs_start_block) != 0)
+    if (strcmp(buf, check) != 0)
     {
         LOG_INST_INF(x->log, "Superblock not found! Is filesystem formatted to XIPA?");
         return -ENOENT;
     }
+    //char numsuperblocks[4];
+    rc = flash_area_read(ptr->pfa, 4, buf, sizeof(buf)); //getting number of superblocks on filesystem.
+    if (rc < 0)
+    {
+        return rc;
+    }
+    ptr->num_superblocks = (uint32_t) buf;
     ptr->offset = ptr->pfa->fa_off;
     char numfiles[4];
-    rc = flash_area_read(ptr->pfa, 4, numfiles, 4); //getting number of files on filesystem.
+    rc = flash_area_read(ptr->pfa, sizeof(xipa_fs_start_block), numfiles, 4); //getting number of files on filesystem.
     if (rc < 0)
     {
         return rc;
@@ -282,6 +295,34 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
     ptr->num_files = (uint32_t) numfiles;
     LOG_INST_INF(x->log, "Number of files - %d", ptr->num_files);
     flash_area_close(ptr->pfa); //NOP right now, but for future compatibility this is fine.
+    ptr->init = true;
+    /*
+    We want to use the stack to keep track of where we've gotten up to in the superblock traversal. 
+    If we end up at a record with file extension "ext", we will store the current value of "record" in the stack
+    and start traversing the new superblock at the given location, and so on so forth. 
+    When the function finishes traversing this level of superblock, it will pop a new record off the stack and 
+    resume where it left off. 
+    */
+    stack_init(&ptr->superblock_locations, ptr->num_superblocks, sizeof(struct xipa_superblock_loc));
+    stack_init(&ptr->superblock_flash_dev_locations, ptr->num_superblocks, sizeof(struct xipa_superblock_loc));
+    struct xipafs_dir_t temp_dir;
+    struct filerecord tempfr;
+    xipa_fs_dir_init(x, &temp_dir); //ignore uninitialised warning
+    do {
+        rc = xipa_fs_traverse_flash_api(x, &tempfr, &temp_dir);
+        if(rc < 0)
+        {
+            if(rc == -ENOTDIR)
+            {
+                ptr->last_file_end = (unsigned int)(tempfr.file_loc + tempfr.size);
+                break;
+            }
+            else return -EIO;
+        }
+    }
+    while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, SIZE_SIZE) && tempfr.name[sizeof(tempfr.name)-1] == '\0');
+    xipa_fs_dir_deinit(x, &temp_dir);
+
     ptr->xip = k_malloc(sizeof(struct xipa_dev));
     rc = xip_init(ptr->xip);
     XIPA_ERR_CHECK(x->log, "Could not init XIP!", rc);
@@ -292,16 +333,8 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
     rc = xip_enable(ptr->xip);
     XIPA_ERR_CHECK(x->log, "Could not enable XIP!", rc);
 
-    /*
-    We want to use the stack to keep track of where we've gotten up to in the superblock traversal. 
-    If we end up at a record with file extension "ext", we will store the current value of "record" in the stack
-    and start traversing the new superblock at the given location, and so on so forth. 
-    When the function finishes traversing this level of superblock, it will pop a new record off the stack and 
-    resume where it left off. 
-    */
-    stack_init(&ptr->superblock_locations, 4, sizeof(struct xipa_superblock_loc));
 
-    ptr->init = true;
+    ptr->storing = -1;
 
     return 1;
 }
@@ -316,6 +349,9 @@ int xipa_fs_unmount(struct xipafs *x)
     k_free(ptr->xip); //free xip to prevent further manipulation
     //this should leave QSPI peripheral in a state where standard flash manipulation commands should work perfectly
     //with no XIPA_FS manipulation. 
+    stack_destroy(&ptr->superblock_flash_dev_locations);
+    stack_destroy(&ptr->superblock_locations);
+    vector_deinit(&ptr->operations);
     ptr->init = false;
     return 1;
 }
@@ -352,22 +388,46 @@ volatile void *xipa_vol_memcpy(volatile void *restrict dest,
     return  dest;
 }
 
+int xipa_fs_write_temp_record(struct xipafs *x, struct filerecord* f, unsigned int record, volatile uint8_t* tableStart)
+{
+    struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+    if(!ptr->init)
+        return -EINVAL;
+    if(f->file_loc != NULL && f->hash != NULL && f->name != NULL && f->run != NULL && f->size != 0 && f->ver_str != NULL)
+    {
+        if(ptr->f.file_loc != (volatile uint8_t*)0x0 || ptr->f.size != (size_t)0x0)
+        {
+            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->run_end_offset - RUN_SIZE), f->run, RUN_SIZE);
+            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->name_end_offset - NAME_SIZE), f->name, NAME_SIZE);
+            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE), f->file_loc, LOC_SIZE);
+            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->size_end_offset - SIZE_SIZE), &f->size, SIZE_SIZE);
+            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->hash_end_offset - HASH_SIZE), f->hash, HASH_SIZE);
+            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->vers_end_offset - VER_STR_SIZE), f->ver_str, VER_STR_SIZE);
+            return 1;
+        }
+        else return -EINVAL;
+    }
+    else return -EINVAL;
+    return -EIO;
+}
 int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int record, volatile uint8_t* tableStart)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
     if (!ptr->init)
         return -EINVAL;
-    xipa_vol_memcpy(ptr->f.run, (volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->run_end_offset - RUN_SIZE), RUN_SIZE);
+    //refactored the journal arithmetic to make it more readable.
+    volatile uint8_t* journal_location = (volatile uint8_t*)(tableStart + ((record-1)<<6));
+    xipa_vol_memcpy(ptr->f.run, journal_location + ptr->param->run_end_offset - RUN_SIZE, RUN_SIZE);
     if(ptr->f.run != NULL)
     {
-        xipa_vol_memcpy(ptr->f.name, (volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->name_end_offset - NAME_SIZE), NAME_SIZE);
-        ptr->f.file_loc = __LOC(tableStart + ((record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE);
-        ptr->f.size = (size_t)*(volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->size_end_offset - SIZE_SIZE);
+        xipa_vol_memcpy(ptr->f.name, journal_location + ptr->param->name_end_offset - NAME_SIZE, NAME_SIZE);
+        ptr->f.file_loc = __LOC(journal_location + ptr->param->loc_end_offset - LOC_SIZE);
+        ptr->f.size = (size_t)*journal_location + ptr->param->size_end_offset - SIZE_SIZE;
         if(ptr->f.file_loc != (volatile uint8_t*)0x0 || ptr->f.size != (size_t)0x0)
         {
-            xipa_vol_memcpy(ptr->f.hash, (volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->hash_end_offset - HASH_SIZE), HASH_SIZE);
-            xipa_vol_memcpy(ptr->f.ver_str, (volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->vers_end_offset - VER_STR_SIZE), VER_STR_SIZE);
-            ptr->f.record_loc = __LOC(tableStart + ((record - 1)<<6));
+            xipa_vol_memcpy(ptr->f.hash, journal_location + ptr->param->hash_end_offset - HASH_SIZE, HASH_SIZE);
+            xipa_vol_memcpy(ptr->f.ver_str, journal_location + ptr->param->vers_end_offset - VER_STR_SIZE, VER_STR_SIZE);
+            ptr->f.record_loc = __LOC(journal_location);
             f = &ptr->f;
             return 1;
         }
@@ -384,21 +444,26 @@ int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int
     return -EIO;
 }
 
-
-int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir) //every call to this function will update the filerecord with details of the next file, until the end of directory is reached.
+int xipa_fs_traverse_flash_api(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
     if (!ptr->init)
         return -EINVAL;
-    volatile uint8_t *tableStart = (volatile uint8_t*)(ptr->param->xip_dev_location + sizeof(ptr->num_files) + sizeof(xipa_fs_start_block)); //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
+    const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
+    volatile uint8_t* tableStart = (volatile uint8_t*)(ptr->param->xip_device_offset + sizeof(ptr->num_files) + sizeof(xipa_fs_start_block)); //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
     if(dir->current_records_to_traverse > 1)
     {
-        xipa_vol_memcpy(ptr->f.run, (volatile uint8_t*)(tableStart + ((dir->current_record-1)<<6) + ptr->param->run_end_offset - RUN_SIZE), RUN_SIZE);
-        if(strcmp(ptr->f.run, "ext") == 0)
+        char journal[XIPA_JOURNAL_SIZE];
+        flash_read(flash_dev, (off_t)tableStart+(dir->current_record*XIPA_JOURNAL_SIZE), journal, XIPA_JOURNAL_SIZE);
+        struct filerecord temp_fr;
+        xipa_fs_populate_record(x, &temp_fr, 1, journal);
+        if(strcmp(temp_fr.run, "ext") == 0)
         {
+            if(ptr->num_superblocks < 2) return -EIO;
+            xipa_fs_populate_record(x, f, 1, journal);
             volatile struct xipa_superblock_loc yeet = {.record = dir->current_record, .superblock_start = tableStart};
             //This should be ok, stack_push carries out malloc and copies manually internally rather than just storing pointers.
-            stack_push(&ptr->superblock_locations, (struct xipa_superblock_loc*)&yeet);
+            stack_push(&ptr->superblock_flash_dev_locations, (struct xipa_superblock_loc*)&yeet);
             //No memcpy required here as we are reading a known datatype.
             volatile uint8_t* new_tablestart = __LOC(tableStart + ((dir->current_record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE);
             tableStart = new_tablestart;
@@ -406,9 +471,12 @@ int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t
         }
         else if(arr_contains_string((char**)xipa_file_extensions, ptr->f.run, ARRAY_SIZE(xipa_file_extensions))==-1) //Checking if file extension is null or garbage, meaning a valid record does not exist (i.e we have moved into the null area) and we need to stop traversing.
         {
-            if(stack_length(&ptr->superblock_locations)>0)
+            if(stack_length(&ptr->superblock_flash_dev_locations)>0)
             {
-                volatile struct xipa_superblock_loc back = *(volatile struct xipa_superblock_loc*)stack_pop(&ptr->superblock_locations);
+                if(ptr->num_superblocks < 2) return -EIO;
+                volatile struct xipa_superblock_loc* back_ptr = (volatile struct xipa_superblock_loc*)stack_pop(&ptr->superblock_locations);
+                volatile struct xipa_superblock_loc back = *back_ptr;
+                free(back_ptr);
                 volatile unsigned int records_left = dir->current_records_to_traverse - (dir->current_record - back.record);
                 tableStart = back.superblock_start;
                 dir->current_record = back.record;
@@ -428,8 +496,75 @@ int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t
         {
             if(ptr->f.run[RUN_SIZE-1]=='\0')
             {
-                int rc = xipa_fs_populate_record(x, f, dir->current_record, tableStart); //this is sorta shitty as we're passing the filerecord pointer down three levels...
+                int rc = xipa_fs_populate_record(x, f, 1, journal); //this is a bit crap as we're passing the filerecord pointer down three levels...
                 XIPA_ERR_CHECK(x->log, "Could not populate record", rc);
+                return rc;
+            }
+        }
+        dir->current_record++;
+    }
+    else 
+    {
+        return -ENOTDIR;
+        LOG_INST_WRN(x->log, "Reached end of directory, reset dir structure");
+    }
+    return -EIO;
+
+}
+
+int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir) //every call to this function will update the filerecord with details of the next file, until the end of directory is reached.
+{
+    struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+    if (!ptr->init)
+        return -EINVAL;
+    volatile uint8_t *tableStart = (volatile uint8_t*)(ptr->param->xip_dev_location + sizeof(ptr->num_files) + sizeof(xipa_fs_start_block) + sizeof(ptr->num_superblocks)); //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
+    if(dir->current_records_to_traverse > 1)
+    {
+        xipa_vol_memcpy(ptr->f.run, (volatile uint8_t*)(tableStart + ((dir->current_record-1)<<6) + ptr->param->run_end_offset - RUN_SIZE), RUN_SIZE);
+        if(strcmp(ptr->f.run, "ext") == 0)
+        {
+            if(ptr->num_superblocks < 2) return -EIO;
+            volatile struct xipa_superblock_loc yeet = {.record = dir->current_record, .superblock_start = tableStart};
+            //This should be ok, stack_push carries out malloc and copies manually internally rather than just storing pointers.
+            stack_push(&ptr->superblock_locations, (struct xipa_superblock_loc*)&yeet);
+            //No memcpy required here as we are reading a known datatype.
+            //Additionally, since the location offsets are done with respect to the start of the flash, we need to add the xip dev location
+            //and subtract the xip offset to jump to the correct place in XIP memory space.
+            volatile uint8_t* new_tablestart = __LOC(tableStart + ((dir->current_record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE) + (unsigned int)ptr->param->xip_dev_location - (unsigned int)ptr->param->xip_device_offset;
+            tableStart = new_tablestart;
+            dir->current_record = (volatile unsigned int)1;
+        }
+        else if(arr_contains_string((char**)xipa_file_extensions, ptr->f.run, ARRAY_SIZE(xipa_file_extensions))==-1) //Checking if file extension is null or garbage, meaning a valid record does not exist (i.e we have moved into the null area) and we need to stop traversing.
+        {
+            if(stack_length(&ptr->superblock_locations)>0)
+            {
+                if(ptr->num_superblocks < 2) return -EIO;
+                volatile struct xipa_superblock_loc* back_ptr = (volatile struct xipa_superblock_loc*)stack_pop(&ptr->superblock_locations);
+                volatile struct xipa_superblock_loc back = *back_ptr;
+                free(back_ptr);
+                volatile unsigned int records_left = dir->current_records_to_traverse - (dir->current_record - back.record);
+                tableStart = back.superblock_start;
+                dir->current_record = back.record;
+                dir->current_records_to_traverse = dir->current_record + records_left;
+                if(dir->current_records_to_traverse > ptr->num_files)
+                {
+                    LOG_INST_ERR(x->log, "IO Error - rtt %i > num_files %i", dir->current_records_to_traverse, ptr->num_files);
+                    return -EIO;
+                }
+            }
+            else
+            {
+                dir->current_records_to_traverse = 1;
+            }
+        }
+        else
+        {
+            if(ptr->f.run[RUN_SIZE-1]=='\0')
+            {
+                int rc = xipa_fs_populate_record(x, f, dir->current_record, tableStart); //eek we're passing the filerecord pointer down three levels...
+                XIPA_ERR_CHECK(x->log, "Could not populate record", rc);
+                f->record_loc = f->record_loc + (unsigned int)(ptr->param->xip_dev_location - ptr->param->xip_device_offset);
+
                 return rc;
             }
         }
@@ -460,6 +595,7 @@ int xipa_fs_get_file(struct xipafs *x, char *filename, struct filerecord* f)
     {
         return -EINVAL;
     }
+    stack_clear(&ptr->superblock_locations);
     struct xipafs_dir_t dir;
     xipa_fs_dir_init(x, &dir);
     //each journal entry is 64 bytes (#wordaligned gang) so we will iterate through until we find our entry!
@@ -521,6 +657,7 @@ int xipa_fs_get_file(struct xipafs *x, char *filename, struct filerecord* f)
         }
     }
     return -ENFILE;
+    //stack is not cleared until next read operation, should traverse be a private method?
 }
 
 //Ensure XIP threads are disabled before calling this!
@@ -552,23 +689,24 @@ int xipa_fs_format(struct xipafs* x)
 
 int xipa_fs_verify(struct xipafs* x)
 {
-    return -EOPNOTSUPP;
+    struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+    
+
 }
-int xipa_fs_store(struct xipafs* x, char* filename)
-{
-    return -EOPNOTSUPP;
-}
+
 
 //Pause XIP apps before calling this unless you love chaos and death.
 int xipa_fs_delete(struct xipafs* x, char* filename)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+    if(ptr->num_files == 0) return -EINVAL;
     volatile uint8_t* deletion_offset = 0;
     volatile uint8_t* record_offset = 0;
+    struct filerecord tempfr;
     size_t size = 0;
-    int rc = xipa_fs_get_file(x, filename, NULL); //we don't need an accessible pointer, we will manipulate directly from within. 
+    int rc = xipa_fs_get_file(x, filename, &tempfr); 
     XIPA_ERR_CHECK(x->log, "Could not get file name!", rc);
-    if(ptr->f.record_loc==(volatile uint8_t*)0 || ptr->f.file_loc==(volatile uint8_t*)0 || ptr->f.size==0)
+    if(tempfr.record_loc==(volatile uint8_t*)0 || tempfr.file_loc==(volatile uint8_t*)0 || tempfr.size==0)
     {
         LOG_INST_ERR(x->log, "Offsets zero!");
         return -EINVAL;
@@ -579,117 +717,266 @@ int xipa_fs_delete(struct xipafs* x, char* filename)
     rc = flash_area_open(ptr->pfa->fa_id, &ptr->pfa);
     XIPA_ERR_CHECK(x->log, "Could not open flash area!", rc);
 
-    rc = flash_area_erase(ptr->pfa, (off_t)ptr->f.file_loc-(off_t)ptr->param->xip_dev_location, size);
+    rc = flash_area_erase(ptr->pfa, (off_t)(tempfr.file_loc-ptr->param->xip_dev_location), size);
     XIPA_ERR_CHECK(x->log, "Could not erase file!", rc);
-    LOG_INST_INF(x->log, "Erased %i byte file data at %i (0-based offset)", size, (off_t)deletion_offset-(off_t)ptr->param->xip_dev_location);
-
-    rc = flash_area_write(ptr->pfa, (off_t)ptr->f.record_loc-(off_t)ptr->param->xip_dev_location+(off_t)ptr->param->run_end_offset-(off_t)RUN_SIZE, &DEL_NAME, RUN_SIZE);
+    LOG_INST_INF(x->log, "Erased %i byte file data at %i (0-based offset)", size, (off_t)(deletion_offset-ptr->param->xip_dev_location));
+    rc = flash_area_write(ptr->pfa, (off_t)(tempfr.record_loc-ptr->param->xip_dev_location+ptr->param->run_end_offset-RUN_SIZE), DEL_NAME, RUN_SIZE);
     XIPA_ERR_CHECK(x->log, "Could not erase file record!", rc);
-    LOG_INST_INF(x->log, "Marked %i byte file record at %i (0-based offset) as erased", XIPA_JOURNAL_SIZE, (off_t)record_offset-(off_t)ptr->param->xip_dev_location);
+    LOG_INST_INF(x->log, "Marked %i byte file record at %i (0-based offset) as erased", XIPA_JOURNAL_SIZE, (off_t)(record_offset-ptr->param->xip_dev_location));
     flash_area_close(ptr->pfa);
-    if(ptr->num_files > 1)
-    {
-        rc = xipa_fs_align(x); //this function will align the main memory blocks 
-        if(rc < 0)
-        {
-            return rc;
-        }
-    }
+    if(ptr->num_files > 0) rc = xipa_fs_align(x, tempfr); //this function will align the main memory blocks 
+    if(rc < 0) return rc;
     xip_enable(ptr->xip);
     return 1;
 }
 
-int xipa_fs_align(struct xipafs *x)
+
+int arr_subset(uint8_t* d, uint8_t* s, uint32_t start, uint32_t len)
+{
+    for(uint32_t i = 0; i < len; i++)
+    {
+        d[i] = s[start+i];
+    }
+    return 1;
+}
+
+int xipa_fs_align(struct xipafs *x, struct filerecord f_del)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
-    /*in align, we want to move everything stored after a deleted file to the start of its offset. 
-    the deleted file's region should be zero.
-    */
-    //ok i am massively overcomplicating this, there will never be more than one deleted record that needs dealing with. . 
-    int del_count;
-    struct vector filerecords;
-    vector_init(&filerecords, 4, sizeof(struct filerecord));
+    struct filerecord tempfr;
     struct xipafs_dir_t dir;
-    xipa_fs_dir_init(x, dir);
-    struct filerecord* f;
-    int rc = flash_area_open(ptr->pfa->fa_id, &ptr->pfa);
-    volatile uint8_t* starting_offset = 0;
-    int traverse_rc;
-    int record_inc = 0;
-    //user might have TONNES of files, so we are going to trade RAM for CPU cycles and make the CPU traverse the entire filesystem block to find 
-    //the next record to update. It should be okay for just a few dozen files which is the general intended use case, but 
-    //things might get sticky in the hundreds of thousands of files!!
-    //(but then again this filesystem is NOT intended for processors which can access something large enough to warrant having hundreds of thousands of read only files lmao)
-    xip_enable(ptr->xip);
-    XIPA_ERR_CHECK(x->log, "Could not open flash area during align operation", rc);
-    bool delrecord = false;
-    bool alignrequired = false;
-    while(!delrecord)
-    {
-        traverse_rc = xipa_fs_traverse(x, f, &dir);
-        if(strcmp(f->run, DEL_NAME)==0)
-        {
-            struct xipafs_dir_t checkdir;
-            xipa_fs_dir_init(x, checkdir);
-            struct filerecord f2;
-            for(int i = 0; i < ptr->num_files - 1; i ++)
-            {
-                traverse_rc = xipa_fs_traverse(x, &f2, &checkdir);
-                if(traverse_rc < 0)
-                {
-                    break;
-                }
-                if(f2.file_loc > f->file_loc)
-                {
-                    alignrequired = true; 
-                }
-            }
-            if(alignrequired == false)
-            {
-                LOG_INST_INF(x->log, "File was logically last, no align required!");
+    int rc;
+    volatile uint8_t* deletion_offset = f_del.file_loc - ptr->param->xip_dev_location + ptr->param->xip_device_offset;
+    volatile uint8_t* record_offset = f_del.record_loc - ptr->param->xip_dev_location + ptr->param->xip_device_offset;
+    if(ptr->num_files == 0) return -EINVAL;
+           
+    int flash_init_rc = flash_area_open(ptr->pfa->fa_id, &ptr->pfa);
+    /*
+        user might have TONNES of files, so we are going to trade RAM for CPU cycles and make the CPU traverse the entire filesystem block to find 
+        the next record to update. It should be okay for just a few dozen files which is the general intended use case, but 
+        things might get sticky in the hundreds of thousands of files!!
+        (but then again this filesystem is NOT intended for processors which can access something large enough to warrant having hundreds of thousands of read only files lmao)
+    */
 
-            }
-        }
-
-    }
-
-    for(int i = 0; i < ptr->num_files-1; i++)
-    {
-        traverse_rc = xipa_fs_traverse(x, f, &dir);
-        if(strcmp(f->run, DEL_NAME)==0)
-        {
-            del_record_found = true;
-        }
-    }
-    if(del_record_found == false)
-    {
-        xipa_fs_traverse(x, f, &dir);
-        if(strcmpf->run, DEL_NAME)
-        LOG_INST_WRN(x->log, "Deleted record was las")
-    }
-    if(f == NULL)
-    {
-        LOG_INST_ERR(x->log, "Filesystem corrupted! Could not get a valid record");
-        return -ENOENT;
-    }
-    volatile uint8_t* deleted_loc = f->file_loc;
-    volatile uint8_t* deleted_size = (volatile uint8_t*)(f->size)*sizeof(size_t);
-    volatile uint8_t* desired_loc = deleted_loc + deleted_size;
-    volatile uint8_t* add_offset = 0;
-    char* buf[8192]; //a memory intensive process - we will copy and write 8kb at a time.
-    while(f!=NULL)
-    {
-        xip_fs_traverse(x, f, &dir);
-        if(f->file_loc == desired_loc)
-        {
-            while(add_offset<deleted_size)
-            {
-                flash_area_read(ptr->pfa, desired_loc - ptr->param->xip_dev_location, buf, ARRAY_SIZE(buf));
-                
-            }
-        }
-    }
-
-   
+    XIPA_ERR_CHECK(x->log, "Could not open flash area during align", flash_init_rc);
+    //xip_enable(ptr->xip);
     
+    xipa_fs_dir_init(x, &dir);
+    
+    //also we want to store the superblock offsets:
+    struct vector superblocks;
+    vector_init(&superblocks, ptr->num_superblocks, sizeof(unsigned int)); //there should ideally only be one superblock added here, otherwise
+    //we have quite a cursed situation going on potentially. 
+    struct xipafs_dir_t temp_dir;
+    //check first superblock (i.e start of flash)
+    if(record_offset < sizeof(ptr->num_files) + sizeof(ptr->num_superblocks) + sizeof(xipa_fs_start_block) + ptr->param->xip_device_offset + (XIPA_JOURNAL_SIZE * 1000))
+    {
+        unsigned int sb_ptr = (unsigned int)ptr->param->xip_device_offset + sizeof(ptr->num_files) + sizeof(ptr->num_superblocks) + sizeof(xipa_fs_start_block);
+        vector_push_back(&superblocks, &sb_ptr); //this is fine, sb_ptr can go out of scope because it's safely stored in our vector.
+    }
+    xipa_fs_dir_init(x, &temp_dir); //ignore uninitialised warning
+    do {
+        rc = xipa_fs_traverse_flash_api(x, &tempfr, &temp_dir);
+        if(rc < 0)
+        {
+            if(rc == -ENOTDIR)
+            {
+                ptr->last_file_end = (unsigned int)(tempfr.file_loc + tempfr.size);
+                break;
+            }
+            else return -EIO;
+        }
+        //because of how the adding logic will work, superblocks added to the vector must be in logical order,
+        //that is they will appear in order on the physical storage medium. 
+        if(tempfr.run == xipa_file_extensions[0] && //superblock entry
+        (tempfr.file_loc > deletion_offset || //superblock is located beyond the starting offset of the file we are deleting
+        (tempfr.file_loc < deletion_offset && (tempfr.file_loc + 0x10000) > deletion_offset))) //superblock entry located inside the current superblock entry.
+        {
+            unsigned int sb_ptr_sec = (unsigned int)tempfr.file_loc;
+            vector_push_back(&superblocks, &sb_ptr_sec); //safe as it will be copied into the vector memory.
+        }
+    }
+    while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, SIZE_SIZE) && tempfr.name[sizeof(tempfr.name)-1] == '\0');
+
+    //we need to do low level block access so we need to get the underlying device.
+    const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
+    struct flash_pages_info* flash_bound_info;
+    //we must add the device offset now, because we have gone down a layer of abstraction.
+    //off_t prepared_del_off = (off_t)(deletion_offset-ptr->param->xip_dev_location+ptr->param->xip_device_offset);
+    rc = flash_get_page_info_by_offs(flash_dev, (unsigned int)deletion_offset, flash_bound_info);
+    XIPA_ERR_CHECK(x->log, "IO Error - deletion offset outside bounds", rc);
+    size_t size_of_erasearea = flash_bound_info->size+XIPA_JOURNAL_SIZE;
+    char* eraseArea = malloc(size_of_erasearea);
+    //Now we have the actual flash page data.
+    if(eraseArea == NULL)
+    XIPA_ERR_CHECK(x->log, "OOM!!? - could not allocate enough memory to perform deletion operation!", rc);
+
+    //Now, we will calculate how far away we are from the start of the superblock, and divide by XIPA_JOURNAL_SIZE to get
+    //the number of records we are away from the start. 
+
+    int buffer_shift_count = 0;
+    int current_superblock = 0;
+    rc = flash_read(flash_dev, flash_bound_info->start_offset, eraseArea, size_of_erasearea);
+    XIPA_ERR_CHECK(x->log, "Could not read data into memory", rc);
+
+    while(current_superblock < vector_length(&superblocks) - 1)
+    {
+        unsigned int* current_superblock_loc_ptr = (unsigned int*)vector_get(&superblocks, current_superblock);
+        unsigned int current_superblock_loc = *current_superblock_loc_ptr;
+        free(current_superblock_loc_ptr);
+        rc = flash_get_page_info_by_offs(flash_dev, current_superblock_loc, flash_bound_info);
+        XIPA_ERR_CHECK(x->log, "Could not get containing bounds for non-primary superblock", rc);
+        int temp_computed_record = (flash_bound_info->start_offset - current_superblock_loc)/XIPA_JOURNAL_SIZE;
+        int intra_buffer_index = ((off_t)record_offset - flash_bound_info->start_offset)/XIPA_JOURNAL_SIZE;
+        do 
+        {
+            xipa_fs_populate_record(x, &tempfr, intra_buffer_index, eraseArea);
+            tempfr.file_loc -= f_del.size;
+            xipa_fs_write_temp_record(x, &tempfr, intra_buffer_index, eraseArea);
+            if(++intra_buffer_index > flash_bound_info->size / XIPA_JOURNAL_SIZE)
+            {
+                //erase the block of flash in question
+                rc = flash_erase(flash_dev, flash_bound_info->start_offset + ((buffer_shift_count) * flash_bound_info->size), flash_bound_info->size); 
+                XIPA_ERR_CHECK(x->log, "Erase failed", rc);
+                //now, we are sneaky and we've managed to shift all the data we need into position with one memmove, so let's write it!
+                rc = flash_write(flash_dev, flash_bound_info->start_offset + ((buffer_shift_count) * flash_bound_info->size), eraseArea, flash_bound_info->size);
+                XIPA_ERR_CHECK(x->log, "Write failed", rc);
+
+                //now, let's read the next block of memory.
+                                                                        //eeeeehhh, this could be more elegant by directly updating start_offset, but this makes more sense
+                                                                        //and will hopefully be easier to debug. 
+                rc = flash_read(flash_dev, flash_bound_info->start_offset + ((++buffer_shift_count) * flash_bound_info->size), eraseArea, size_of_erasearea);
+                if(current_superblock == 0) // we are only shifting memory in the first superblock as we've deleted a record. 
+                {
+                    memmove((eraseArea+(intra_buffer_index*XIPA_JOURNAL_SIZE)), 
+                    (eraseArea+(intra_buffer_index+1*XIPA_JOURNAL_SIZE)), 
+                    (size_of_erasearea-((intra_buffer_index)*XIPA_JOURNAL_SIZE)));
+                }
+                XIPA_ERR_CHECK(x->log, "Read failed", rc);
+                intra_buffer_index = 0;
+                buffer_shift_count++;
+            }
+        }
+        while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, RUN_SIZE) && 
+            tempfr.name[sizeof(tempfr.name)-1] == '\0' &&
+            (temp_computed_record + (buffer_shift_count * (flash_bound_info->size / XIPA_JOURNAL_SIZE))) > 1000);
+        current_superblock ++;
+    }
+
+
+/*
+    first superblock has now been completely modified. 
+    Time to go through the rest of the files, starting from the end offset, and copy everything right until the end.
+    One limitation here, is that Nordic QSPI is capable of 64KB erase, but Zephyr will generally only expose the ability to erase 4KB at a time.
+    A future TODO might be to add another parameter that defines a user defined erase size, but this is dangerous!! It would be much safer
+    to rely on pre-built drivers. We will see.
+*/   
+    //We have location of last file from first traversal, so now we copy 4096 bytes from end of deleted file, erase starting 4096 bytes, and write the 4096 until our pointer is greater than or equal to the 
+    //ending offset of the filesystem.
+    unsigned int main_align_ptr = (unsigned int)f_del.file_loc;
+    rc = flash_get_page_info_by_offs(flash_dev, main_align_ptr, flash_bound_info); //first we need to get the initial overlap as the files may not be 4096 byte aligned.
+    size_t bytes_to_read_left = main_align_ptr - flash_bound_info->start_offset;
+    size_t bytes_to_read_right = (unsigned int)(flash_bound_info->size - bytes_to_read_left);
+    //we can assume all files will be 4 byte aligned though, sub-word alignment will be hell. Adding function will pad anything up to a multiple of 4.
+    rc = flash_read(flash_dev, main_align_ptr-bytes_to_read_left, eraseArea, bytes_to_read_left);
+    XIPA_ERR_CHECK(x->log, "Read failed", rc);
+
+    rc = flash_read(flash_dev, main_align_ptr+f_del.size, eraseArea, bytes_to_read_right);
+    XIPA_ERR_CHECK(x->log, "Read failed", rc);
+
+    rc = flash_erase(flash_dev, flash_bound_info->start_offset, flash_bound_info->size);
+    XIPA_ERR_CHECK(x->log, "Erase failed", rc);
+
+    rc = flash_write(flash_dev, flash_bound_info->start_offset, eraseArea, flash_bound_info->size);
+    XIPA_ERR_CHECK(x->log, "Write failed", rc);
+
+    unsigned int reach_ptr = (unsigned int)(f_del.file_loc + f_del.size + bytes_to_read_right);
+    unsigned int current_ptr = flash_bound_info->start_offset + flash_bound_info->size;
+    while(reach_ptr < (unsigned int)(ptr->last_file_end + flash_bound_info->size)) //if last bit of last file is in between another sector, we need to copy that sector too. 
+    {
+        rc = flash_read(flash_dev, reach_ptr, eraseArea, flash_bound_info->size);
+        XIPA_ERR_CHECK(x->log, "Read failed", rc);
+
+        rc = flash_erase(flash_dev, current_ptr, flash_bound_info->size);
+        XIPA_ERR_CHECK(x->log, "Erase failed", rc);
+
+        rc = flash_write(flash_dev, current_ptr, eraseArea, flash_bound_info->size);
+        XIPA_ERR_CHECK(x->log, "Write failed", rc);
+
+        reach_ptr += flash_bound_info->size; //moving to next sector in flash
+        current_ptr += flash_bound_info->size;
+    }
+    ptr->last_file_end -= f_del.size;
+    vector_deinit(&superblocks);
+    free(eraseArea);
+    xipa_fs_dir_deinit(x, &temp_dir);
+    return 1;
 }
+
+int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size, char* hash, char* ver_str)
+{
+    struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+    if(ptr->storing > 0) return -EINVAL;
+    if(strlen(filename) > NAME_SIZE) return -EINVAL;
+    if(strlen(extension) > RUN_SIZE) return -EINVAL;
+    if(strlen(hash) != HASH_SIZE) return -EINVAL;
+    if(strlen(ver_str) > VER_STR_SIZE) return -EINVAL;
+    int extension_index = arr_contains_string((char**)xipa_file_extensions, extension, RUN_SIZE);
+    if(extension_index == -1) return -EINVAL;
+    if(size % 4 != 0) return -EINVAL;
+    if(ptr->last_file_end + size > ptr->param->dev_size) return -EINVAL;
+    //we want to get location of file record for very last file. we will append our new data onto the end of the corresponding superblock. 
+    struct xipafs_dir_t tempdir;
+    xipa_fs_dir_init(x, &tempdir);
+    struct filerecord tempfr;
+    int traverse_rc = 0;
+    while(traverse_rc != -ENOTDIR)
+    {
+        xipa_fs_traverse_flash_api(x, &tempfr, &tempdir);
+        XIPA_ERR_CHECK(x->log, "IO Error - filesystem corrupted?", traverse_rc);
+    }
+    if((unsigned int)(tempfr.file_loc + tempfr.size) != ptr->last_file_end) return -EIO;
+    char newJournalEntry[XIPA_JOURNAL_SIZE];
+    tempfr.file_loc = (volatile uint8_t*)ptr->last_file_end;
+    memcpy(tempfr.name, filename, NAME_SIZE);
+    memcpy(tempfr.run, extension, RUN_SIZE);
+    memcpy(tempfr.hash, hash, HASH_SIZE);
+    memcpy(tempfr.ver_str, ver_str, VER_STR_SIZE);
+    tempfr.size = size;
+    //we need to do low level block access so we need to get the underlying device.
+    const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
+    struct flash_pages_info* flash_bound_info;
+    //we must add the device offset now, because we have gone down a layer of abstraction.
+    //off_t prepared_del_off = (off_t)(deletion_offset-ptr->param->xip_dev_location+ptr->param->xip_device_offset);
+    unsigned int new_record_loc = (unsigned int)(tempfr.record_loc + XIPA_JOURNAL_SIZE);
+    int rc = flash_get_page_info_by_offs(flash_dev, new_record_loc, flash_bound_info);
+    XIPA_ERR_CHECK(x->log, "IO Error - deletion offset outside bounds", rc);
+    rc = xipa_fs_write_temp_record(x, &tempfr, 0, newJournalEntry);
+    XIPA_ERR_CHECK(x->log, "IO Error - temporary record construction failed", rc);
+
+    rc = flash_write(flash_dev, new_record_loc, newJournalEntry, XIPA_JOURNAL_SIZE);
+    XIPA_ERR_CHECK(x->log, "IO Error - new record write failed", rc);
+    ptr->last_file_end += size;
+    xipa_fs_dir_deinit(x, &tempdir);
+    ptr->storing = 0;
+    ptr->f = tempfr;
+    return 1;
+}
+
+int xipa_fs_data_store_cb(struct xipafs* x, void* buf, size_t buf_size)
+{
+    struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+    if(ptr->storing == -1) return -EINVAL;
+    const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
+    flash_write(flash_dev, (unsigned int)(ptr->f.file_loc + ptr->storing), buf, buf_size);
+    ptr->storing += buf_size;
+    if(ptr->storing == ptr->f.size)
+    {
+        ptr->storing = -1;
+        return 1;
+    }
+    return 0;
+}
+
+
+

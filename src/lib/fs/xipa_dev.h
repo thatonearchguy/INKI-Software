@@ -18,11 +18,15 @@ struct xipa_dev {
 typedef int (*xipa_xip_setoffset)(const struct xipa_dev*, off_t xip_offset);
 typedef int (*xipa_xip_enable)(const struct xipa_dev*);
 typedef int (*xipa_xip_disable)(const struct xipa_dev*);
+typedef int (*xipa_sha256_frag_verif)(const struct xipa_dev*, void* frag_buf, size_t frag_len);
+typedef int (*xipa_sha256_frag_finish)(const struct xipa_dev* dev, void* hash_buf);
 
 
 //May add more funcions to api, but this is enough for now!
 __subsystem struct xipa_dev_api
 {
+    xipa_sha256_frag_verif verif;
+    xipa_sha256_frag_finish fin;
     xipa_xip_setoffset setoffset;
     xipa_xip_enable en;
     xipa_xip_disable di;
@@ -44,6 +48,17 @@ static inline int xip_disable(const struct xipa_dev* dev)
 static inline int xip_setoffset(const struct xipa_dev* dev, off_t offset)
 {
     return dev->api->setoffset(dev, offset);
+}
+
+static inline int xipa_frag_sha256_verif(const struct xipa_dev* dev, void* frag_buf, size_t frag_len)
+{
+    return dev->api->verif(dev, frag_buf, frag_len);
+}
+
+
+static inline int xipa_frag_sha256_fin(const struct xipa_dev* dev, void* hash_buf)
+{
+    return dev->api->fin(dev, hash_buf);
 }
 
 int xip_init(struct xipa_dev* dev);

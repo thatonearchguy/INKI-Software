@@ -28,7 +28,7 @@ set (LV_CONF_PATH
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lv_conf.h
     CACHE STRING "" FORCE)
 
-set (WAMR_ROOT_DIR 
+set (WAMR_ROOT_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/wasm)
 
 set (MCUBOOT_DIR $ENV{ZEPHYR_BASE}/../bootloader/mcuboot)

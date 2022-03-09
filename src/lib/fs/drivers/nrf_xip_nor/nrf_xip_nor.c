@@ -16,6 +16,8 @@
 #include <errno.h>
 #include <hal/nrf_qspi.h>
 #include <nrfx_qspi.h>
+#include <../../nrf_cc310_bl/include/nrf_cc310_bl_init.h>
+#include <../../nrf_cc310_bl/include/nrf_cc310_bl_hash_sha256.h>
 #include "../../xipa_dev.h"
 
 #define mod_name nrf_xip_qspi_xipa_drv
@@ -23,6 +25,14 @@
 
 NRF_QSPI_Type nrf_qspi_reg;
 off_t xipo;
+static struct crypto_ctx 
+{
+    int initialised;
+    int64_t bytes_checked;  
+    nrf_cc310_bl_hash_context_sha256_t *const p_hash_context;  
+};
+
+struct crypto_ctx sha_operation = {.bytes_checked = -1, .initialised = -1};
 
 static int nrf_qspi_xip_setoffset(const struct xipa_dev* dev, off_t xip_offset)
 {
@@ -59,10 +69,47 @@ static int nrf_qspi_xip_disable(const struct xipa_dev* dev)
     return nrf_qspi_xip_fs_set(dev, false);
 }
 
+static int nrf_qspi_sha256_verif(const struct xipa_dev* dev, void* frag_buf, size_t frag_len)
+{
+    CRYSError_t err_code;
+    if(sha_operation.initialised == -1)
+    {
+        if(nrf_cc310_bl_init() != 0)
+        {
+            return -1;
+        }
+        NRF_CRYPTOCELL->ENABLE = 1;
+
+        err_code = nrf_cc310_bl_hash_sha256_init(sha_operation.p_hash_context);
+        if(err_code != CRYS_OK) return err_code;
+        sha_operation.initialised = 1;
+        sha_operation.bytes_checked = 0;
+    }
+    err_code = nrf_cc310_bl_hash_sha256_update(sha_operation.p_hash_context, (const uint8_t*)frag_buf, (uint32_t)frag_len);
+    return err_code;
+}
+
+static int nrf_qspi_sha256_finish(const struct xipa_dev* dev, void* hash_buf)
+{
+    CRYSError_t err_code = nrf_cc310_bl_hash_sha256_finalize(sha_operation.p_hash_context, (uint8_t*)hash_buf);
+    if(err_code = CRYS_OK)
+    {
+        sha_operation.initialised = -1;
+        sha_operation.bytes_checked = 0;
+        NRF_CRYPTOCELL->ENABLE = 0;
+        return 1;
+    }
+    return err_code;
+}
+
+
+
 static const struct xipa_dev_api nrf_qspi_xip_api = {
     .di = nrf_qspi_xip_disable,
     .en = nrf_qspi_xip_enable,
     .setoffset = nrf_qspi_xip_setoffset,
+    .verif = nrf_qspi_sha256_finish,
+    .fin = nrf_qspi_sha256_finish,
 };
 
 int xip_init(struct xipa_dev* dev)

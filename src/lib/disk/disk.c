@@ -39,7 +39,8 @@ int base_init(struct baseDisk *b, char* label)
 }
 int base_deinit(struct baseDisk *b)
 {
-	int retcode = b->vtable->deinit(b);
+    int retcode;
+    retcode = b->vtable->deinit(b);
 	LOG_INST_WRN(b->log, "Deinitialised.");
 	return retcode;
 }

@@ -15,7 +15,7 @@ struct privatevector
     void* items;
     size_t item_size;
     size_t capacity;
-    size_t num_items;
+    unsigned int num_items;
     size_t allocated_items;
 };
 
@@ -145,6 +145,8 @@ int vector_insert_at(struct vector* v, int index, void* element)
         LOG_INST_ERR(v->log, "Invalid index: %i", index);
         return -EINVAL;
     }
+    char* testing_str = "hello world this is some important binary code";
+
     //Secondly, the index is -1, meaning the item is to be appended to the back of the list.
     if (index == -1)
     {
@@ -157,7 +159,7 @@ int vector_insert_at(struct vector* v, int index, void* element)
     {
         vector_resize(v, ptr->allocated_items*2);
     }
-    memmove((void*)vector_get_index_pointer(v, index+1), (void*)vector_get_index_pointer(v, index), ptr->item_size);
+    if(index < ptr->num_items) memmove((void*)vector_get_index_pointer(v, index+1), (void*)vector_get_index_pointer(v, index), (ptr->num_items - index) * ptr->item_size);
     memcpy((void*)vector_get_index_pointer(v, index), element, ptr->item_size);
     ptr->num_items++;
     return 1;
@@ -181,7 +183,7 @@ size_t vector_allocated_size(struct vector* v)
     struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
     return ptr->item_size * ptr->allocated_items;
 }
-size_t vector_length(struct vector* v)
+unsigned int vector_length(struct vector* v)
 {
     struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
     return ptr->num_items;
