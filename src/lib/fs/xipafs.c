@@ -41,11 +41,6 @@ adding, removing files a composition of granular processes that
 
 */
 
-/*
-
-TODO - 
-
-*/
 
 LOG_LEVEL_SET(LOG_LEVEL_INF);
 
@@ -122,10 +117,15 @@ struct __attribute__((__packed__)) xipa_superblock_loc //packed to shove into st
 
 //XIPA-FS filesystems, to minimise unnecessary aligns and wearing down the flash, will have a fixed
 //starting block of 64 KiloBytes. This will contain all the required information about the binary files.
-//The file system keep some information stored
 
-//TODO - Change offsets to ENDING OFFSETS -> Done!! YAY!!
-
+/**
+ * @brief Helper funcion to return the index of a number stored in an array
+ * 
+ * @param array Input array
+ * @param value Desired integer to find
+ * @param len Length of array
+ * @return Index of element if found, else -1.
+ */
 int arr_contains_int(uint8_t array[], uint8_t value, int len)
 {
     for(int i = 0; i < len; i++)
@@ -138,6 +138,14 @@ int arr_contains_int(uint8_t array[], uint8_t value, int len)
     return -1;
 }
 
+/**
+ * @brief Helper funcion to return the index of a string stored in an array
+ * 
+ * @param array Input array
+ * @param value Desired string to find
+ * @param len Length of array
+ * @return Index of element if found, else -1.
+ */
 int arr_contains_string(char* array[], char* value, int len)
 {
     for(int i = 0; i < len; i++)
@@ -152,30 +160,38 @@ int arr_contains_string(char* array[], char* value, int len)
 
 const char* xipa_file_extensions[] =
 {
-    "ext", //superblock pointer
-    "pdf", //pdf
-    "wsm", //wasm binary
-    "bin", //misc binary file
-    DEL_NAME, //file marked for deletion
-    FREE_NAME, //freed file after align operation
-    "ttf", //font file
-    "txt", //text file
-    "zip", //zip file
-    "png", //PNG image
-    "jpg", //JPG image
-    "svg", //SVG image (vector)
-    "bmp", //Bitmap image
-    "prt", //Part download
-    "jso", //JSON
-    "xml", //XML
-    "htm", //HTML
-    "mp3", //MP3 - but like is this actually going to be used?
-    "wav", //WAV - really?!    
+    "ext", /** superblock pointer */
+    "pdf", /** pdf */
+    "bin", /** misc binary file */
+    "wsm", /** wasm binary */
+    DEL_NAME, /** file marked for deletion */
+    FREE_NAME, /** freed file after align operation */
+    "ttf", /** font file */
+    "txt", /** text file */
+    "zip", /** zip file */
+    "png", /** PNG image */
+    "jpg", /** JPG image */
+    "svg", /** SVG image (vector) */
+    "bmp", /** Bitmap image */
+    "prt", /** Part download */
+    "jso", /** JSON */
+    "xml", /** XML */
+    "htm", /** HTML */
+    "mp3", /** MP3 - but like is this actually going to be used? */
+    "wav", /** WAV - really?!   */  
 };
 
 //In XIPA_FS, the sizes for the individual fields that make up the 64 bytes are totally fixed.
 //You have control over the location of each field within the filesystem, so this function
 //will check if the offsets you've put in correspond to valid sizes!
+/**
+ * @brief Helper function to help verify user-specified offsets
+ * 
+ * @param offsets Array populated with offsets
+ * @param sizes Expected sizes
+ * @param len Length of 
+ * @return int 
+ */
 int xipa_fs_check_sizes(uint8_t offsets[6], uint8_t sizes[6], int len)
 {
     //finding which offset is first - i.e whichever one subtracted by it's size ends up with zero. if we can't find 
@@ -221,7 +237,12 @@ int xipa_fs_check_sizes(uint8_t offsets[6], uint8_t sizes[6], int len)
     return -1;
 }
 
-
+/**
+ * @brief Function to check if user specified parameters make sense or not. These are basic sanity checks only! 
+ * 
+ * @param ptr Pointer to populated parameter struct.
+ * @return 1 if parameters valid, negative err code otherwise. 
+ */
 int xipa_fs_verifyparams(struct xipafs_params *ptr)
 {
     int rc = 1;
@@ -265,6 +286,13 @@ int xipa_fs_verifyparams(struct xipafs_params *ptr)
 }
 
 //Ensure filesystem is formatted to XIPA_FS before mounting. Returns ENOENT if superblock not found
+/**
+ * @brief Mount a XIPA partition with specified offset parameters.
+ * 
+ * @param x xipafs disk object
+ * @param params struct containing offset parameters for file parsing and XIP handling.
+ * @return 1 on success, negative err code otherwise. 
+ */
 int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
 {
     int rc;
@@ -360,6 +388,12 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
     return 1;
 }
 
+/**
+ * @brief Unmount XIPA file system. Ensure all pending operations have been completed.
+ * 
+ * @param x xipafs disk pointer
+ * @return 1 on success, -EBUSY if operations pending, else negative err code.
+ */
 int xipa_fs_unmount(struct xipafs *x)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -381,6 +415,13 @@ int xipa_fs_unmount(struct xipafs *x)
     else return -EBUSY;
 }
 
+/**
+ * @brief Initialises directory context object from heap for file traversal.
+ * 
+ * @param x xipafs disk object
+ * @param dir xipafs directory pointer
+ * @return 1 on success, else negative err code.
+ */
 int xipa_fs_dir_init(struct xipafs* x, struct xipafs_dir_t* dir)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -394,6 +435,13 @@ int xipa_fs_dir_init(struct xipafs* x, struct xipafs_dir_t* dir)
     return -ENOMEM; 
 }
 
+/**
+ * @brief Frees resources allocated for a directory context object.
+ * 
+ * @param x xipafs disk object
+ * @param dir xipafs directory pointer
+ * @return 1 on success
+ */
 int xipa_fs_dir_deinit(struct xipafs* x, struct xipafs_dir_t* dir)
 {
     free(dir);
@@ -414,7 +462,16 @@ volatile void *xipa_vol_memcpy(volatile void *restrict dest,
     }
     return  dest;
 }
-
+/**
+ * @brief Helper function to translate a filerecord to a buffer of memory, ready to write to filesystem.
+ * 
+ * @param x xipafs disk object
+ * @param f pointer to filerecord
+ * @param record record number to update
+ * @param tableStart pointer to start of memory location.
+ * @return 1 on success, negative err code otherwise.
+ * @exception You must ensure the record and tablestart values make sense - buffer overflow is not checked! 
+ */
 int xipa_fs_write_temp_record(struct xipafs *x, struct filerecord* f, unsigned int record, volatile uint8_t* tableStart)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -439,6 +496,16 @@ int xipa_fs_write_temp_record(struct xipafs *x, struct filerecord* f, unsigned i
     return -EIO;
 }
 
+/**
+ * @brief Helper function to translate a record stored in memory into a filerecord for manipulation.
+ * 
+ * @param x xipafs disk object
+ * @param f pointer to filerecord
+ * @param record record number inside memory region
+ * @param tableStart pointer to memory region.
+ * @return 1 on success, negative err code otherwise
+ * @exception Bounds are not checked! Please ensure your offsets are correct!
+ */
 int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int record, volatile uint8_t* tableStart)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -473,6 +540,14 @@ int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int
     return -EIO;
 }
 
+/**
+ * @brief Traverse through the flash - but using the flash driver in XIP disable mode.
+ * 
+ * @param x xipafs disk object
+ * @param f pointer to filerecord to fill with file details (including superblock!)
+ * @param dir directory context object
+ * @return 1 on success, -ENOTDIR at end of filesystem, negative err code otherwise.
+ */
 int xipa_fs_traverse_flash_api(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -494,7 +569,7 @@ int xipa_fs_traverse_flash_api(struct xipafs *x, struct filerecord* f, struct xi
             //This should be ok, stack_push carries out malloc and copies manually internally rather than just storing pointers.
             stack_push(&ptr->superblock_flash_dev_locations, (struct xipa_superblock_loc*)&yeet);
             //No memcpy required here as we are reading a known datatype.
-            volatile uint8_t* new_tablestart = __LOC(tableStart + ((dir->current_record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE);
+            volatile uint8_t* new_tablestart = temp_fr.file_loc + ptr->offset;
             tableStart = new_tablestart;
             dir->current_record = (volatile unsigned int)1;
         }
@@ -541,6 +616,15 @@ int xipa_fs_traverse_flash_api(struct xipafs *x, struct filerecord* f, struct xi
 
 }
 
+
+/**
+ * @brief Traverse through the flash in XIP enable mode.
+ * 
+ * @param x xipafs disk object
+ * @param f pointer to filerecord to fill with file details (including superblock!)
+ * @param dir directory context object
+ * @return 1 on success, -ENOTDIR at end of filesystem, negative err code otherwise.
+ */
 int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir) //every call to this function will update the filerecord with details of the next file, until the end of directory is reached.
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -606,8 +690,16 @@ int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t
     return -EIO;
 }
 
-//Mount before calling this function - TODO add nice documentation to all the XIPA functions.
+//Mount before calling this function - TODO add nice documentation to all the XIPA functions ->TODO DONE YAAYY!!
 
+/**
+ * @brief Returns the first instance of a file designated by filename in a filerecord f. 
+ * 
+ * @param x xipafs disk object
+ * @param filename Desired filename with extension
+ * @param f Pointer to filerecord to populate with information about the file if found.
+ * @return f -> NULL if file not found, 1 on success, -ENFILE if file not found, negative err code otherwise.
+ */
 int xipa_fs_get_file(struct xipafs *x, char *filename, struct filerecord* f)
 {
     char *fname;
@@ -688,7 +780,14 @@ int xipa_fs_get_file(struct xipafs *x, char *filename, struct filerecord* f)
     //stack is not cleared until next read operation, should traverse be a private method?
 }
 
-//Ensure XIP threads are disabled before calling this!
+/**
+ * @brief Format the filesystem - hard delete all files and records.
+ * @exception 1) WARNING - FORMAT OPERATION IS IRREVERSIBLE! 
+ * @exception 2) Stop all XIP utilising threads to prevent crashes.
+ * 
+ * @param x xipafs disk object
+ * @return 1 on success, else negative err code. 
+ */
 int xipa_fs_format(struct xipafs* x)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -715,17 +814,23 @@ int xipa_fs_format(struct xipafs* x)
     return 1;
 } 
 
-
+/**
+ * @brief This function will use your hardware crypto acceleration (if present) to verify the integrity of a particular file by calculating a SHA-256 hash, and comparing it to the known hash. Ensure the correct drivers and Kconfig directives are selected!  
+ * 
+ * @param x xipafs disk object
+ * @param f_verify filerecord of the desired file to verify
+ * @return 1 on success, -1 if file is corrupt.
+ */
 int xipa_fs_verify(struct xipafs* x, struct filerecord* f_verify)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
     xip_enable(ptr->xip);
     uint32_t passes = 0;
     //we are hardcoding a 1024 byte pass here, not really any need for more.
-    volatile uint8_t* start_addr = f_verify->file_loc + (unsigned int)(ptr->param->xip_dev_location) - (unsigned int)(ptr->param->xip_device_offset);
+    volatile uint8_t* start_addr = f_verify->file_loc + (unsigned int)(ptr->param->xip_dev_location);// - (unsigned int)(ptr->param->xip_device_offset);
     while(start_addr + (passes * 1024) < f_verify->file_loc + f_verify->size)
     {
-        xipa_frag_sha256_verif(ptr->xip, start_addr + (passes * 1024), 1024);
+        xipa_frag_sha256_verif(ptr->xip, start_addr + (passes++ * 1024), 1024);
     }
     xipa_frag_sha256_verif(ptr->xip, start_addr+(passes * 1024), f_verify->size-(passes * 1024));
     char hash[32];
@@ -736,6 +841,16 @@ int xipa_fs_verify(struct xipafs* x, struct filerecord* f_verify)
 
 
 //Pause XIP apps before calling this unless you love chaos and death.
+/**
+ * @brief Delete the first instance of a particular file with specified name.
+ * @exception 1) IMPORTANT! You must pause any activity on the XIP region to prevent reads to undefined memory locations while deletion takes place.
+ * @exception 2) You must include the extension in the filename.
+ * @exception 3) This will only delete the FIRST instance of a file.
+ * 
+ * @param x xipafs disk object
+ * @param filename char array of length 16 containing name and extension 
+ * @return -EINVAL if there are no files, or if file could not be found. negative err code otherwise. 
+ */
 int xipa_fs_delete(struct xipafs* x, char* filename)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -757,9 +872,11 @@ int xipa_fs_delete(struct xipafs* x, char* filename)
     rc = flash_area_open(ptr->pfa->fa_id, &ptr->pfa);
     XIPA_ERR_CHECK(x->log, "Could not open flash area!", rc);
 
+    /* We are already erasing the flash sector by sector during align operation, no point doing it again!
     rc = flash_area_erase(ptr->pfa, (off_t)(tempfr.file_loc-ptr->param->xip_dev_location), size);
     XIPA_ERR_CHECK(x->log, "Could not erase file!", rc);
     LOG_INST_INF(x->log, "Erased %i byte file data at %i (0-based offset)", size, (off_t)(deletion_offset-ptr->param->xip_dev_location));
+    */
     rc = flash_area_write(ptr->pfa, (off_t)(tempfr.record_loc-ptr->param->xip_dev_location+ptr->param->run_end_offset-RUN_SIZE), DEL_NAME, RUN_SIZE);
     XIPA_ERR_CHECK(x->log, "Could not erase file record!", rc);
     LOG_INST_INF(x->log, "Marked %i byte file record at %i (0-based offset) as erased", XIPA_JOURNAL_SIZE, (off_t)(record_offset-ptr->param->xip_dev_location));
@@ -780,6 +897,13 @@ int arr_subset(uint8_t* d, uint8_t* s, uint32_t start, uint32_t len)
     return 1;
 }
 
+/**
+ * @brief Internal function to align physical memory after a delete operation. ONLY ACCESS VIA xipa_fs_delete() !
+ * 
+ * @param x xipafs disk object
+ * @param f_del filerecord of deleted file
+ * @return 1 on success, negative err code otherwise. 
+ */
 int xipa_fs_align(struct xipafs *x, struct filerecord f_del)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -954,6 +1078,17 @@ int xipa_fs_align(struct xipafs *x, struct filerecord f_del)
     return 1;
 }
 
+/**
+ * @brief Initiate write of a new file to the filesystem. Once write is initialised, call xipa_fs_data_store_cb() with your incremental buffer writes. 
+ * 
+ * @param x xipafs disk object
+ * @param filename Desired filename, should not exceed 12 characters (i.e should fit inside a char[12] with null termination)
+ * @param extension Desired extension, should fit inside a char[4] with null terminator, and must be one of the defined extensions in xipa_file_extensions.
+ * @param size Size of new file - MUST BE WORD ALIGNED! (i.e rounded up to nearest multiple of 4 for 32-bit systems)
+ * @param hash SHA-256 hash of new file
+ * @param ver_str Version string of file or app.
+ * @return 1 on success, negative err_code otherwise. 
+ */
 int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size, char* hash, char* ver_str)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -1016,6 +1151,14 @@ int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size
     return 1;
 }
 
+/**
+ * @brief Callback function to write contents of file bit by bit. You can use arbitrarily sized buffers and call this function as you receive the data, just please keep them word aligned. You must initialise a write operation first with store().
+ * 
+ * @param x xipafs disk object
+ * @param buf pointer to buffer containing file data
+ * @param buf_size size of data to copy - MUST BE WORD ALIGNED (multiple of 4 on 32-bit systems)!
+ * @return 0 on incremental write success, 1 when all data written successfully, -EINVAL when called uninitialised or if end buffer too large.
+ */
 int xipa_fs_data_store_cb(struct xipafs* x, void* buf, size_t buf_size)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -1023,11 +1166,12 @@ int xipa_fs_data_store_cb(struct xipafs* x, void* buf, size_t buf_size)
     const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
     flash_write(flash_dev, (unsigned int)(ptr->f.file_loc + ptr->storing), buf, buf_size);
     ptr->storing += buf_size;
-    if(ptr->storing == ptr->f.size)
+    if(ptr->storing = ptr->f.size)
     {
         ptr->storing = -1;
         return 1;
     }
+    if(ptr->storing > ptr->f.size) return -EINVAL;
     return 0;
 }
 
