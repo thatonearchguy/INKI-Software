@@ -41,6 +41,12 @@ adding, removing files a composition of granular processes that
 
 */
 
+/*
+
+TODO - 
+
+*/
+
 LOG_LEVEL_SET(LOG_LEVEL_INF);
 
 #define XIPA_ERR_CHECK(logger, message, rc) \
@@ -71,20 +77,35 @@ int xipa_fs_traverse_flash_api(struct xipafs *x, struct filerecord* f, struct xi
 
 static char xipa_fs_start_block[8] = {'X', 'I', 'P', 'A', '\0', '\0', '\0', '\0'}; //get rid of null terminator messing up byte sizes. 
 
-
+/**
+ * @brief Main container for XIPA_FS implementation. 
+ * 
+ * 
+ */
 struct privatefs_ptr
 {
-    //struct vector filerecord_list; //now unnecessary as we are not loading the entire table into memory.
+     /** Current number of files in the filesystem - including superblock records */
     uint32_t num_files;
+    //struct vector filerecord_list; //now unnecessary as we are not loading the entire table into memory.
+    /** Current number of superblocks in the filesystem - populated at mount time */
     uint32_t num_superblocks;
+    /** Zephyr struct representing current flash area */
     const struct flash_area *pfa;
+    /** XIPA_FS parameter struct, containing offsets, XIP region address, and desired XIP offset */
     struct xipafs_params *param;
+    /** XIPA_FS device struct, exposes APIs for HW specific operations */
     struct xipa_dev *xip;
-    struct vector operations; //stores pointers to functions in order of atomic operations. Could help in implementing thread safety.
+    /** List/vector containing function pointers - TODO: add mutex/lock functionality to lock file system for writes, but reads should still be allowed. for thread safety */
+    struct vector operations; 
+    /** Storing superblock locations during traverse operation to ensure no files are left after a superblock traversal */
     struct stack superblock_locations;
+    /** Storing superblock locations during traverse operation with FLASH API to ensure no files are left after a superblock traversal */
     struct stack superblock_flash_dev_locations;
+    /** Internal filerecord */
     struct filerecord f; 
+    /** Pointer represented as integer pointing to end of the file-system. Subtract from start offset of flash area to get space used. */
     unsigned int last_file_end;
+    /** Starting offset */
     size_t offset;
     bool init;
     int64_t storing;
@@ -284,7 +305,7 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
     {
         return rc;
     }
-    ptr->num_superblocks = (uint32_t) buf;
+    ptr->num_superblocks = (uint32_t) buf;   //we must add the device offset now, because we have gone down a layer of abstraction.
     ptr->offset = ptr->pfa->fa_off;
     char numfiles[4];
     rc = flash_area_read(ptr->pfa, sizeof(xipa_fs_start_block), numfiles, 4); //getting number of files on filesystem.
@@ -344,16 +365,20 @@ int xipa_fs_unmount(struct xipafs *x)
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
     if (!ptr->init)
         return -EINVAL;
-    //k_free(ptr->f); //free filerecord to prevent further transactions.
-    xip_disable(ptr->xip);
-    k_free(ptr->xip); //free xip to prevent further manipulation
-    //this should leave QSPI peripheral in a state where standard flash manipulation commands should work perfectly
-    //with no XIPA_FS manipulation. 
-    stack_destroy(&ptr->superblock_flash_dev_locations);
-    stack_destroy(&ptr->superblock_locations);
-    vector_deinit(&ptr->operations);
-    ptr->init = false;
-    return 1;
+    if(vector_length(&ptr->operations) == 0)
+    {
+        //k_free(ptr->f); //free filerecord to prevent further transactions.
+        xip_disable(ptr->xip);
+        k_free(ptr->xip); //free xip to prevent further manipulation
+        //this should leave QSPI peripheral in a state where standard flash manipulation commands should work perfectly
+        //with no XIPA_FS manipulation. 
+        stack_destroy(&ptr->superblock_flash_dev_locations);
+        stack_destroy(&ptr->superblock_locations);
+        vector_deinit(&ptr->operations);
+        ptr->init = false;
+        return 1;
+    }
+    else return -EBUSY;
 }
 
 int xipa_fs_dir_init(struct xipafs* x, struct xipafs_dir_t* dir)
@@ -377,11 +402,13 @@ int xipa_fs_dir_deinit(struct xipafs* x, struct xipafs_dir_t* dir)
 //https://stackoverflow.com/questions/54964154/is-memcpyvoid-dest-src-n-with-a-volatile-array-safe
 //This function is a volatile safe memcpy for XIP region reads and validation. 
 volatile void *xipa_vol_memcpy(volatile void *restrict dest,
-            const volatile void *restrict src, size_t n) {
+                               const volatile void *restrict src, size_t n) 
+{
     const volatile unsigned char *src_c = src;
-    volatile unsigned char *dest_c      = dest;
+    volatile unsigned char *dest_c = dest;
 
-    while (n > 0) {
+    while (n > 0)
+    {
         n--;
         dest_c[n] = src_c[n];
     }
@@ -397,12 +424,13 @@ int xipa_fs_write_temp_record(struct xipafs *x, struct filerecord* f, unsigned i
     {
         if(ptr->f.file_loc != (volatile uint8_t*)0x0 || ptr->f.size != (size_t)0x0)
         {
-            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->run_end_offset - RUN_SIZE), f->run, RUN_SIZE);
-            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->name_end_offset - NAME_SIZE), f->name, NAME_SIZE);
-            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE), f->file_loc, LOC_SIZE);
-            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->size_end_offset - SIZE_SIZE), &f->size, SIZE_SIZE);
-            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->hash_end_offset - HASH_SIZE), f->hash, HASH_SIZE);
-            xipa_vol_memcpy((volatile uint8_t*)(tableStart + ((record-1)<<6) + ptr->param->vers_end_offset - VER_STR_SIZE), f->ver_str, VER_STR_SIZE);
+            volatile uint8_t* journal_loc = (tableStart + ((record-1)<<6));
+            xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->run_end_offset - RUN_SIZE), f->run, RUN_SIZE);
+            xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->name_end_offset - NAME_SIZE), f->name, NAME_SIZE);
+            xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->loc_end_offset - LOC_SIZE), f->file_loc, LOC_SIZE);
+            xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->size_end_offset - SIZE_SIZE), &f->size, SIZE_SIZE);
+            xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->hash_end_offset - HASH_SIZE), f->hash, HASH_SIZE);
+            xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->vers_end_offset - VER_STR_SIZE), f->ver_str, VER_STR_SIZE);
             return 1;
         }
         else return -EINVAL;
@@ -410,6 +438,7 @@ int xipa_fs_write_temp_record(struct xipafs *x, struct filerecord* f, unsigned i
     else return -EINVAL;
     return -EIO;
 }
+
 int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int record, volatile uint8_t* tableStart)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
@@ -427,7 +456,7 @@ int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int
         {
             xipa_vol_memcpy(ptr->f.hash, journal_location + ptr->param->hash_end_offset - HASH_SIZE, HASH_SIZE);
             xipa_vol_memcpy(ptr->f.ver_str, journal_location + ptr->param->vers_end_offset - VER_STR_SIZE, VER_STR_SIZE);
-            ptr->f.record_loc = __LOC(journal_location);
+            ptr->f.record_loc = journal_location;
             f = &ptr->f;
             return 1;
         }
@@ -450,7 +479,7 @@ int xipa_fs_traverse_flash_api(struct xipafs *x, struct filerecord* f, struct xi
     if (!ptr->init)
         return -EINVAL;
     const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
-    volatile uint8_t* tableStart = (volatile uint8_t*)(ptr->param->xip_device_offset + sizeof(ptr->num_files) + sizeof(xipa_fs_start_block)); //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
+    volatile uint8_t* tableStart = (volatile uint8_t*)(ptr->offset + sizeof(ptr->num_files) + sizeof(xipa_fs_start_block)); //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
     if(dir->current_records_to_traverse > 1)
     {
         char journal[XIPA_JOURNAL_SIZE];
@@ -563,8 +592,7 @@ int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t
             {
                 int rc = xipa_fs_populate_record(x, f, dir->current_record, tableStart); //eek we're passing the filerecord pointer down three levels...
                 XIPA_ERR_CHECK(x->log, "Could not populate record", rc);
-                f->record_loc = f->record_loc + (unsigned int)(ptr->param->xip_dev_location - ptr->param->xip_device_offset);
-
+                f->file_loc = f->file_loc + (unsigned int)(ptr->param->xip_dev_location - ptr->param->xip_device_offset);
                 return rc;
             }
         }
@@ -673,6 +701,7 @@ int xipa_fs_format(struct xipafs* x)
     XIPA_ERR_CHECK(x->log, "Could not open flash area", rc);
 
     LOG_INST_WRN(x->log, "Formatting filesystem to XIPA!");
+     //Bounding erase logic not required as we are erasing entirety of flash, which is a multiple of 4096 as it's all the sectors.
 	rc = flash_area_erase(ptr->pfa, 0, ptr->pfa->fa_size);
     XIPA_ERR_CHECK(x->log, "Format failed", rc);
 
@@ -687,11 +716,22 @@ int xipa_fs_format(struct xipafs* x)
 } 
 
 
-int xipa_fs_verify(struct xipafs* x)
+int xipa_fs_verify(struct xipafs* x, struct filerecord* f_verify)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
-    
-
+    xip_enable(ptr->xip);
+    uint32_t passes = 0;
+    //we are hardcoding a 1024 byte pass here, not really any need for more.
+    volatile uint8_t* start_addr = f_verify->file_loc + (unsigned int)(ptr->param->xip_dev_location) - (unsigned int)(ptr->param->xip_device_offset);
+    while(start_addr + (passes * 1024) < f_verify->file_loc + f_verify->size)
+    {
+        xipa_frag_sha256_verif(ptr->xip, start_addr + (passes * 1024), 1024);
+    }
+    xipa_frag_sha256_verif(ptr->xip, start_addr+(passes * 1024), f_verify->size-(passes * 1024));
+    char hash[32];
+    xipa_frag_sha256_fin(ptr->xip, hash);
+    if(strcmp(f_verify->hash, hash) == 0) return 1;
+    return -1;
 }
 
 
@@ -746,8 +786,8 @@ int xipa_fs_align(struct xipafs *x, struct filerecord f_del)
     struct filerecord tempfr;
     struct xipafs_dir_t dir;
     int rc;
-    volatile uint8_t* deletion_offset = f_del.file_loc - ptr->param->xip_dev_location + ptr->param->xip_device_offset;
-    volatile uint8_t* record_offset = f_del.record_loc - ptr->param->xip_dev_location + ptr->param->xip_device_offset;
+    volatile uint8_t* deletion_offset = f_del.file_loc - ptr->param->xip_dev_location + ptr->offset;
+    volatile uint8_t* record_offset = f_del.record_loc - ptr->param->xip_dev_location + ptr->offset;
     if(ptr->num_files == 0) return -EINVAL;
            
     int flash_init_rc = flash_area_open(ptr->pfa->fa_id, &ptr->pfa);
@@ -769,9 +809,10 @@ int xipa_fs_align(struct xipafs *x, struct filerecord f_del)
     //we have quite a cursed situation going on potentially. 
     struct xipafs_dir_t temp_dir;
     //check first superblock (i.e start of flash)
-    if(record_offset < sizeof(ptr->num_files) + sizeof(ptr->num_superblocks) + sizeof(xipa_fs_start_block) + ptr->param->xip_device_offset + (XIPA_JOURNAL_SIZE * 1000))
+    unsigned int end_of_first_superblock = sizeof(ptr->num_files) + sizeof(ptr->num_superblocks) + sizeof(xipa_fs_start_block) + ptr->offset + (XIPA_JOURNAL_SIZE * 1000);
+    if(record_offset < end_of_first_superblock)
     {
-        unsigned int sb_ptr = (unsigned int)ptr->param->xip_device_offset + sizeof(ptr->num_files) + sizeof(ptr->num_superblocks) + sizeof(xipa_fs_start_block);
+        unsigned int sb_ptr = end_of_first_superblock - (XIPA_JOURNAL_SIZE * 1000);
         vector_push_back(&superblocks, &sb_ptr); //this is fine, sb_ptr can go out of scope because it's safely stored in our vector.
     }
     xipa_fs_dir_init(x, &temp_dir); //ignore uninitialised warning
@@ -946,14 +987,26 @@ int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size
     //we need to do low level block access so we need to get the underlying device.
     const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
     struct flash_pages_info* flash_bound_info;
-    //we must add the device offset now, because we have gone down a layer of abstraction.
-    //off_t prepared_del_off = (off_t)(deletion_offset-ptr->param->xip_dev_location+ptr->param->xip_device_offset);
     unsigned int new_record_loc = (unsigned int)(tempfr.record_loc + XIPA_JOURNAL_SIZE);
-    int rc = flash_get_page_info_by_offs(flash_dev, new_record_loc, flash_bound_info);
-    XIPA_ERR_CHECK(x->log, "IO Error - deletion offset outside bounds", rc);
-    rc = xipa_fs_write_temp_record(x, &tempfr, 0, newJournalEntry);
     XIPA_ERR_CHECK(x->log, "IO Error - temporary record construction failed", rc);
-
+    if(tempdir.current_record == 999)
+    {
+        struct filerecord new_superblock;
+        new_superblock.file_loc = ptr->last_file_end;
+        memcpy(new_superblock.run, xipa_file_extensions[0], RUN_SIZE);
+        snprintf(new_superblock.name, NAME_SIZE, "superblock%d", ++ptr->num_superblocks);
+        memset(new_superblock.hash, 1, HASH_SIZE);
+        new_superblock.size = XIPA_JOURNAL_SIZE * 1000;
+        snprintf(new_superblock.ver_str, "1.0", VER_STR_SIZE);
+        char new_superblock_entry[XIPA_JOURNAL_SIZE];
+        xipa_fs_write_temp_record(x, &new_superblock, 1, new_superblock_entry);
+        flash_write(flash_dev, ptr->last_file_end, new_superblock_entry, XIPA_JOURNAL_SIZE);
+        ptr->last_file_end += new_superblock.size;
+        new_record_loc = ptr->last_file_end;
+    }
+    
+    int rc = xipa_fs_write_temp_record(x, &tempfr, 0, newJournalEntry);
+    XIPA_ERR_CHECK(x->log, "IO Error - new record creation failed", rc);
     rc = flash_write(flash_dev, new_record_loc, newJournalEntry, XIPA_JOURNAL_SIZE);
     XIPA_ERR_CHECK(x->log, "IO Error - new record write failed", rc);
     ptr->last_file_end += size;

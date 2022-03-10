@@ -101,7 +101,7 @@ struct xipafs
 
 struct filerecord
 {
-    //Constant RAM usage - 16+32+4+4+4+4 = 64 bytes
+    //Constant RAM usage - actual data stored in memory is 64 bytes per file, but we will store some extra data to make life easier for us. 
     char name[NAME_SIZE];
     char hash[HASH_SIZE];
     volatile uint8_t* file_loc;
