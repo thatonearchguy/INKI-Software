@@ -1,0 +1,32 @@
+# INKI_LP_UARTE drivers
+
+# 	Copyright (c) 2021 INKI-Systems Inc.
+#
+#	Licensed under GPL 3
+#
+#
+
+menuconfig INKI_LP_UARTE
+	bool "INKI's custom low-power UART communication system"
+	help
+	  Enable INKI LP_UARTE subsystem
+	  
+config INKI_LP_UARTE
+	bool "INKI's custom low-power UART communication system"
+	help
+	  Enable INKI LP_UARTE subsystem 
+
+if INKI_LP_UARTE
+
+config INKI_LP_UARTE_DRV_EXISTS
+	bool #hidden 
+	help
+	  Private! Selected by driver.
+
+module = INKI_LP_UARTE
+module-str = inki_lp_uarte
+source "subsys/logging/Kconfig.template.log_config"
+
+rsource "drivers/nrf_lp_uarte/Kconfig.nrf_lp_uarte"
+
+endif # INKI_LP_UARTE

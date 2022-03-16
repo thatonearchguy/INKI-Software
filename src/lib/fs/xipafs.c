@@ -66,7 +66,6 @@ int xipa_fs_verifyparams(struct xipafs_params *ptr);
 int arr_contains_int(uint8_t array[], uint8_t value, int len);
 int arr_contains_string(char* array[], char* value, int len);
 int xipa_fs_check_sizes(uint8_t offsets[6], uint8_t sizes[6], int len);
-int xipa_fs_verifyparams(struct xipafs_params *ptr);
 int xipa_fs_traverse_flash_api(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir);
 
 
@@ -1174,6 +1173,3 @@ int xipa_fs_data_store_cb(struct xipafs* x, void* buf, size_t buf_size)
     if(ptr->storing > ptr->f.size) return -EINVAL;
     return 0;
 }
-
-
-

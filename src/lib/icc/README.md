@@ -8,3 +8,5 @@ This will predominantely be used for requesting sensor data which will be
 connected to the nRF9160 in order to offload precious CPU, memory, and FLASH from the user-facing nRF52840, provide efficient background processing, and forge robust security. 
 
 Watch this space!
+
+

@@ -188,15 +188,16 @@ unsigned int vector_length(struct vector* v)
     struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
     return ptr->num_items;
 }
-/*
 // A utility function to swap two elements
-void swap(int* a, int* b)
+void swap(struct vector* v, int* a, int* b)
 {
+    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
     int t = *a;
     *a = *b;
     *b = t;
 }
  
+/*
 int partition(int arr[], int l, int h)
 {
     int x = arr[h];

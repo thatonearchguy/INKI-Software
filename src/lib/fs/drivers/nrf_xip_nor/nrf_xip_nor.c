@@ -34,7 +34,7 @@ static struct crypto_ctx
 
 struct crypto_ctx sha_operation = {.bytes_checked = -1, .initialised = -1};
 
-static int nrf_qspi_xip_setoffset(const struct xipa_dev* dev, off_t xip_offset)
+static int nrf_lp_uarte_init(const struct xipa_dev* dev, off_t xip_offset)
 {
     //default offset is zero in the zephyr flash drivers, so as long as our storage partition
     //is stored at 0x0 offset we should be fine. 
@@ -59,12 +59,12 @@ static int nrf_qspi_xip_fs_set(const struct xipa_dev* dev, bool en)
     return rc;
 }
 
-static int nrf_qspi_xip_enable(const struct xipa_dev* dev)
+static int nrf_lp_uarte_ft_start(const struct xipa_dev* dev)
 {
     return nrf_qspi_xip_fs_set(dev, true);
 }
 
-static int nrf_qspi_xip_disable(const struct xipa_dev* dev)
+static int nrf_lp_uarte_deinit(const struct xipa_dev* dev)
 {
     return nrf_qspi_xip_fs_set(dev, false);
 }
@@ -89,7 +89,7 @@ static int nrf_qspi_sha256_verif(const struct xipa_dev* dev, void* frag_buf, siz
     return err_code;
 }
 
-static int nrf_qspi_sha256_finish(const struct xipa_dev* dev, void* hash_buf)
+static int nrf_lp_uarte_rx(const struct xipa_dev* dev, void* hash_buf)
 {
     CRYSError_t err_code = nrf_cc310_bl_hash_sha256_finalize(sha_operation.p_hash_context, (uint8_t*)hash_buf);
     if(err_code = CRYS_OK)
@@ -105,11 +105,11 @@ static int nrf_qspi_sha256_finish(const struct xipa_dev* dev, void* hash_buf)
 
 
 static const struct xipa_dev_api nrf_qspi_xip_api = {
-    .di = nrf_qspi_xip_disable,
-    .en = nrf_qspi_xip_enable,
-    .setoffset = nrf_qspi_xip_setoffset,
-    .verif = nrf_qspi_sha256_finish,
-    .fin = nrf_qspi_sha256_finish,
+    .di = nrf_lp_uarte_deinit,
+    .en = nrf_lp_uarte_ft_start,
+    .setoffset = nrf_lp_uarte_init,
+    .verif = nrf_lp_uarte_rx,
+    .fin = nrf_lp_uarte_rx,
 };
 
 int xip_init(struct xipa_dev* dev)
