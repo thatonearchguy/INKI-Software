@@ -1,19 +1,17 @@
-# Copyright: 2021 INKI-Systems Inc. - Licensed under GPL 3
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
 
-zephyr_library_named(inki_lp_uarte)
+zephyr_library_named(inki_icc)
 
 zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 zephyr_library_sources(
-    lp_uarte.c
+    icc.c
 )
 
-if(CONFIG_INKI_LP_UARTE)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/drivers/nrf_lp_uarte/nrf_lp_uarte.cmake})
-    # Add more when the time comes!!
+
+if(NOT CONFIG_INKI_ICC_BKEND_EXISTS)
+    message( FATAL_ERROR "No backend exists for ")
 endif()
 
-
-if(NOT CONFIG_INKI_LP_UARTE_DRV_EXISTS)
-    message( FATAL_ERROR "No driver selected for LP_UartE!")
-endif()
+target_link_libraries(inki_icc, inki_lp_uarte)
 

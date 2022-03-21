@@ -1,4 +1,5 @@
-# Copyright: 2021 INKI-Systems Inc. - Licensed under GPL 3
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
 
 zephyr_library_named(inki_xipa_fs)
 

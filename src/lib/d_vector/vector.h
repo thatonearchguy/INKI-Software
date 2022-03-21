@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2021 INKI-Systems Inc.
+ * Copyright (c) 2022 INKI-Systems Inc.
  *
  * Licensed under GPL 3
+ * 
  */
 
 #ifndef INKI_VECTOR

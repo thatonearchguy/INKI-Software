@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2021 INKI-Systems Inc.
+ * Copyright (c) 2022 INKI-Systems Inc.
  *
  * Licensed under GPL 3
+ * 
  */
 
 /*
@@ -854,10 +855,8 @@ int xipa_fs_delete(struct xipafs* x, char* filename)
 {
     struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
     if(ptr->num_files == 0) return -EINVAL;
-    volatile uint8_t* deletion_offset = 0;
     volatile uint8_t* record_offset = 0;
     struct filerecord tempfr;
-    size_t size = 0;
     int rc = xipa_fs_get_file(x, filename, &tempfr); 
     XIPA_ERR_CHECK(x->log, "Could not get file name!", rc);
     if(tempfr.record_loc==(volatile uint8_t*)0 || tempfr.file_loc==(volatile uint8_t*)0 || tempfr.size==0)
@@ -909,8 +908,8 @@ int xipa_fs_align(struct xipafs *x, struct filerecord f_del)
     struct filerecord tempfr;
     struct xipafs_dir_t dir;
     int rc;
-    volatile uint8_t* deletion_offset = f_del.file_loc - ptr->param->xip_dev_location + ptr->offset;
-    volatile uint8_t* record_offset = f_del.record_loc - ptr->param->xip_dev_location + ptr->offset;
+    volatile uint8_t* deletion_offset = f_del.file_loc - (uint32_t)ptr->param->xip_dev_location + ptr->offset;
+    volatile uint8_t* record_offset = f_del.record_loc - (uint32_t)ptr->param->xip_dev_location + (uint32_t)ptr->offset;
     if(ptr->num_files == 0) return -EINVAL;
            
     int flash_init_rc = flash_area_open(ptr->pfa->fa_id, &ptr->pfa);
@@ -933,7 +932,7 @@ int xipa_fs_align(struct xipafs *x, struct filerecord f_del)
     struct xipafs_dir_t temp_dir;
     //check first superblock (i.e start of flash)
     unsigned int end_of_first_superblock = sizeof(ptr->num_files) + sizeof(ptr->num_superblocks) + sizeof(xipa_fs_start_block) + ptr->offset + (XIPA_JOURNAL_SIZE * 1000);
-    if(record_offset < end_of_first_superblock)
+    if((unsigned int)record_offset < end_of_first_superblock)
     {
         unsigned int sb_ptr = end_of_first_superblock - (XIPA_JOURNAL_SIZE * 1000);
         vector_push_back(&superblocks, &sb_ptr); //this is fine, sb_ptr can go out of scope because it's safely stored in our vector.
@@ -1105,6 +1104,7 @@ int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size
     xipa_fs_dir_init(x, &tempdir);
     struct filerecord tempfr;
     int traverse_rc = 0;
+    int rc = 0;
     while(traverse_rc != -ENOTDIR)
     {
         xipa_fs_traverse_flash_api(x, &tempfr, &tempdir);
@@ -1120,18 +1120,17 @@ int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size
     tempfr.size = size;
     //we need to do low level block access so we need to get the underlying device.
     const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
-    struct flash_pages_info* flash_bound_info;
     unsigned int new_record_loc = (unsigned int)(tempfr.record_loc + XIPA_JOURNAL_SIZE);
     XIPA_ERR_CHECK(x->log, "IO Error - temporary record construction failed", rc);
     if(tempdir.current_record == 999)
     {
         struct filerecord new_superblock;
-        new_superblock.file_loc = ptr->last_file_end;
+        new_superblock.file_loc = (volatile uint8_t*)ptr->last_file_end;
         memcpy(new_superblock.run, xipa_file_extensions[0], RUN_SIZE);
         snprintf(new_superblock.name, NAME_SIZE, "superblock%d", ++ptr->num_superblocks);
         memset(new_superblock.hash, 1, HASH_SIZE);
         new_superblock.size = XIPA_JOURNAL_SIZE * 1000;
-        snprintf(new_superblock.ver_str, "1.0", VER_STR_SIZE);
+        memcpy(new_superblock.ver_str, "1.0", VER_STR_SIZE);
         char new_superblock_entry[XIPA_JOURNAL_SIZE];
         xipa_fs_write_temp_record(x, &new_superblock, 1, new_superblock_entry);
         flash_write(flash_dev, ptr->last_file_end, new_superblock_entry, XIPA_JOURNAL_SIZE);
@@ -1139,7 +1138,7 @@ int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size
         new_record_loc = ptr->last_file_end;
     }
     
-    int rc = xipa_fs_write_temp_record(x, &tempfr, 0, newJournalEntry);
+    rc = xipa_fs_write_temp_record(x, &tempfr, 0, newJournalEntry);
     XIPA_ERR_CHECK(x->log, "IO Error - new record creation failed", rc);
     rc = flash_write(flash_dev, new_record_loc, newJournalEntry, XIPA_JOURNAL_SIZE);
     XIPA_ERR_CHECK(x->log, "IO Error - new record write failed", rc);
@@ -1165,7 +1164,7 @@ int xipa_fs_data_store_cb(struct xipafs* x, void* buf, size_t buf_size)
     const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
     flash_write(flash_dev, (unsigned int)(ptr->f.file_loc + ptr->storing), buf, buf_size);
     ptr->storing += buf_size;
-    if(ptr->storing = ptr->f.size)
+    if(ptr->storing == ptr->f.size)
     {
         ptr->storing = -1;
         return 1;

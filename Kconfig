@@ -1,4 +1,4 @@
-# Copyright (c) 2021 INKI-Systems Inc
+# Copyright (c) 2022 INKI-Systems Inc
 # Licensed under GPL 3
 
 mainmenu "INKI Options"
@@ -31,3 +31,4 @@ config XIPAFS_LOG_LEVEL
 source "Kconfig.zephyr"
 rsource "src/lib/display/Kconfig"
 rsource "src/lib/fs/Kconfig"
+rsource "src/lib/lp_uarte/Kconfig"

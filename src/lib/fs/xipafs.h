@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2021 INKI-Systems Inc.
+ * Copyright (c) 2022 INKI-Systems Inc.
  *
  * Licensed under GPL 3
+ * 
  */
 
 /*
@@ -126,7 +127,7 @@ struct xipafs_params
     char* path;
 };
 
-struct __attribute__((__packed__)) xipafs_dir_t //we are packing this struct so we can safely copy to vector and stack objects.
+struct __attribute__((__packed__)) xipafs_dir_t //we are packing this struct so we can safely copy and receive to/from vector and stack objects.
 {
     volatile unsigned int current_record;
     volatile unsigned int current_records_to_traverse;
@@ -134,7 +135,7 @@ struct __attribute__((__packed__)) xipafs_dir_t //we are packing this struct so 
 
 #define XIPAFS_INIT(_name)  \
 LOG_INSTANCE_REGISTER(XIPA_FS_NAME, _name, CONFIG_XIPAFS_LOG_LEVEL);  \
-struct vector _name = {  \
+struct xipafs _name = {  \
             LOG_INSTANCE_PTR_INIT(log, XIPA_FS_NAME, _name)  \
 }
 
