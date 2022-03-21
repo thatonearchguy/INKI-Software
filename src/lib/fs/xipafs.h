@@ -150,5 +150,6 @@ int xipa_fs_format(struct xipafs* x);
 int xipa_fs_verify(struct xipafs* x, struct filerecord* f_verify);
 int xipa_fs_dir_init(struct xipafs* x, struct xipafs_dir_t* dir);
 int xipa_fs_dir_deinit(struct xipafs* x, struct xipafs_dir_t* dir);
+int xipa_fs_data_store_cb(struct xipafs* x, void* buf, size_t buf_size);
 
 #endif

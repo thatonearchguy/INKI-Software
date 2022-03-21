@@ -1,10 +1,9 @@
 # INKI_XIPA_FS drivers
 
-# 	Copyright (c) 2021 INKI-Systems Inc.
-#
-#	Licensed under GPL 3
-#
-#
+
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
+
 
 menuconfig INKI_XIPA_FS
 	bool "INKI's custom XIPA_FS file system"
