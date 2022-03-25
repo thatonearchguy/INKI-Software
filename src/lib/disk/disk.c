@@ -46,10 +46,10 @@ int base_deinit(struct baseDisk *b)
 	return retcode;
 }
 
-int base_get_file_path(struct baseDisk *b, const char* filename)
+int base_get_file_path(struct baseDisk *b, bool found, const char* filename)
 {
 	LOG_INST_INF(b->log, "Finding file path");
-	int retcode = b->vtable->get_file_path(b, filename);
+	int retcode = b->vtable->get_file_path(b, found, filename);
 	return retcode;
 }
 
@@ -57,7 +57,7 @@ int base_get_file_path(struct baseDisk *b, const char* filename)
 //so we can just do straight up strcmp without any strtok_r invocations.
 //Place the starting path inside the struct's fname, this function will set fname to the path if found, otherwise NULL. 
 //Function not defined in header, therefore technically encapsulated away!
-int base_find_file_from_path(struct baseDisk* b, const char* filename)
+int base_find_file_from_path(struct baseDisk* b, bool found, const char* filename)
 {
     struct fs_dir_t* dir;
 	fs_dir_t_init(dir); //ignore uninitialised error, we are initialising in fs_dir_t_init.
@@ -80,6 +80,7 @@ int base_find_file_from_path(struct baseDisk* b, const char* filename)
 				snprintf(b->fname, sizeof(b->fname), "%s/%s", b->fname, dirent.name); //ignore warning, we are writing to itself correctly.
 				LOG_INST_INF(b->log, "Found at %s, joe!", b->fname);
 				fs_closedir(dir);
+				found = true;
 				return 1;
 			}
 		}
@@ -87,18 +88,18 @@ int base_find_file_from_path(struct baseDisk* b, const char* filename)
 		{
 			snprintf(b->fname, sizeof(b->fname), "%s/%s", b->fname, dirent.name); //ignore warning, we are writing to itself correctly.
 			LOG_INST_INF(b->log, "Going to %s", b->fname);
-			return base_find_file_from_path(b, filename);
+			if(!found) return base_find_file_from_path(b, found, filename);
 			fs_closedir(dir);
 		}
     }
 	return 0;
 }
 
-int general_get_file_path(struct baseDisk *b, const char* filename)
+int general_get_file_path(struct baseDisk *b, bool found, const char* filename)
 {
 	memset(b->fname, 0, MAX_FS_PATH_LENGTH);
 	snprintf(b->fname, sizeof(b->fname), "%s", b->mnt_p->mnt_point);
-	if(base_find_file_from_path(b, filename) == 1) return 1;
+	if(base_find_file_from_path(b, found, filename) == 1) return 1;
 	else return -ENFILE;
 }
 

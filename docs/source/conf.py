@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'INKI-OS'
-copyright = '2021, Yuvraj Dubey'
+copyright = '2022, Yuvraj Dubey'
 author = 'Yuvraj Dubey'
 
 # The full version, including alpha/beta/rc tags

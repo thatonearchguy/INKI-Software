@@ -51,7 +51,7 @@ struct baseDisk_vtable
 {
     int (*init)(void *self, char* label);
     int (*deinit)(void *self);
-    int (*get_file_path) (void *self, const char* filename);
+    int (*get_file_path) (void *self, bool found, const char* filename);
 };
 
 struct baseDisk
