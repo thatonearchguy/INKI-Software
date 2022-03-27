@@ -122,7 +122,7 @@ It has an attractive square design with rounded corners and a clear, vibrant dis
 
 Multiple reviewers have stated how comfortable the watch is once fastened, this is a great step in the right direction. There's a physical haptic button, meaning the button doesn't actually press down, rather it uses vibration technology to emulate the feeling of the button being pressed much like on the newer Apple devices. This is still much better than not having any buttons at all and would undoubtedly improve water resistance. 
 
-There is support for 3rd party apps, while the app selection is more limited compared to Apple there are still some highly useful applications like Spotify, Pandora, Starbucks, Uber, and quite a few great looking apps from independent developers. 
+There is support for 3rd party apps, while the app selection is more limited compared to Apple there are still some highly useful applications like Spotify, Pandora, Starbucks, Uber, and quite a few great looking apps from independent developers. [22]_
 
 The only drawback here is the battery life - with light usage this is around six days, but drops drastically during GPS tracking and if the display is left in "always on" mode. To conclude, this is a really interesting device that gets a lot right, but the app selection and battery life could be a little better. It still destroys the Apple Watch and Galaxy Watch in the battery life department though. 
 
@@ -140,7 +140,7 @@ Garmin Venu
     :alt: "Garmin Venu on someone's wrist"
 
 The Garmin Venu has built upon Garmin's Vivoactive 4, replacing the traditional power-saving transflective LCD with a bright & vibrant AMOLED display.
-One criticism of the physical design is that it might look a little generic, which in my opinion has some basis. Garmin watches typically have quite a distinctive look, but this model does struggle a little in differentiating itself from the competition [#]_ [#]_. 
+One criticism of the physical design is that it might look a little generic, which in my opinion has some basis. Garmin watches typically have quite a distinctive look, but this model does struggle a little in differentiating itself from the competition [23]_ [24]_. 
 
 Garmin is generally known for their unrivalled fitness tracking - they've recently started orienting more of their products towards the "techie" smartwatch market, and they seem to have done a reasonably good job of it. The Garmin offers music storage and playback, physical buttons for maximised usability in the rain, and a nice gesture based navigation. Garmin doesn't rely on WearOS for its core functionality, they have their own in house operating system that's shared across most of their devices and is part of why the battery life is so much longer. The Garmin has been criticised a little for some UI sluggishness, this might be down to the graphics stack not being designed to cope with the demands of a full-colour high resolution display, or it could simply have slower hardware to maximise battery life. 
 
@@ -371,7 +371,7 @@ Here is a UML diagram explaining how the main objects interact with each other.
 
 MountConfig is a struct in C that contains some parameters like the type of filesystem, mount point, corresponding devicetree binding, and filesystem specific parameters. In our case, we hardcoded MountConfig's parameters for InternalFlash and InternalQSPIFlash, as we know they must use a specific defined filesystem. 
 For this application, I chose to use LittleFS as it offers built-in wear levelling which would be critical to the long-term endurance and life-cycle of the product. The flash memory embedded inside the nRF52/nRF53 series and even the external ``QSPI`` flash have a limited number of write operations, meaning that after some time the contents of the flash can no longer be trusted and the device is effectively rendered useless. 
-On top of this, it offers bounded RAM usage on file traversal, which will be critical for our memory constrained [41]_application, and is incredibly resilient to faults and power-losses. It fits all our constraints perfectly. 
+On top of this, it offers bounded RAM usage on file traversal, which will be critical for our memory constrained [41]_ application, and is incredibly resilient to faults and power-losses. It fits all our constraints perfectly. 
 There are some other alternatives, like SPIFFS and FATFS (FAT32). SPIFFS is an older filesystem which has been superseded by LittleFS - LittleFS can write a file 8 times faster than SPIFFS, read a file 5 times faster, format 500 times faster, and mount 60 times faster [42]_. For an application that needs to eek as much speed and performance out of the resource-constrained hardware, LittleFS is a no-brainer. FAT32 is similarly destroyed by LittleFS, it is unsuitable for systems that might have random power failures (hopefully that won't happen too much with a smartwatch, but there's always a risk during software upgrades!) as it gets corrupted very easily [43]_.
 
 The LittleFS initialisation routine is not overly complex - we can see this in the below image:
@@ -401,7 +401,7 @@ Hardware Interface
 The Disk API needs some way of knowing what devices should be permanently connected to the system, and which devices might be connected later on. The nRF52/nRF53 series' USB controller does not support host mode, meaning it cannot mount a USB stick by itself for instance. This is not much of a limitation for the project however, as USB sticks are understandably not used with smartwatches. Even for mass data backup and/or exfiltration, the nRF52/nRF53 SoCs' BLE link will be utilised instead. 
 What might be worth supporting is an external SD card for music streaming & storage, and/or other large data. 
 
-nRF52/nRF53 series has several RTOSes to choose from, FreeRTOS and Zephyr to name a few. For reasons I will explain in detail a little later, I dumped FreeRTOS and took up Zephyr which has an innovative Kconfig + devicetree build system, which works much like the mainline Linux kernel albeit with some syntactical differences. This is brilliant, as we're moving towards robust, tried & tested industry standard approaches to device enumeration rather than shoving in a library every time. Some interfacing is required to connect with the filesystem nodes on the devicetree, and typically devicetree partitions have to be defined from scratch. 
+nRF52/nRF53 series has several RTOSes to choose from, FreeRTOS and Zephyr to name a few. For reasons I will explain in detail a little later, I had to dump FreeRTOS and instead took up Zephyr, which has an innovative Kconfig + devicetree build system which works much like the mainline Linux kernel albeit with some syntactical differences. This is brilliant, as we're moving towards robust, tried & tested industry standard approaches to device enumeration rather than shoving in a library every time. Some interfacing is required to connect with the filesystem nodes on the devicetree, and typically devicetree partitions have to be defined from scratch. 
 
 See the hierarchy diagram below to see how all this fits together:
 
@@ -469,7 +469,7 @@ Below is a flowchart showing how the various methods will interlink to drive the
 We can see that each of the six basic parts can be segregated into their own subroutines for greater control and resilience. There are two options for waiting for the EPD - either we can have a thread poll the BUSY pin until it goes low, which wastes CPU cycles and power, or we can configure an interrupt that will fire when the pin goes to low, which we can then handle according to the known state of the EPD. 
 
 ``XIPA_FS`` - eXecute In Place compiled Ahead of time File System
--------------------------------------------------------------
+-----------------------------------------------------------------
 Soon after I had attempted to integrate the runtime into the firmware, I ran into a huge unforseen limitaiton. I couldn't use the external storage as I originally thought to extend the MCU's capabilities, as the nRF52/nRF53 series is not equipped with an MMU. This means it cannot map files stored in a fragmented way on LittleFS as memory and directly execute it without severe slow-down and needless complexity. 
 For WASM runtime, the app must be found in a contiguous memory buffer which can be passed as an argument to the initialisation routine. This meant I had to design my own filesystem which would store binary apps and other bits of large information contiguously on the external flash in a memory-efficient and power-efficient manner. 
 Another show-stopper limitation was that I could not write to any memory addresses mapped into the XIP space, meaning I could not treat the ``QSPI`` flash as merely an extension of SRAM. If I wanted to write to the flash, I would need to use a DMA (Direct Memory Access) transfer (i.e the normal approach) and suspend all XIP operations.
@@ -805,12 +805,934 @@ Then, we need an algorithm that will manipulate the data in the custom monochrom
 
 This algorithm calculates the correct byte to jump to in memory using the buffer width, height, and provided x/y coordinates, performs a left shift to move a test bit to the correct location, then either sets the pixel with an OR operation, or unsets it with a logical NOT and then logical AND operation. 
 
+LVGL can now write the display output of objects that we create into our buffer, it can now write the contents of the buffer to the display and refresh it on our accord, and it can now sense inputs using a simple (albeit power inefficient) polling method. This is all we need to start implementing the GUI with LVGL's comprehensive and versatile range of built in objects. 
 
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
 
 
 
 App Runtime - Sandboxed environment for app execution at near native speed
 --------------------------------------------------------------------------
+The short answer: WAMR - Web Assembly Micro Runtime.
+
+The longer answer: It took me a very long time to stumble upon this game-changing project. At first, it was looking for ways to run precompiled code back on FreeRTOS. FreeRTOS, being an RTOS and not a full-blown operating system did not support this use-case. A forum post gave me a key piece of terminology - "dynamic linking" - which helped me come across WASM. To understand this, we must first understand static linking. 
+When we compile a project consisting of multiple C source code files, the compiler will first go through file by file, turning the expressions and logic into assembly, and then machine code. Of course, at this stage the compiler will not know about variables or functions located in other files, but it will chug along happily anyway substituting these unknown variables with their name. The resulting file is known as an "object file" - we can't execute them as they have undefined references to other bits of code that need to be satisfied, but most of the hard work has already been done by the compiler converting it into machine code.
+Linking is the process of substituting all the undefined references within the object files with the correct memory addresses found in the other files - this then generates a binary executable or a dynamic library that can be executed or called into respectively. Awesome!
+
+So, **static linking** is where all the linking is done at compile-time, as it normally is. In our embedded use-case, our application is a singular binary executable which is then written to the onboard flash - it can do all sorts of things but the application needs to know about all the symbols ahead of time. 
+
+**Dynamic linking** is where the linking is done at **run-time** - this is necessary for most applications running on a full-blown operating system like Windows, MacOS, and Linux. The code will most likely have references to routines, objects, and variables that are already compiled and operating underneath in the operating system, so the OS needs to find these subroutines and variables and substitute them into the executable on-the-fly before continuing with program execution. This is what allows programs to be distributed across multiple different computers that run the same operating system, they're targeting the same common routines and objects that exist on every copy of said operating system. 
+
+We need to be able to dynamically link precompiled code in order to execute it - one way to do this is to create a jump table of all the elements that we want the dynamic application to have access to (in essence, a public API that exposes system calls, LVGL drawing routines, classes etc..) and maintain this in memory. We then provide a copy of this jump table to the application which it can include and then use. At run-time, we load the compiled app in ELF or TIFF form, and overwrite the compiled address pointing to the jump table with the address that we have currently in memory. Then, we can simply ask the CPU to jump to the first instruction of the binary file, and we can execute the program. Cool!
+There are some issues here - firstly, not all programs are going to, or even should have access to every single element within the jump table, as this poses a major security risk. If we want some apps to be able to modify system files and parameters (for example a self-written settings app), and some apps that cannot (like a Starbucks app or Uber client), we need to implement a concept of secure & non-secure code and permissions. It quickly becomes extremely complex, especially without an MMU. It means separate structs have to be used for normal & privileged applications, and since there is no MMU and precompiled code is being run natively, it would be relatively trivial to deduce the location of the privileged struct and execute functions it should not be allowed to do. 
+Granted, security with 3rd party apps and the absence of an MMU appear to be mutually exclusive - at the end of the day everything is just a memory location and everything can access everything else, but we need to put up more of a defence for badly coded or maliciously coded applications to keep our users safe as privacy and security are really critical topics on this market that a lot of companies get wrong.
+
+What we need then, is some **intermediary** layer of compilation that allows us to selectively look at instrutions and memory addresses and choose whether we even want to execute an instruction if it's accessing an "illegal" memory address. This would allow total sandboxing of applications on an MMU-less system as the intermediary layer sort of acts as an MMU. The tricky part here is balancing speed with security - it's no good building an iron cage around applications if execution is slowed so far that it's not possible to do anything useful with them.  
+
+And then I found WAMR, a library bringing WebAssembly, a proven and tested format used extensively in serving binary executables over the internet to be run in web browsers, to the realm of microcontrollers. The idea is that apps aren't compiled directly to machine code, but rather to WebAssembly - WAMR then allocates the program its own stack and heap, and executes the program in an execution environment. You can define APIs and shared objects that apps should have access to. This is where we can also implement privilege-escalation with simple checks that verify if the current thread has privileges or not. If it wants to request privileges, the user must approve it by pressing "Yes" on the screen, just like how programs request administrator access on Windows.  
+
+It's implemented all the functionality I was looking for in a dynamic app-loading system, and even has event-based inter-application signalling! The only limitation was that it needed the binaries to be stored in a contiguous region of memory, which meant I couldn't store them split up on a regular filesystem - this is why I designed XIPA_FS and LP_UARTE. 
+
+This is what the OS will sort of look like with WAMR:
+
+.. figure:: wasm.jpg
+    :width: 100% 
+    :align: center
+    :alt: "WASM diagram"
+
+And thus, we've reached the end of where I've gotten to so far with the project. Now let's see the actual code!
+
+Implementation
+==============
+
+Disk API
+--------
+I started off first with the Disk API, as it would have formed the basis for app and data storage which in theory WAMR was supposed to build off. Getting disks working was extremely challenging as I had to learn several industry standard tools and languages with steep learning curves with no prior experience. The first technique was **devicetree**. 
+devicetree is a way to describe the hardware composition of a system to a build-system which allows application code to be built hardware agnostically. It's used extensively in embedded systems with fixed hardware compositions, like Android smartphones, WearOS watches, and countless proprietary systems [53]_ . For development purposes I was utilising a Nordic development kit, which had lots of hardware prepopulated on the PCB, and hence its own devicetree file supplied by Nordic for use in application development. I had to override features relating to the prepopulated QSPI flash to make it follow my bidding - this can be seen below:
+
+.. code-block:: devicetree
+
+    /delete-node/ &slot1_partition; //Deleting pre-defined devicetree nodes in vendor-provided overlay file.
+    /delete-node/ &scratch_partition;
+    /delete-node/ &storage_partition;
+    /delete-node/ &slot0_partition;
+
+    / {
+        chosen {
+            nordic,pm-ext-flash = &mx25r64; //Spent almost a week debugging why I couldn't use external flash - turns out partition manager requires a
+            //chosen directive GRRRRR
+        };
+    };
+
+
+    / {
+        fstab {
+            compatible = "zephyr,fstab";
+            lfs1: lfs1 {
+                compatible = "zephyr,fstab,littlefs";
+                mount-point = "/int";
+                partition = <&lfs1_part>;
+                read-size = <16>;
+                prog-size = <16>;
+                cache-size = <64>;
+                lookahead-size = <32>;
+                block-cycles = <512>;
+            };
+            /* Not required because we had to switch to XIPA_FS!
+            lfs2: lfs2 {
+                compatible = "zephyr,fstab,littlefs";
+                mount-point = "/ext";
+                partition = <&lfs2_part>;
+                read-size = <16>;
+                prog-size = <16>;
+                cache-size = <64>;
+                lookahead-size = <32>;
+                block-cycles = <512>;
+            };
+            */
+        };
+    };
+
+
+    &flash0 {
+
+        partitions {
+            compatible = "fixed-partitions";
+            #address-cells = <1>;
+            #size-cells = <1>;
+
+            boot_partition: partition@0 { //MCUBoot is an upgradeable bootloader offering secure-boot and firmware encryption. Open source too for modifications!
+                label = "mcuboot";
+                reg = <0x00000000 0x00010000>; //Sizes in hexadecimal
+            };
+            mcuboot_pad: partition@10000 {
+                label = "mcuboot-pad"; //Padding partition required by MCUBoot for swapping images.
+                reg = <0x00010000 0x00001000>;
+            };
+            slot0_partition: partition@11000 {
+                label = "image-0"; //Main firmware binary image
+                reg = <0x00011000 0x00080000>;
+            };
+            lfs1_part: partition@91000 {
+                label = "int_storage"; //LittleFS storage partition on internal flash
+                reg = <0x00091000 0x0006F000>;
+            };
+        };
+    };
+
+    &mx25r64 {
+        partitions {
+            compatible = "fixed-partitions";
+            #address-cells = <1>;
+            #size-cells = <1>;
+            xipa1_part: partition@00000 {
+                label = "ext_storage"; //Exposes device for raw access in Zephyr - in reality we'll be using this with XIPA_FS. 
+                reg = <0x00000000 0x00780000>;
+            };
+            slot1_partition: partition@780000 {
+                label = "flash-image-1"; //Backup firmware binary image - MCUBoot can swap images at boot time for updating.
+                reg = <0x00780000 0x0080000>;
+            };
+        };
+    };
+
+    &spi3 {
+        status = "okay"; //Devicetree node for SD card usage for large amounts of data.
+        cs-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>; //Chip select
+        sck-pin = <44>; //Serial Clock
+        miso-pin = <46>; //Controller In Peripheral Out
+        mosi-pin = <45>; //Controller Out Peripheral In
+        sdhc0: sdhc@0 {
+            compatible = "zephyr,mmc-spi-slot";
+            reg = <0>;
+            status = "okay";
+            label = "SDHC0";
+            spi-max-frequency = <24000000>; //Frequency we will talk to SD card at in Hz
+        };
+    };
+
+    &spi2 {
+        status = "okay"; //Devicetree node for display, getting parameters neatly through here instead of hardcoding in display driver!! 
+        compatible = "nordic,nrf-spim";
+        sck-pin = <35>;
+        mosi-pin = <36>;
+        miso-pin = <37>;
+        inki,ssd16xxfb@0 {
+            compatible = "inki,ssd16xxfb";
+            //EPD parameters given by manufacturer
+            pp-height-bits = <16>; 
+            pp-width-bits = <8>;
+            gdv = [00]; //Gate driving voltage of internal transistors
+            sdv = [41 a8 32]; //Source driving voltage 
+            vcom = <0x00>; //Common electrode - gate and data current
+            border-waveform = <0x05>; //self explanatory
+            tssv = <0x80>; //Select which temperature sensor. We're using the internal one 
+            height = <200>; //Vertical resolution
+            width = <200>; //Horizontal resolution
+            dc-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>; //Data/command
+            reset-gpios = <&gpio1 16 GPIO_ACTIVE_LOW>; //Reset pin	
+            busy-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>; //Busy pin
+            label = "GDEH0154D67";
+            spi-max-frequency = <4000000>; //SPI Frequency, max supported by EPD is 20MHz, we have it at 4 for debug purposes.
+            reg = <1>; //How to select the device. Here we have SPI, so we have the second chipselect line to avoid clashing with the SD card.
+        };
+    };
+
+Now we have a devicetree file defined with some of our custom hardware. Some things are missing for now, like the accelerometer, hardware buttons, and heart rate monitor. The reason for this is that the accelerometer I was previously using had terribly abstracted driver code, and currently I am not sure which accelerometer to go for. The beauty of devicetree is that when I want to add it in at some point in the future, I can easily write a little definition for it and provide the correct driver file. The reason for the heart monitor's absence is the possibility of obtaining a seriously high-tech heart monitoring system from Maxim under an NDA if the watch proves to be popular [54]_ [55]_ . This would comprise of an electrode that makes contact with the user's skin and can measure potentials and thus deduce heart electrical activity, LEDs and photodiodes to examine blood flow & measure SpO2 and heart rate, and an encrypted Maxim MAX32664 MCU with highly advanced proprietary algorithms to detect heart rate, SpO2, and potentially even atrial fibrillation. This would be next level. 
+
+Back to the realm of reality, everything was cool until I decided to integrate MCUBoot into the design. This wasn't too difficult, I had to add a directory called "child_image" in my project root, and then add an "mcuboot" folder which contained a "prj.conf" file. Here are the contents of the prj.conf file:
+
+.. code-block:: kernel-config
+    
+    CONFIG_MAIN_STACK_SIZE=10240
+
+    CONFIG_SIZE_OPTIMIZATIONS=y
+    CONFIG_PM_PARTITION_SIZE_MCUBOOT=0x0000C000
+    CONFIG_PM_PARTITION_SIZE_MCUBOOT_SECONDARY=0x00080000
+    CONFIG_PM_PARTITION_SIZE_MCUBOOT_PAD=0x00001000
+    # Enable flash operations
+    CONFIG_FLASH=y
+
+    # This must be increased to accommodate the bigger images.
+    CONFIG_BOOT_MAX_IMG_SECTORS=256
+
+    # Serial
+    CONFIG_SERIAL=y
+    CONFIG_UART_LINE_CTRL=y
+    CONFIG_BOOT_SERIAL_DETECT_PIN=11
+
+    # MCUBoot serial
+    CONFIG_MCUBOOT_SERIAL=y
+    CONFIG_BOOT_SERIAL_CDC_ACM=y
+
+    CONFIG_LOG_BACKEND_UART=n
+    CONFIG_LOG_BACKEND_RTT=y
+
+MCUBoot is treated as a child application of my main application. These options enable some convenient amenities like USB-emulated serial to recover the device in the case of a dodgy user-space update or flash job, serial for debugging and logging, and space compaction to maximise space available for the main application and the LittleFS partition. 
+It turns out that enabling MCUBoot automatically enabled Nordic Partition Manager, which ignored all of the size directives that I put in the devicetree. This meant I had to write my own static partition allocation file which manhandled everything into the right hexadecimal offsets that I had painstakingly calculated in the above step:
+
+.. code-block:: yaml
+
+    app:
+    address: 0x11000
+    end_address: 0x91000
+    region: flash_primary
+    size: 0x80000
+    littlefs_storage:
+    address: 0x91000
+    end_address: 0x100000
+    placement:
+        before:
+        - end
+    region: flash_primary
+    size: 0x6F000
+    mcuboot:
+    address: 0x0
+    end_address: 0x10000
+    placement:
+        before:
+        - mcuboot_primary
+    region: flash_primary
+    size: 0x10000
+    mcuboot_pad:
+    address: 0x10000
+    end_address: 0x11000
+    placement:
+        before:
+        - mcuboot_primary_app
+    region: flash_primary
+    size: 0x1000
+    mcuboot_primary:
+    address: 0x10000
+    end_address: 0x91000
+    orig_span: &id001
+    - mcuboot_pad
+    - app
+    region: flash_primary
+    size: 0x81000
+    span: *id001
+    mcuboot_primary_app:
+    address: 0x11000
+    end_address: 0x91000
+    orig_span: &id002
+    - app
+    region: flash_primary
+    size: 0x80000
+    span: *id002
+    external_flash:
+    address: 0x800000
+    region: external_flash
+    size: 0x0
+    ext_storage:
+    address: 0x00
+    device: MX25R64
+    region: external_flash
+    size: 0x77F000
+    mcuboot_secondary:
+    address: 0x77F000
+    device: MX25R64
+    placement:
+        after:
+        - ext_storage
+        align:
+        start: 0x1000
+    region: external_flash
+    size: 0x81000
+    sram_primary:
+    address: 0x20000000
+    end_address: 0x20040000
+    region: sram_primary
+    size: 0x40000
+
+Getting the flash areas to be recognised correctly by the application was extremely difficult at first, the partitions kept getting swapped around incorrectly. I then removed MCUBoot, and examined the generated ``pm_static.yml`` in the build folder, and found that I had to define the flash area that I was using with a name and a size of zero to allow it to be recognised correctly by the build system. Once I did this, CMake started complaining about missing directives at linking time, which turned out to be a situation that wasn't documented in Zephyr. I had to manually trawl through the layers before I found a generated header file from the pre-processor with a bunch of configuration options missing. I had to add these manually to the global ``prj.conf`` file:
+
+.. code-block:: kernel-config
+
+    CONFIG_DISK_FLASH_DEV_NAME="NRF_FLASH_DRV_NAME"
+    CONFIG_DISK_FLASH_VOLUME_NAME="int_storage"
+    CONFIG_DISK_FLASH_START=0x91000
+    CONFIG_DISK_VOLUME_SIZE=0x6F000
+    CONFIG_DISK_ERASE_BLOCK_SIZE=0x1000
+    CONFIG_DISK_FLASH_ERASE_ALIGNMENT=0x1000
+    CONFIG_DISK_FLASH_MAX_RW_SIZE=4
+
+These values are all in hexadecimal, and specify how the flash should be treated by Zephyr. We have specified the internal storage here, because we are not using the Zephyr-specific Disk API for XIPA_FS - we're instead using the lower level Flash API for optimal speed. 
+
+Here are the KConfig values required to enable internal flash manipulation in Zephyr with LittleFS, MCUBoot and Partition Manager:
+
+.. code-block:: kernel-config
+
+    #Internal Flash
+    CONFIG_FLASH_MAP=y
+    CONFIG_FLASH_PAGE_LAYOUT=y
+    CONFIG_MPU_ALLOW_FLASH_WRITE=y
+    CONFIG_SOC_FLASH_NRF_EMULATE_ONE_BYTE_WRITE_ACCESS=n
+
+    #Bootloader
+    CONFIG_BOOTLOADER_MCUBOOT=y
+    CONFIG_MCUMGR=y
+    CONFIG_PM_PARTITION_SIZE_MCUBOOT_SECONDARY=0x00080000
+
+    #Disk wiping on reboot (For INKI's Disk API)
+    CONFIG_APP_INT_WIPE_STORAGE=n
+    CONFIG_APP_EXT_WIPE_STORAGE=n
+
+    #LittleFS 
+    CONFIG_FLASH=y
+    CONFIG_FILE_SYSTEM=y
+    CONFIG_FILE_SYSTEM_LITTLEFS=y
+
+
+Now we needed to get the external libraries (LVGL and WASM) building successfully with a simple test file that used some of their functions - to do this we had to get to grips with CMake. 
+CMake is a compiler-agnostic build system generator that is responsible for gathering the various libraries, source files, applying the requested build directives and options, and generating a build script that the requested compiler can execute to build the complete project. It can cache pre-built files and keep track of files modified to avoid having to rebuild the project completely every time. It's very powerful, and after getting to grips with it I can tell you that it's very elegant and you should use it in all your projects. 
+But in the moment, it was not easy. 
+
+Here's my main CMake file in the root directory that dictates how the entire project is built at the highest level. 
+
+.. code-block:: cmake
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+    cmake_minimum_required(VERSION 3.20.0) #Sets minimum version
+    set(NO_BUILD_TYPE_WARNING 1) #Fix conflict with CMake cache
+    find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE}) #Get Zephyr CMake project
+    project(inki_firmware) #Our project declaration
+
+    enable_language(ASM) #LVGL requires assembly support
+
+    #Parameters for WAMR - disabling stuff we don't need to get the binary size down. 
+    set(WAMR_BUILD_PLATFORM "zephyr") 
+     #Cortex M33 classifies as ARM-V8 - THUMB mode has 16-bit instructions for greater code density and minimal performance loss.
+    set(WAMR_BUILD_TARGET "THUMBV8")
+    #Disabling interpreter - not needed
+    set(WAMR_BUILD_INTERP 0) 
+    #Ahead of time i.e precompiled. - this is what we want for maximum speed. 
+    set(WAMR_BUILD_AOT 1) 
+    #JIT compilation - not required as we are precompiling for maximum speed.
+    set(WAMR_BUILD_JIT 0)
+    set(WAMR_BUILD_APP_FRAMEWORK 1) 
+    set(WAMR_BUILD_SHARED_MEMORY 1)
+    #LIBC is C's standard library. Zephyr has its own, we will expose that instead.
+    set(WAMR_BUILD_LIBC_WASI 0) 
+    set(WAMR_BUILD_LIBC_BUILTIN 1) 
+    set(WAMR_BUILD_FAST_INTERP 0)
+    set(WAMR_BUILD_LIB_PTHREAD 0)
+    #Yes, we want multiple apps to run at once. 
+    set(WAMR_BUILD_MULTI_MODULE 1) 
+    #We will write our own loader
+    set(WAMR_BUILD_MINI_LOADER 0) 
+    set (WAMR_BUILD_APP_LIST WAMR_APP_BUILD_BASE)
+
+    #Allow different / future watches to be built with different modules and features by setting variable.
+    add_definitions(-DMARK_ONE=1) 
+
+    set (LV_CONF_PATH #Telling CMake about LVGL's configuration file
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/lv_conf.h
+        CACHE STRING "" FORCE)
+
+    set (WAMR_ROOT_DIR #Telling CMake about wamr's build directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/wasm)
+
+    #Telling CMake we want MCUBoot in our project
+    set (MCUBOOT_DIR $ENV{ZEPHYR_BASE}/../bootloader/mcuboot)
+
+    #Telling CMake to tell our compiler & linker to trim any unused data and code from the resulting binary executable to save space.
+    add_compile_options(-fdata-sections -ffunction-sections)
+    add_link_options(-Wl,--gc-sections)
+
+    #LVGL has a CMake target, so we're just pointing CMake to that
+    add_subdirectory(lvgl)
+    #Ditto but for WAMR
+    include (${WAMR_ROOT_DIR}/build-scripts/runtime_lib.cmake) 
+
+    #Telling CMake about our application's source files
+    file(GLOB_RECURSE app_sources src/*.c)
+    target_sources(app PRIVATE ${app_sources})
+
+    #Telling CMake about the libraries we wrote
+    file(GLOB_RECURSE inki_libs src/lib/*/*.c src/lib/*/*.h)
+    target_sources(app PRIVATE ${inki_libs})
+
+    #Telling CMake about WAMR's sources
+    target_sources(app PRIVATE ${WAMR_RUNTIME_LIB_SOURCE})
+
+    #Telling CMake to tell the linker and Ninja about our custom partition layout
+    set(PM_STATIC_YML_FILE
+    ${CMAKE_CURRENT_SOURCE_DIR}/pm_static.yml
+    )
+    
+    #Telling CMake to tell Zephyr about our libraries and integrate them.
+    list(APPEND ZEPHYR_EXTRA_MODULES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/display
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/fs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/lp_uarte
+    )
+
+    #Linking LVGL as a static library to our application.
+    target_link_libraries(app PUBLIC lvgl -lgcc)
+
+The next port of call was to start writing INKI's Disk API. 
+
+I wrote INKI's libraries in a modular format. Each module had its own folder, in which resided at least one ".h" file which contained the module's public objects and functions, and at least one ".c" file containing the actual implementation of the public functions and any implementation specific private functions. 
+
+Here is the start of ``disk.h``:
+
+.. code-block::  c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+    #ifndef INKI_DISK_API
+    #define INKI_DISK_API
+
+    #include <fs/fs.h>
+    #include <fs/littlefs.h>
+    #include <ff.h>
+    #include <storage/disk_access.h>
+    #include <storage/flash_map.h> //Yes, this is required!
+    #include <logging/log_instance.h>
+    #include <logging/log.h>
+    #include <stdio.h>
+    #include <kernel.h>
+    #include <string.h>
+    #include <stdlib.h>
+
+    #define MAX_FS_PATH_LENGTH 255
+    #define TYPE_INTERNAL_FLASH 1
+    #define TYPE_INTERNAL_QSPI_FLASH 2
+    #define TYPE_EXTERNAL_SPI_FLASH 3
+    #define TYPE_EXTERNAL_USB_FAT 4 //LONG TERM TODO
+    #define TYPE_EXTERNAL_USB_NTFS 5 //LONG TERM TODO (after production probably!!)
+    #define FS_MOUNT_FLAG_USE_DISK_ACCESS 1
+    //*************************************************************************************************************************************************
+    //Straight C POLYMORPHISM LET'S GOOO (no access protection though without opaque pointers, which are semi pointless because I want to allow 3rd
+    //party devs and myself to manipulate the Zephyr FileSystem (FS) structs directly for full access over the hardware.)
+    //Protection will most likely be implemented on the WASM sandbox side to prevent apps misbehaving, but I will definitely need TOTAL access.
+    //Currently supported types - SPI external (SD card), QSPI internal, FLASH internal
+    //*************************************************************************************************************************************************
+
+    //******************************************************************************************************
+    //*   LONG TERM TO-DOs:                                                                          
+    //*     - Add method(s) for intQSPIFlash device that streamline XIP/Data lookups to the same flash chip  
+    //*     - RAMDisk? Feels like a solution in search of a problem tho 
+    //*     - Integrate USB Host chip, and use FATFS driver to add support for USB Mass Storage devices
+
+    #define BASEDISK_NAME bDisk
+    #define INTFLASH_NAME iDisk
+    #define INTQSPIFLASH_NAME qDisk
+    #define EXTSPIFLASH_NAME eDisk
+
+    struct baseDisk //Main object exposed for user
+    {
+        LOG_INSTANCE_PTR_DECLARE(log);
+        struct baseDisk_vtable* vtable; //function pointer table
+        struct fs_mount_t* mnt_p; //Mount point object
+        unsigned int id; //Disk ID
+        char fname[MAX_FS_PATH_LENGTH]; //Internal filename used for traversal operations
+        struct fs_statvfs vol_stats; //Volume statistics
+    };
+
+
+``#define`` directives are part of a piece of C pre-processor functionality called **macros**. If we quote a ``#define`` ed value in our code, at compile-time the pre-processor will go through the code and perform a direct substitution with whatever is put next to the directive. The top ``#ifndef INKI_DISK_API`` directive and the following line form an "include guard", that essentially stops the file from being included more than once, and causing all kinds of havoc with duplicated symbols in the linking process. 
+
+Now, C is not an object-oriented language. There are no built-in facilities for OOP principles such as polymorphism or inheritance, but luckily for us it is possible to implement these from scratch. I will attempt to explain how I did this.
+
+Firstly, we need a struct that contains the function pointers that we want to share amongst derived classes, we will call this a vtable for "virtual table":
+
+.. code-block::  c
+
+    struct baseDisk_vtable
+    {
+        int (*init)(void *self, char* label);
+        int (*deinit)(void *self);
+        int (*get_file_path) (void *self, bool found, const char* filename);
+    };
+
+Our base struct is ``baseDisk``, and it contains a copy of this function table defined as ``baseDisk_vtable``.  
+
+Now, we write prototypes for the base functions that we want users to be able to access. These will be the C# equivalent of an "abstract" function
+
+.. code-block:: c
+
+    int base_init(struct baseDisk *b, char* label);
+    int base_deinit(struct baseDisk *b);
+    int base_get_file_path(struct baseDisk *b, bool found, const char* filename);
+
+Hopping over to the ``.c`` file, we then write their definitions:
+
+.. code-block:: c
+
+    int base_init(struct baseDisk *b, char* label)
+    {
+        int retcode = b->vtable->init(b, label);
+        LOG_INST_INF(b->log, "Initialised.");
+        return retcode;
+    }
+    int base_deinit(struct baseDisk *b)
+    {
+        int retcode;
+        retcode = b->vtable->deinit(b);
+        LOG_INST_WRN(b->log, "Deinitialised.");
+        return retcode;
+    }
+
+    int base_get_file_path(struct baseDisk *b, bool found, const char* filename)
+    {
+        LOG_INST_INF(b->log, "Finding file path");
+        int retcode = b->vtable->get_file_path(b, found, filename);
+        return retcode;
+    }
+
+What we've done here is quite nifty. If a user calls the base function on a particular instance of the struct, it will go in and call the saved function pointer within the struct's vtable. This is in effect the implementation of a base class. 
+
+Now, let's write a "class" that derives from baseDisk and manages the internal flash, called "intFlash". Here is the main struct definition in ``disk.h``:
+
+.. code-block:: c
+
+    struct intFlash
+    {
+        struct baseDisk super;
+        const struct flash_area* pfa;
+    };
+
+And here are the function prototypes in ``disk.c``:
+
+.. code-block:: c
+
+    int intFlash_init(struct intFlash *i, char* label);
+    int intFlash_deinit(struct intFlash *i)
+    int general_get_file_path(struct baseDisk *b, bool found, const char* filename);
+
+We have put an instance of baseDisk within our derived class, which gives us all of baseDisk's variables, and most importantly, the vtable. 
+
+Now, here's the implementation of the function prototypes:
+
+.. code-block:: c
+
+    int intFlash_init(struct intFlash *i, char* label)
+    {
+        int rc;
+        LOG_INST_INF(i->super.log, "Initialising lfs internal flash");
+        i->super.mnt_p = &int_storage_mnt;
+        i->super.id = (uintptr_t)i->super.mnt_p->storage_dev;
+        rc = flash_area_open(i->super.id, &i->pfa);
+        if(rc < 0)
+        {
+            LOG_INST_ERR(i->super.log, "FAILED: Could not find flash area %u: %d", i->super.id, rc);
+            return rc;
+        }
+        else
+        {
+            LOG_INST_INF(i->super.log, "Area %u at 0x%x on %s for %u bytes", i->super.id, (unsigned int)i->pfa->fa_off, i->pfa->fa_dev_name, (unsigned int)i->pfa->fa_size);
+            if (IS_ENABLED(CONFIG_APP_INT_WIPE_STORAGE))
+            {
+                LOG_INST_WRN(i->super.log, "Erasing flash area ...");
+                rc = flash_area_erase(i->pfa, 0, i->pfa->fa_size);
+                LOG_INST_WRN(i->super.log, "Code: %d", rc);
+            }
+            flash_area_close(i->pfa);
+        }
+        LOG_INST_INF(i->super.log, "Attempting to mount id %u at %s", (unsigned int)i->super.mnt_p->storage_dev, i->super.mnt_p->mnt_point);
+        rc = fs_mount(i->super.mnt_p);
+        if (rc < 0) {
+            LOG_INST_ERR(i->super.log, "FAIL: mount id %u at %s: %d",
+                (unsigned int)i->super.mnt_p->storage_dev, i->super.mnt_p->mnt_point,
+                rc);
+            return rc;
+        }
+        LOG_INST_INF(i->super.log, "%s mounted: %d!", i->super.mnt_p->mnt_point, rc);
+        rc = fs_register(FS_LITTLEFS, i->super.mnt_p->fs);
+        if (rc < 0) {
+            LOG_INST_ERR(i->super.log, "FAIL: register id %u at %s: %d",
+                (unsigned int)i->super.mnt_p->storage_dev, i->super.mnt_p->mnt_point,
+                rc);
+            return rc;
+        }
+        /* //internal flash MUST be in FSTAB!! NO EXCEPTIONS!!
+                Thinking ahead to newer models and revisions, possibly even
+                different architectures and eventual end products, everything
+                must be extensified using devicetree tables to keep consistency.
+                Hacks in code and measures to counteract negligence on DST 
+                will result in significant issues while debugging later revisions
+                with the same library!
+            */
+        return 0;
+    }
+
+    int intFlash_deinit(struct intFlash *i)
+    {
+        int rc = 1;
+        LOG_INST_INF(i->super.log, "Unmounting...");
+        rc = fs_unmount(i->super.mnt_p);
+        if (rc < 0) {
+            LOG_INST_ERR(i->super.log, "Could not unmount, error code %d\n", rc);
+        }
+        else if (rc == EINVAL)
+        {
+            LOG_INST_WRN(i->super.log, "Already unmounted!");
+        }
+        rc = fs_unregister(i->super.mnt_p->type, i->super.mnt_p->fs);
+        return rc;
+    }
+
+    int general_get_file_path(struct baseDisk *b, bool found, const char* filename)
+    {
+        memset(b->fname, 0, MAX_FS_PATH_LENGTH);
+        snprintf(b->fname, sizeof(b->fname), "%s", b->mnt_p->mnt_point);
+        if(base_find_file_from_path(b, found, filename) == 1) return 1;
+        else return -ENFILE;
+    }
+
+
+Here's the definition for ``base_find_file_from_path()``, a recursive function that makes use of the Zephyr file-system API to return the full path to the first occurence of a particular filename stored inside the internal fname string. 
+
+.. code-block:: c
+
+    //so we can just do straight up strcmp without any strtok_r invocations.
+    //Place the starting path inside the struct's fname, this function will set fname to the path if found, otherwise NULL. 
+    //Function not defined in header, therefore technically encapsulated away!
+    int base_find_file_from_path(struct baseDisk* b, bool found, const char* filename)
+    {
+        struct fs_dir_t* dir; 
+        fs_dir_t_init(dir); //ignore uninitialised error, we are initialising in fs_dir_t_init.
+
+        static struct fs_dirent dirent;
+
+        if (fs_opendir(dir, b->fname) < 0)
+        {
+            return -ENOTDIR;
+        }
+        while (&dirent.name[0] != 0) { //this checks if we've reached the end of the directory.
+            if(fs_readdir(dir, &dirent) < 0)
+                break;
+            //This is safe because there can never be directories inside files on LittleFS.
+            //Would be unnecessary to set filepath back to original as this function is purely looking for FILES, not searching inside a zip for instance.
+            if(dirent.type == FS_DIR_ENTRY_FILE)
+            {
+                if(strcmp(&dirent.name[0], filename) == 0)
+                {
+                    snprintf(b->fname, sizeof(b->fname), "%s/%s", b->fname, dirent.name); //ignore warning, we are writing to itself correctly.
+                    LOG_INST_INF(b->log, "Found at %s, yay!", b->fname);
+                    fs_closedir(dir);
+                    found = true;
+                    return 1;
+                }
+            }
+            if(dirent.type == FS_DIR_ENTRY_DIR)
+            {
+                //found boolean will terminate recursion if a particular call instance finds the file.  
+                if(!found)
+                {
+                    snprintf(b->fname, sizeof(b->fname), "%s/%s", b->fname, dirent.name); //ignore warning, we are writing to itself correctly.
+                    LOG_INST_INF(b->log, "Going to %s", b->fname);
+                    return base_find_file_from_path(b, found, filename); //recursively calls function on every subdirectory encountered
+                } 
+                fs_closedir(dir);
+            }
+        }
+        return 0;
+    }
+
+Now, here's where we apply polymorphism. We create a vtable struct in ``disk.c`` and set its function pointers to the functions we've just implemented above:
+
+.. code-block:: c
+
+    struct baseDisk_vtable intFlash_vtable = 
+    {
+        (int (*)(void *, char *))&intFlash_init,
+        (int (*)(void *))&intFlash_deinit,
+        (int (*)(void *, const char *))&general_get_file_path,
+    };
+
+From this point, there is one final step. We have **a** vtable filled with the correct pointers for our derived intFlash "class", **not the vtable stored inside the inherited baseDisk!** All we need to do, is set the internal vtable pointer equal to the pointer to the vtable we've just created above:
+
+.. code-block:: c
+
+    void intFlash_setup(struct intFlash *i)
+    {
+        i->super.vtable = &intFlash_vtable;
+    }
+
+And that's it! We've implemented polymorphism from first principles! It's simple and elegant for single-level inheritance, things start getting extremely messy for multiple layer inheritance, but luckily for a disk API like ours we do not need more than a single level of inheritance and polymorphism. 
+
+Here's the rest of the ".c" file that implements the logic for the other types of disk using the same principle as above:
+
+.. code-block:: c
+
+    int intQSPIFlash_init(struct intQSPIFlash *q, char* label)
+    {
+        int rc;
+        LOG_INST_INF(q->super.log, "Initialising lfs internal flash");
+        q->super.mnt_p = &ext_storage_mnt;
+        q->super.id = (uintptr_t)q->super.mnt_p->storage_dev;
+        rc = flash_area_open(q->super.id, &q->pfa);
+        if(rc < 0)
+        {
+            LOG_INST_ERR(q->super.log, "FAILED: Could not find flash area %u: %d", q->super.id, rc);
+            return rc;
+        }
+        else
+        {
+            LOG_INST_INF(q->super.log, "Area %u at 0x%x on %s for %u bytes", q->super.id, (unsigned int)q->pfa->fa_off, q->pfa->fa_dev_name, (unsigned int)q->pfa->fa_size);
+            if (IS_ENABLED(CONFIG_APP_EXT_WIPE_STORAGE))
+            {
+                LOG_INST_WRN(q->super.log, "Erasing flash area ...");
+                rc = flash_area_erase(q->pfa, 0, q->pfa->fa_size);
+                LOG_INST_WRN(q->super.log, "Code: %d", rc);
+            }
+            flash_area_close(q->pfa);
+        }
+        LOG_INST_INF(q->super.log, "Attempting to mount id %u at %s", (unsigned int)q->super.mnt_p->storage_dev, q->super.mnt_p->mnt_point);
+        rc = fs_mount(q->super.mnt_p);
+        if (rc < 0) {
+            LOG_INST_ERR(q->super.log, "FAIL: mount id %u at %s: %d",
+                (unsigned int)q->super.mnt_p->storage_dev, q->super.mnt_p->mnt_point,
+                rc);
+            return rc;
+        }
+        LOG_INST_INF(q->super.log, "%s mounted: %d!", q->super.mnt_p->mnt_point, rc);
+        rc = fs_register(FS_LITTLEFS, q->super.mnt_p->fs);
+        if (rc < 0) {
+            LOG_INST_ERR(q->super.log, "FAIL: register id %u at %s: %d",
+                (unsigned int)q->super.mnt_p->storage_dev, q->super.mnt_p->mnt_point,
+                rc);
+            return rc;
+        }
+        /* //internal flash MUST be in FSTAB!! NO EXCEPTIONS!!
+                Thinking ahead to newer models and revisions, possibly even
+                different architectures and eventual end products, everything
+                must be extensified using devicetree tables to keep consistency.
+                Hacks in code and measures to counteract negligence on DST 
+                will result in significant issues while debugging later revisions
+                with the same library!
+            */
+        return 0;
+
+    }
+    int intQSPIFlash_deinit(struct intQSPIFlash *q)
+    {
+        int rc = 1;
+        LOG_INST_INF(q->super.log, "Unmounting...");
+        rc = fs_unmount(q->super.mnt_p);
+        if (rc < 0) {
+            LOG_INST_ERR(q->super.log, "Could not unmount, error code %d\n", rc);
+        }
+        else if (rc == EINVAL)
+        {
+            LOG_INST_WRN(q->super.log, "Already unmounted!");
+        }
+        rc = fs_unregister(q->super.mnt_p->type, q->super.mnt_p->fs);
+        return rc;
+    }
+
+
+    struct baseDisk_vtable intQSPIFlash_vtable = 
+    {
+        (int (*)(void *, char *))&intQSPIFlash_init,
+        (int (*)(void *))&intQSPIFlash_deinit,
+        (int (*)(void *, const char *))&general_get_file_path,
+    };
+
+    void intQSPIFlash_setup(struct intQSPIFlash *q)
+    {
+        q->super.vtable = &intQSPIFlash_vtable;
+    }
+
+    //https://stackoverflow.com/questions/25661925/quickly-find-whether-a-value-is-present-in-a-c-array 
+    //One-branch instruction optimised linear search (modified)
+    //Again technically encapsulated away as not exposed in header file.
+    bool check(char* arr[], char* val)
+    {
+        uint16_t i;
+        uint16_t count = sizeof(&arr)/sizeof(arr[0]);
+        char* x = arr[count-1];
+        if (strcmp(x,val)==0)
+            return true;
+        arr[count-1] = val;
+        for (i = 0; strcmp(arr[i], val) != 0; i++);
+        arr[count-1] = x;
+        return i != count-1;
+    }
+
+    //Must use drive-names specified in _VOLUME_STRS, otherwise 
+    //function will return ENOTDIR (20)
+    int extSPIFlash_init(struct extSPIFlash *e, char* label)
+    {
+        int rc;
+        char* mountpath;
+        e->mnt.type = FS_FATFS;
+        e->mnt.fs_data = &e->fat_fs;
+        char* vols [] = {_VOLUME_STRS};
+        if(!(check(vols, label)))
+        {
+            LOG_INST_INF(e->super.log, "Invalid mount point!");
+            return ENOTDIR;
+        }
+        e->disk_mount_pt = label;
+        rc = disk_access_init(e->disk_mount_pt);
+        if(rc != 0)
+        {
+            LOG_INST_ERR(e->super.log, "FAILED: Could not init id %u at %s: %d", (unsigned int)e->super.mnt_p->storage_dev, e->super.mnt_p->mnt_point, rc);
+            return rc;
+        }
+        if((mountpath = k_malloc(strlen(label)+2)) != NULL)
+        {
+            mountpath[0] = '\0';
+            strcat(mountpath, "/");
+            strcat(mountpath, label);
+            strcat(mountpath, ":");
+        }
+        else
+        {
+            LOG_INST_ERR(e->super.log, "Label malloc failed! Check memory usage");
+            return ENOMEM;
+        }
+        e->mnt.mnt_point = mountpath;
+        rc = fs_mount(&e->mnt);
+        k_free(mountpath);
+        if(rc != FR_OK)
+        {
+            LOG_INST_ERR(e->super.log, "FAIL: Could not mount id %u at %s: %d", (unsigned int)e->super.mnt_p->storage_dev, e->super.mnt_p->mnt_point, rc);
+        }
+        LOG_INST_INF(e->super.log, "SUCCESS: Could mounted id %u at %s: %d", (unsigned int)e->super.mnt_p->storage_dev, e->super.mnt_p->mnt_point, rc);
+        if(disk_access_status(e->disk_mount_pt)==DISK_STATUS_WR_PROTECT)
+        {
+            LOG_INST_WRN(e->super.log, "Disk in Write-Protect Mode!!");
+        }
+        return 1;
+    }
+
+    //Zero on success
+    int extSPIFlash_deinit(struct extSPIFlash *e)
+    {
+        int rc = 1;
+        LOG_INST_INF(e->super.log, "Unmounting...");
+        rc = fs_unmount(e->super.mnt_p);
+        if (rc < 0) {
+            LOG_INST_ERR(e->super.log, "Could not unmount, error code %d\n", rc);
+            return rc;
+        }
+        else if (rc == EINVAL)
+        {
+            LOG_INST_WRN(e->super.log, "Already unmounted!");
+        }
+        rc = fs_unregister(e->super.mnt_p->type, e->super.mnt_p->fs);
+        if (rc < 0)
+        {
+            LOG_INST_ERR(e->super.log, "Could not unregister filesystem");
+            return rc;
+        }
+        return 1;
+    }
+
+    struct baseDisk_vtable extSPIFlash_vtable = 
+    {
+        (int (*)(void *, char *))&intQSPIFlash_init,
+        (int (*)(void *))&intQSPIFlash_deinit,
+        (int (*)(void *, const char *))&general_get_file_path,
+    };
+
+    void extSPIFlash_setup(struct extSPIFlash *e)
+    {
+        e->super.vtable = &extSPIFlash_vtable;
+    }
+
+Now finally, we're utilising Zephyr's built in logging API, which means we need to know the name of the object prior to actually declaring it. Normally this would be impossible, but luckily in C we have macros, which will let us just substitute in the name at compile time:
+
+.. code-block:: c
+
+    #define BASE_DISK_DEFINE(_name)  \
+    LOG_INSTANCE_REGISTER(BASEDISK_NAME, _name, CONFIG_LOG_DEFAULT_LEVEL);  \
+    struct baseDisk _name = {  \
+                LOG_INSTANCE_PTR_INIT(log, BASEDISK_NAME, _name)  \
+    }       
+
+Tada! You will also notice that we're using BASEDISK_NAME, which was defined earlier in ``disk.h``. This is because Zephyr's instance logging API needs to know the current name of the object for us to be able to tell which instance of a particular "class" is doing in the debug logs. 
+
+Now, the only limitation of this method is that it is not possible to just declare the object using the macro and go. If we remember, the actual polymorphism part of this technique is implemented with the ``setup`` function, which sets the correct vtable for the particular object. Normally we'd be able to inline it into the ``DEFINE`` macro, but since Zephyr's logging API requires the logger to be declared outside the function scope (and rather in the global scope), we must call ``DEFINE`` in the global scope, and call the ``setup`` method separately in the function scope. This isn't too much of a limitation, as a developer using this object will know its type and will know to initialise the object first with the ``setup`` routine before using it. The other limitation is that if the programmer **doesn't** call the setup routine on the vtable, the function pointers could be set to garbage values, which could crash the entire system when trying to mount the disk. 
+
+Finally, here are the configuration structs for the on-die and QSPI internal flashes, which grab the nodes off the devicetree and static partition file and make them available to the manipulation routines:
+
+.. code-block:: c
+
+    FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(littlefs_storage);
+    static struct fs_mount_t int_storage_mnt = {
+        .type = FS_LITTLEFS,
+        .fs_data = &littlefs_storage,
+        .storage_dev = (void *)FLASH_AREA_ID(littlefs_storage),
+        .mnt_point = "/int",
+    };
+
+    FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(ext_storage);
+    static struct fs_mount_t ext_storage_mnt = {
+        .type = FS_LITTLEFS,
+        .fs_data = &ext_storage,
+        .storage_dev = (void *)FLASH_AREA_ID(ext_storage),
+        .mnt_point = "/ext",
+    };
+
+Initially I was using automounting on boot and verifying whether the disk was mounted in the init() function, but after adding the partition manager I had disks swapping themselves around and initialising the wrong partition, causing the device to format its own firmware on multiple occasions - going back to these structs defined within the ``disk.c`` file fixed these issues. 
+
+Now the Disk API is done, let's move onto XIPA_FS. 
+
+
+XIPA_FS
+-------
+
 
 
 .. [41] https://github.com/littlefs-project/littlefs
@@ -825,3 +1747,6 @@ App Runtime - Sandboxed environment for app execution at near native speed
 .. [50] https://icarus.cs.weber.edu/~dab/cs1410/textbook/4.Pointers/memory.html
 .. [51] http://www.chiark.greenend.org.uk/doc/libg2c0/cpp.html
 .. [52] https://www.androidauthority.com/skagen-falster-2-review-915798/
+.. [53] https://www.devicetree.org/
+.. [54] https://www.maximintegrated.com/en/products/sensors/MAX86176.html/product-details/tabs-4?intcid=para
+.. [55] 

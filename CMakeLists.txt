@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
 
 cmake_minimum_required(VERSION 3.20.0)
 set(NO_BUILD_TYPE_WARNING 1)
@@ -54,6 +55,7 @@ set(PM_STATIC_YML_FILE
 list(APPEND ZEPHYR_EXTRA_MODULES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/display
   ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/fs
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/lp_uarte
 )
 
 target_link_libraries(app PUBLIC lvgl -lgcc)
