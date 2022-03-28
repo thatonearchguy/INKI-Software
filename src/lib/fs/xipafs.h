@@ -88,7 +88,7 @@ A: Have a wander through these files and find out! Joking, I will update this se
 #define VER_STR_SIZE 4
 #define RUN_SIZE 4
 
-#define __LOC (volatile uint8_t*)(volatile intptr_t)*(volatile uint8_t*) //this macro makes the code a little nicer.
+#define __LOC (volatile uint8_t*)(volatile intptr_t)*(volatile uint32_t*) //this macro makes the code a little nicer.
 //these are a series of casts that takes the value at a specific pointer, which is actually a pointer itself, 
 
 struct xipafs

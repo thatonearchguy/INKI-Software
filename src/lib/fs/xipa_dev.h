@@ -16,7 +16,7 @@ struct xipa_dev {
 };
 
 
-typedef int (*lp_uarte_init)(const struct xipa_dev*, off_t xip_offset);
+typedef int (*xipa_xip_setoffset)(const struct xipa_dev*, off_t xip_offset);
 typedef int (*xipa_xip_enable)(const struct xipa_dev*);
 typedef int (*xipa_xip_disable)(const struct xipa_dev*);
 typedef int (*xipa_sha256_frag_verif)(const struct xipa_dev*, void* frag_buf, size_t frag_len);
@@ -28,7 +28,7 @@ __subsystem struct xipa_dev_api
 {
     xipa_sha256_frag_verif verif;
     xipa_sha256_frag_finish fin;
-    lp_uarte_init setoffset;
+    xipa_xip_setoffset setoffset;
     xipa_xip_enable en;
     xipa_xip_disable di;
 };

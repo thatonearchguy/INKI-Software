@@ -49,7 +49,7 @@ Research Methodology
 INKI was inspired by similar projects such as the Light Phone [#]_ and Light Phone 2. These are phones built to be used as little as possible to help disconnect from the tech monopolies and social medias that are increasingly sucking up our time and energy. While the Light Phone 2 is beautiful, and INKI seeks a similar aesthetic, the internal hardware of the Light Phone 2 is much like a modern Android smartphone, utilising a fairly beefy ARMv7/ARMv8 CPU capable of running Android, which it does. This isn't a deal-breaker as the Android OS appears to be heavily modified to better support the Electro-Phoretic Display (abbr. EPD) and maximise battery life / minimise power consumption, but Android is still inherently a major operating system with significant overhead and thus power consumption. 
 This made me wonder whether lower power hardware, utilising an ultra-low-power display technology like Electro-Phoretic Displays, running a simpler operating system written from the ground up tailored for smartwatch duty could do a highly effective job at a fraction of the complexity and power consumption.
 
-A lot of internet research later, I found Nordic Semiconductor, a fabless semiconductor company that specialises in Bluetooth Low Energy low power ARM chips after looking at powerful microcontrollers on Adafruit's website. The nRF52 series was of particular interest due to the relative simplicity of the SoC but immense power available compared to traditional AVR based microcontrollers. All chips in this series feature a 64MHz ARM Cortex-M4 CPU, which is four times faster than the ATMega32u4 on clock speed alone [#]_ and undoubtedly many times faster on IPC due to the 32 vs 8 bit architecture. The best part is that these chips are as easy to program as an AVR, and massively more capable at the same time; the top spec nRF52840 is a perfect candidate for the smartwatch as it has inbuilt hardware accelerated AES, instruction Cache to speed up execution and minimise current, a floating point unit, and has the most RAM and memory to allow for exciting applications and features to be implemented without being constrained too much by hardware limitations.
+A lot of internet research later, I found Nordic Semiconductor, a fabless semiconductor company that specialises in Bluetooth Low Energy low power ARM chips after looking at powerful microcontrollers on Adafruit's website. The nRF52 series was of particular interest due to the relative simplicity of the SoC (System on a Chip) but immense power available compared to traditional AVR based microcontrollers. All chips in this series feature a 64MHz ARM Cortex-M4 CPU, which is four times faster than the ATMega32u4 on clock speed alone [#]_ and undoubtedly many times faster on IPC due to the 32 vs 8 bit architecture. The best part is that these chips are as easy to program as an AVR, and massively more capable at the same time; the top spec nRF52840 is a perfect candidate for the smartwatch as it has inbuilt hardware accelerated AES, instruction Cache to speed up execution and minimise current, a floating point unit, and has the most RAM and memory to allow for exciting applications and features to be implemented without being constrained too much by hardware limitations.
 
 Deducing what functionality would be required was a lot easier, I simply looked through the spec sheets and prices for some of the most popular smartwatches today [#]_ [#]_ and saw what they all had in common. The main features I was looking for was determined by several consumer-oriented articles aimed at tech enthusiasts looking to make their next purchase - which is our target market here. [#]_ [#]_ [#]_
 
@@ -80,9 +80,9 @@ Apple Watch Series 7
 The Apple Watch is the current market leader in the smartwatch world, despite being completely incompatible with Android devices. The rectangular screen with the curved edges and robust metal casing is an instantly recognisable design, and one that Apple has maintained for several years now. 
 The reason it's been so popular is that it's sort of changed the face of smartwatches, transforming them from a gimmick in the eyes of the public to something genuinely useful and usable. They've integrated high-end fitness tracking, useful 3rd party apps, and effectively extended the iPhone to a user's wrist in a way that hadn't been done before - and it worked!
 
-I respect the Apple Watch for this greatly. Additionally, the Apple Watch, and Apple products in general are well-reputed for being amongst the best on the market with regards to privacy and security. The iCloud lock functionality prevents sensitive data being released off a stolen device, and gives users the ability to remotely lock or disable their lost devices. And of course, all data on the watch itself is encrypted, and activation is authenticated with Apple's "Albert" servers, making false activations and thus any possible data exfiltration impractically difficult. The user-experience is also made quite a lot nicer by the physical controls in conjunction with the touch screen - the Apple Watch is equipped with a rotating "crown" used to scroll through menus, and a singular button is used to switch between apps. This is superior to touch only watches, which are rendered useless underwater or fall victim to crazy, spurious inputs upon entering contact with water. 
+I respect the Apple Watch for this greatly. Additionally, Apple products in general are well-reputed for being amongst the best on the market with regards to privacy and security. The iCloud lock functionality prevents sensitive data being released off a stolen device, and gives users the ability to remotely lock or disable their lost devices. And of course, all data on the watch itself is encrypted, and activation is authenticated with Apple's "Albert" servers, making false activations and thus any possible data exfiltration impractically difficult. The user-experience is also made quite a lot nicer by the physical controls in conjunction with the touch screen - the Apple Watch is equipped with a rotating "crown" used to scroll through menus, and a singular button is used to switch between apps. This is superior to touch only watches, which are rendered useless underwater or fall victim to crazy, spurious inputs upon entering contact with water. 
 
-The Apple Watch does have a few limitations though. Some models are equipped with optional LTE connectivity, which allows the watch to connect itself directly to the internet using a cellular data connection - a common criticsm is how the watch is still overly reliant upon the mother iOS device for much of its functionality. This has been resolved more with the newer versions, which can download podcasts and songs by themselves. Additionally, the LTE versions cost quite a lot more than the regular counterparts and require a monthly cellular subscription. The notifications can be quite distracting, but since it's an Apple product there's fairly comprehensive notification management and this can be mitigated somewhat. 
+The Apple Watch does have a few limitations though. Some models are equipped with optional LTE connectivity, which allows the watch to connect itself directly to the internet using a cellular data connection - a common criticsm is how the watch is still overly reliant upon the mother iOS device for much of its functionality. This has been improved with the newer versions, which can download podcasts and songs by themselves. Additionally, the LTE versions cost quite a lot more than the regular counterparts and require a monthly cellular subscription. The notifications can be quite distracting, but since it's an Apple product there are some fairly comprehensive notification management settings, meaning this can be mitigated somewhat. 
 
 Its greatest flaw, which Apple has been chagrined for, is undoubtedly the battery life. Apple Watches run a custom OS known as watchOS, which is known to be descended from iOS which runs on their tablets and smartphones. The iOS underpinnings could potentially explain why these watches struggle to outlast their competition, as it would make sense that iOS would not have been written from the ground up with wearable applications in mind. It is also entirely possible that the slick user interface that is so heavily praised by reviewers requires a power-hungry and powerful SoC to drive, contributing further to the battery drain. In any case, the battery life is likely the last thing holding the Apple Watch back from total domination over the competition. Having to charge another device every evening can get irritating - I personally find myself quite often in situations where I've forgotten to charge my phone overnight and I run out of juice midway through the day.
 
@@ -102,11 +102,11 @@ Samsung has been at the smartwatch game since 2013, starting out with their Gala
 
 Galaxy watches up until recently have run their own custom firmware called Tizen, based on Linux. It's been a competent alternative to WearOS, which had been more or less left by the wayside to collect dust until Samsung came around and offered to help redevelop WearOS using Tizen code. Tizen has been criticised for being "riddled with serious security vulnerabilities" [#]_ in a 2017 article detailing an Israeli security researcher's work into investigating the Tizen firmware that was shipped with their new smart television. Considering this operating system had been in development since 2013, and constrasting these comments to Apple's relative strength in the security/privacy area, this paints these devices in quite a dim light. Recently, Samsung and Google have started working together to merge the floundering WearOS and Tizen codebases into something hopefully fresh and new - and the result can be seen with the Galaxy Watch 4.
 
-The construction is similar to the Apple Watch, with robust and sleek aluminium utilised with the vibrant AMOLED display. The trademark hardware rotating bezel is gone in place of a virtual solution actuated by rotating the finger around the bezel. This would be difficult with gloves on or in rain. The Galaxy Watch 4 comes in two different sizes to cater for all shapes and sizes of wrist - a possible solution for INKI could be to utilise a display in the middle range of what Samsung is utilising in their watches.  
+The construction is similar to the Apple Watch, with robust and sleek aluminium utilised with the vibrant AMOLED display. The trademark hardware rotating bezel is gone in place of a virtual solution actuated by rotating the finger around the bezel. This would be difficult with gloves on or in rain. The Galaxy Watch 4 comes in two different sizes to cater for most shapes and sizes of wrist - a possible solution for INKI could be to utilise a display in the middle range of what Samsung is utilising in their watches. 
 
-One quite annoying drawback is that Samsung has chosen to reserve several features for Samsung phones only, which seems like a slightly petty (albeit understandable) move to encourage smartphone sales, which could be driven by concerns about profit margins. 
+One quite annoying drawback is that Samsung has chosen to reserve several features for Samsung phones only, which seems like a slightly petty (albeit understandable) move to encourage smartphone sales, which could be driven by concerns about profit margins.
 
-To conclude - fairly solid device using Samsung's own custom silicon with questions surrounding the future of its software support. 
+To conclude - fairly well-executed device using Samsung's own custom silicon with questions surrounding the future of its software support. 
 
 
 Fitbit Sense
@@ -117,14 +117,14 @@ Fitbit Sense
     :align: right
     :alt: "Fitbit Sense on someone's wrist"
 
-The Fitbit Sense is an interesting piece - it's Fitbit's flagship model at the moment. It's the first Fitbit to monitor your stress using electrodermal activity, which has been used in fraudulent looking [20]_ products in the past to supposedly diagnose and treat illnesses but here is only being used as a stress indicator [21]_. 
+The Fitbit Sense is an interesting flagship piece at the moment. It's the first to monitor your stress using electrodermal activity. There have been cases of electrodermal activity being used in fraudulent looking [20]_ products in the past to supposedly diagnose and treat illnesses, but here it's just being used as a stress indicator [21]_ .
 It has an attractive square design with rounded corners and a clear, vibrant display much like the other watches we've analysed so far. There's ample customisation with regards to the watch - changing the watchface and changing the physical strap is straightforward. Aluminium is used throughout the construction of the watch module itself, the straps are offered in various materials ranging from leather & nylon, to steel and sillicon. This all looks very promising. 
 
 Multiple reviewers have stated how comfortable the watch is once fastened, this is a great step in the right direction. There's a physical haptic button, meaning the button doesn't actually press down, rather it uses vibration technology to emulate the feeling of the button being pressed much like on the newer Apple devices. This is still much better than not having any buttons at all and would undoubtedly improve water resistance. 
 
 There is support for 3rd party apps, while the app selection is more limited compared to Apple there are still some highly useful applications like Spotify, Pandora, Starbucks, Uber, and quite a few great looking apps from independent developers. [22]_
 
-The only drawback here is the battery life - with light usage this is around six days, but drops drastically during GPS tracking and if the display is left in "always on" mode. To conclude, this is a really interesting device that gets a lot right, but the app selection and battery life could be a little better. It still destroys the Apple Watch and Galaxy Watch in the battery life department though. 
+The only drawback here is the battery life - with light usage this is around six days, but drops drastically during GPS tracking and if the display is left in "always on" mode. To conclude, this is a really interesting device that gets a lot right, but the app selection and battery life could be a little better. It still trumps the Apple Watch and Galaxy Watch in the battery life department though. 
 
 .. [20] https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6140073/
 .. [21] https://www.healthline.com/health/fitness/fitbit-sense
@@ -158,7 +158,7 @@ OnePlus Watch
     :align: right
     :alt: "OnePlus Watch on someone's wrist"
 
-The OnePlus Watch has taken a similar approach to its smartwatch to Garmin and Fitbit in designing its own custom operating system to maximise battery life instead of using WearOS. 
+The OnePlus Watch has taken a similar approach to its smartwatch to Garmin and Fitbit in designing its own custom operating system to maximise battery life.
 The casing is refined and hits above its price point, but it's quite large at 46mm, perhaps excessively so for consumers with smaller wrists. There's no always-on-display which is understandable to save power, but since AMOLED displays are supposed to be reasonably low-power I don't quite understand why this functionality has been omitted. It also doesn't really differentiate itself from the population. [25]_
 There are also concerns about bugs [26]_ in the companion app and some odd design choices on the watch firmware - particularly the "quick reply" functionality for messages which is limited to just 4 choices which do not appear to be changeable. Additionally, emojis in text messages aren't shown which seems like a bit of a waste for the beautiful 454x454 display. Some of these issues have been addressed in a firmware update, but what matters here is why the watch was released without these amenities in the first place. 
 
@@ -171,7 +171,7 @@ On the other hand, the sensors appear to be accurate, meauring heart rate and ox
 Takeaways & Fate of WearOS
 ++++++++++++++++++++++++++
 
-It seems that the smartwatch market isn't quite being taken as seriously as it could be, especially on the Android side of things. In conjunction with the state of WearOS, Qualcomm had let the smartwatch market collect dust from 2016 by simply not releasing any new SoCs for over two years. Not just that, their "flagship" smartwatch SoC was based on Qualcomm's flagship offering on the 28nm node, which would have been produced sometime in 2013 [27]_. Smaller transistors require less power to actuate, benefit from lower leakage current, and are typically more efficient, which contributes to significantly lower power consumption with zero loss in performance. From this follows reduced cooling requirements (only really relevant in full-blown smartphones or personal computers), and extended battery life (universally relevant!). It therefore makes sense that smartwatches should benefit from the smallest node available to Qualcomm, not be left to collect dust for 2 years on an already 3 year old node. 
+It seems that the smartwatch market isn't quite being taken as seriously as it could be, especially on the Android side of things. In conjunction with the state of WearOS, Qualcomm had let the smartwatch market collect dust from 2016 by simply not releasing any new SoCs for over two years. Not just that, their "flagship" smartwatch SoC was based on Qualcomm's flagship offering on the 28nm node, which would have been produced sometime in 2013 [27]_. Smaller transistors require less power to actuate, benefit from lower leakage current, and are typically more efficient, which contributes to significantly lower power consumption with zero loss in performance. From this follows reduced cooling requirements (only really relevant in full-blown smartphones or personal computers), and extended battery life (universally relevant!). It therefore makes sense that smartwatches should benefit from the smallest node available to Qualcomm, not be left to wither away for 2 years on an already 3 year old node. 
 
 Apple and Samsung have their own processor design programs that allowed them to dodge this stagnation and provide their teams with newer, faster, more efficient SoCs year on year to claim first and second place in the smartwatch market - this would be fine bar the fact that Samsung uses Tizen for their watches, and Apple uses their own watchOS. They do not rely on WearOS! This could very well have been a factor in WearOS's decline and decay. Even in this situation, there are always optimisations and new features that can be carefully evaluated and added to a watch even on older SoCs without jeopardising the user-experience or perceived responsiveness. 
 
@@ -212,7 +212,7 @@ Bare Metal vs RTOS
 A Bare-Metal device typically hosts a singular application dedicated to a very specific set of functions. For example, the microcontroller driving your oven, the lights on your bicycle, or the doors of your car have a very specific job to do. There are a small number of possible states that the programmer writing the firmware is well aware of while writing the software. In these scenarios, while a microcontroller is invaluable and absolutely a necessity, there is no need for the microcontroller to ever run a different program at will. There is no need for security, app-loading, multi-threading, because they only need to do one thing - unlocking/locking the door, blinking the light etc...
 This type of application typically has free-reign over the hardware, which can be risky when manipulating registers directly as one really needs to get to know the hardware to avoid making disastrous mistakes, but at the same time the total control makes for a far more deterministic and hence more easily debuggable application. Any bugs that occur are then totally within your command, and hopefully highly fixable!
 
-An RTOS changes things quite a lot for our humble little microcontrollers. It gives them the boon of multi-threading, allowing them to do multiple things at once. They can react to new events, they can start and stop tasks at will, they can behave quite a lot like a full-blown OS we are used to seeing on our smartphones and laptop/desktop computing devices. RTOS frameworks typically have fairly comprehensive driver bases, much like Linux, so can facilitate development of reasonably portable code that can be built and flashed onto many different kinds of MCU. This can be a game changer with more complicated microcontrollers like the nRF52 series, STM32 and other high-end Cortex M7, where writing code from scratch to control complex periperhals like graphical acceleration or on-chip TCP/IP infrastructure could take months of effort that could be dedicated towards developing kickass applications.
+An RTOS changes things quite a lot for our humble little microcontrollers. It gives them the boon of multi-threading, allowing them to do multiple things at once. They can react to new events, they can start and stop tasks at will, they can behave quite a lot like a full-blown OS we are used to seeing on our smartphones and laptop/desktop computing devices. RTOS frameworks typically have fairly comprehensive driver bases, much like Linux, so can facilitate development of reasonably portable code that can be built and flashed onto many different kinds of MCU. This can be a game changer with more complicated microcontrollers like the nRF52 series, STM32 and other high-end Cortex M7, where writing code from scratch to control complex periperhals like graphical acceleration or on-chip TCP/IP infrastructure could take months of effort that could be dedicated towards developing kickass applications. 
 
 This table summarises some of the differences between Bare Metal and RTOS:
 
@@ -470,7 +470,7 @@ We can see that each of the six basic parts can be segregated into their own sub
 
 ``XIPA_FS`` - eXecute In Place compiled Ahead of time File System
 -----------------------------------------------------------------
-Soon after I had attempted to integrate the runtime into the firmware, I ran into a huge unforseen limitaiton. I couldn't use the external storage as I originally thought to extend the MCU's capabilities, as the nRF52/nRF53 series is not equipped with an MMU. This means it cannot map files stored in a fragmented way on LittleFS as memory and directly execute it without severe slow-down and needless complexity. 
+Soon after I had attempted to integrate the runtime into the firmware, I ran into a huge unforseen limitaiton. I couldn't use the external storage as I originally thought to extend the MCU's capabilities, as the nRF52/nRF53 series is not equipped with an MMU. This means it cannot map files stored in a fragmented way on LittleFS directly as memory addresses and directly execute it without severe slow-down and needless complexity. 
 For WASM runtime, the app must be found in a contiguous memory buffer which can be passed as an argument to the initialisation routine. This meant I had to design my own filesystem which would store binary apps and other bits of large information contiguously on the external flash in a memory-efficient and power-efficient manner. 
 Another show-stopper limitation was that I could not write to any memory addresses mapped into the XIP space, meaning I could not treat the ``QSPI`` flash as merely an extension of SRAM. If I wanted to write to the flash, I would need to use a DMA (Direct Memory Access) transfer (i.e the normal approach) and suspend all XIP operations.
 Even this would be serviceable, but it turned out that the nRF52840 had some serious silicon bugs [46]_ in the ``QSPI`` peripheral. In essence, it would be impossible to get accurate reads directly from the ``QSPI`` XIP region without using ``memcpy()`` because of a race condition. This made it even more critical that I write a bespoke filesystem that could work around these show-stopping bugs - ultimately the ``QSPI`` race-condition bug forced me to dump the nRF52840 in favour of the nRF5340 which has almost three times the processing power of the nRF52840 with very similar power consumption. 
@@ -702,8 +702,8 @@ Data would be enclosed inside packets, which would be made up of a 4 byte identi
 In essence, this protocol will allow the nRF9160 to act as a modem over serial, but also be able to carry out tasks for the main application core. It could very well be possible to integrate another app runtime on the nRF9160, and have encrypted firmware fed to it at boot time for maximised security.  
 
 
-Vector - C implementation of a list
------------------------------------
+``Vector`` - C implementation of a list
+---------------------------------------
 Zephyr didn't play very well with C++ even with the CONFIG_CPLUSPLUS option. Even if I could get it to work, Zephyr officially did not support C++ dynamic object generation or static global object destruction [49]_, which would be a significant limitation in the sort of middle-layer code I was writing. 
 For this reason, I had to step down a rung on the ladder to C, and suddenly I was thrust into the realm of manual memory management and bit level data manipulation. It was awesome. 
 
@@ -745,8 +745,8 @@ The other functions in the UML diagram are self-explanatory and are some conveni
 
 By specifying the size of individual items at object generation time, it is possible to have type-agnostic vectors (albeit with some clunky code to retrieve items and cast them back to the correct form). It is even possible to push structs into vectors - which is supposed to be very difficult because the compiler inserts padding bytes to round them to multiples of words or push them into a particular memory block to speed up access. The padding bytes mean that not all of the data will be copied into the list if we're assuming a constant size. By applying a  ``packed`` attribute to the struct, we can tell the compiler to not use any padding bytes, allowing us to serialise them into a block of memory and manipulate it directly. Since the C standard guarantees that struct elements are stored in order in memory, we can just copy the entirety of the struct into the list and cast it to our particular object. It would be critical to ensure the right element is being casted to the right type, especially when the structs are supposed to contain pointers, otherwise we could end up manipulating random memory and crashing the MCU. 
 
-Stack - Wrapper around Vector to emulate a stack
-------------------------------------------------
+``Stack`` - Wrapper around ``Vector`` to emulate a stack
+--------------------------------------------------------
 Stack contains a Vector internally, and wraps around Vector's APIs implementing the following functions:
 
 .. figure:: stackuml.png
@@ -854,8 +854,8 @@ And thus, we've reached the end of where I've gotten to so far with the project.
 Implementation
 ==============
 
-Disk API
---------
+Disk API Implementation
+-----------------------
 I started off first with the Disk API, as it would have formed the basis for app and data storage which in theory WAMR was supposed to build off. Getting disks working was extremely challenging as I had to learn several industry standard tools and languages with steep learning curves with no prior experience. The first technique was **devicetree**. 
 devicetree is a way to describe the hardware composition of a system to a build-system which allows application code to be built hardware agnostically. It's used extensively in embedded systems with fixed hardware compositions, like Android smartphones, WearOS watches, and countless proprietary systems [53]_ . For development purposes I was utilising a Nordic development kit, which had lots of hardware prepopulated on the PCB, and hence its own devicetree file supplied by Nordic for use in application development. I had to override features relating to the prepopulated QSPI flash to make it follow my bidding - this can be seen below:
 
@@ -1017,7 +1017,7 @@ Back to the realm of reality, everything was cool until I decided to integrate M
     CONFIG_LOG_BACKEND_UART=n
     CONFIG_LOG_BACKEND_RTT=y
 
-MCUBoot is treated as a child application of my main application. These options enable some convenient amenities like USB-emulated serial to recover the device in the case of a dodgy user-space update or flash job, serial for debugging and logging, and space compaction to maximise space available for the main application and the LittleFS partition. 
+Zephyr RTOS uses KConfig underneath to select what features should be compiled into the resulting kernel and executable. It's far better than the old Nordic SDK's ``sdk_config.h`` file which would often be tens of thousands of lines of commented out options and little clarification or documentation over what options were needed to enable a particular option. The best part is that it's a tried and proven industry standard tool - it's used extensively in the Linux kernel and CoreBoot repositories - which I will have under my belt by the time this project is complete! Now, back to MCUBoot - MCUBoot is treated as a child application of my main application. The KConfig options above enable some convenient amenities like USB-emulated serial to recover the device in the case of a dodgy user-space update or flash job, serial for debugging and logging, and space compaction to maximise space available for the main application and the LittleFS partition. 
 It turns out that enabling MCUBoot automatically enabled Nordic Partition Manager, which ignored all of the size directives that I put in the devicetree. This meant I had to write my own static partition allocation file which manhandled everything into the right hexadecimal offsets that I had painstakingly calculated in the above step:
 
 .. code-block:: yaml
@@ -1107,7 +1107,7 @@ Getting the flash areas to be recognised correctly by the application was extrem
 
 These values are all in hexadecimal, and specify how the flash should be treated by Zephyr. We have specified the internal storage here, because we are not using the Zephyr-specific Disk API for XIPA_FS - we're instead using the lower level Flash API for optimal speed. 
 
-Here are the KConfig values required to enable internal flash manipulation in Zephyr with LittleFS, MCUBoot and Partition Manager:
+Here are the KConfig values required to enable internal flash and SD card manipulation in Zephyr with LittleFS, MCUBoot and Partition Manager, with basic logging. 
 
 .. code-block:: kernel-config
 
@@ -1131,12 +1131,67 @@ Here are the KConfig values required to enable internal flash manipulation in Ze
     CONFIG_FILE_SYSTEM=y
     CONFIG_FILE_SYSTEM_LITTLEFS=y
 
+    #Logging
+    CONFIG_UART_CONSOLE=n #ignore warning, we are overriding uart usage.
+    CONFIG_USE_SEGGER_RTT=y
+    CONFIG_RTT_CONSOLE=y
+    CONFIG_LOG=y
+    CONFIG_LOG_RUNTIME_FILTERING=y
+    CONFIG_LOG_DEFAULT_LEVEL=4
+    CONFIG_LOG2_MODE_DEFERRED=y
+    CONFIG_LOG_TIMESTAMP_64BIT=y
+    CONFIG_LOG_BACKEND_SHOW_COLOR=y
+    CONFIG_EFLASH_LOG_LEVEL=3
+    CONFIG_QFLASH_LOG_LEVEL=3
+    CONFIG_IFLASH_LOG_LEVEL=3
+
+    #SDHC
+    CONFIG_DISK_ACCESS=y
+    CONFIG_FAT_FILESYSTEM_ELM=y
+    CONFIG_DISK_DRIVER_SDMMC=y
+    CONFIG_SPI=y
+    CONFIG_SPI_NRFX=y
+
+
+Some of these KConfig variables are my own. For example ``CONFIG_EFLASH_LOG_LEVEL``, or ``CONFIG_APP_EXT_WIPE_STORAGE``. We can define custom KConfig variables in the project root KConfig file as shown below:
+
+.. code-block:: kconfig
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+    mainmenu "INKI Options"
+
+    config APP_INT_WIPE_STORAGE
+        bool "Option to clear the internal flash area before mounting"
+        help
+        Use this to force an existing file system to be created.
+
+    config APP_EXT_WIPE_STORAGE
+        bool "Option to clear the external flash area before mounting"
+        help
+        Use this to force an existing file system to be created.
+
+    config EFLASH_LOG_LEVEL
+        int "Set log level for External SPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    config IFLASH_LOG_LEVEL
+        int "Set log level for Internal Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+        
+    config QFLASH_LOG_LEVEL
+        int "Set log level for Internal QSPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    source "Kconfig.zephyr"
+
+This is fine for a .h & .c only module implementation, but for more complex modules we can use the ``source`` and/or ``rsource`` directives to effectively "include" KConfig files stored deeper inside the project tree, which is most certainly a neater way to go about things.  
 
 Now we needed to get the external libraries (LVGL and WASM) building successfully with a simple test file that used some of their functions - to do this we had to get to grips with CMake. 
 CMake is a compiler-agnostic build system generator that is responsible for gathering the various libraries, source files, applying the requested build directives and options, and generating a build script that the requested compiler can execute to build the complete project. It can cache pre-built files and keep track of files modified to avoid having to rebuild the project completely every time. It's very powerful, and after getting to grips with it I can tell you that it's very elegant and you should use it in all your projects. 
 But in the moment, it was not easy. 
 
 Here's my main CMake file in the root directory that dictates how the entire project is built at the highest level. 
+
+.. _cmake-file:
 
 .. code-block:: cmake
 
@@ -1258,14 +1313,13 @@ Here is the start of ``disk.h``:
     #define TYPE_EXTERNAL_USB_FAT 4 //LONG TERM TODO
     #define TYPE_EXTERNAL_USB_NTFS 5 //LONG TERM TODO (after production probably!!)
     #define FS_MOUNT_FLAG_USE_DISK_ACCESS 1
-    //*************************************************************************************************************************************************
+    
+    
     //Straight C POLYMORPHISM LET'S GOOO (no access protection though without opaque pointers, which are semi pointless because I want to allow 3rd
     //party devs and myself to manipulate the Zephyr FileSystem (FS) structs directly for full access over the hardware.)
     //Protection will most likely be implemented on the WASM sandbox side to prevent apps misbehaving, but I will definitely need TOTAL access.
     //Currently supported types - SPI external (SD card), QSPI internal, FLASH internal
-    //*************************************************************************************************************************************************
-
-    //******************************************************************************************************
+    
     //*   LONG TERM TO-DOs:                                                                          
     //*     - Add method(s) for intQSPIFlash device that streamline XIP/Data lookups to the same flash chip  
     //*     - RAMDisk? Feels like a solution in search of a problem tho 
@@ -1437,6 +1491,7 @@ Now, here's the implementation of the function prototypes:
         else return -ENFILE;
     }
 
+We can notice that we're using some of the custom KConfig variables we defined earlier within our code - specifically the line ``IS_ENABLED(CONFIG_APP_INT_WIPE_STORAGE)`` - which is a built in Zephyr macro which checks if a particular KConfig variable has been set or not. It's very powerful. 
 
 Here's the definition for ``base_find_file_from_path()``, a recursive function that makes use of the Zephyr file-system API to return the full path to the first occurence of a particular filename stored inside the internal fname string. 
 
@@ -1727,13 +1782,2487 @@ Finally, here are the configuration structs for the on-die and QSPI internal fla
 
 Initially I was using automounting on boot and verifying whether the disk was mounted in the init() function, but after adding the partition manager I had disks swapping themselves around and initialising the wrong partition, causing the device to format its own firmware on multiple occasions - going back to these structs defined within the ``disk.c`` file fixed these issues. 
 
-Now the Disk API is done, let's move onto XIPA_FS. 
+Now the Disk API is done, let's move onto ``Vector``.
+
+``Vector``
+----------
+Vector's implementation was fairly straightforward. Let's take a look at the header file:
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+    /*
+    __      __       _             
+    \ \    / /      | |            
+     \ \  / /__  ___| |_ ___  _ __ 
+      \ \/ / _ \/ __| __/ _ \| '__|
+       \  /  __/ (__| || (_) | |   
+        \/ \___|\___|\__\___/|_|   
+
+    custom list/vector implementation
+
+    */
+
+    #ifndef INKI_VECTOR
+    #define INKI_VECTOR
+
+    #include <stdlib.h>
+    #include <logging/log_instance.h>
+    #include <logging/log.h>
+    #include <logging/log_ctrl.h>
+
+    #define VECTOR_DEFAULT_SIZE 4
+    #define VECTOR_NAME iVector
+
+    struct vector
+    {
+        LOG_INSTANCE_PTR_DECLARE(log);
+        void* privatevector_ptr;
+    };
+
+    //Macro definition for Zephyr logging
+    #define VECTOR_INIT(_name)  \
+    LOG_INSTANCE_REGISTER(VECTOR_NAME, _name, CONFIG_VECTOR_LOG_LEVEL);  \
+    struct vector _name = {  \
+                LOG_INSTANCE_PTR_INIT(log, VECTOR_NAME, _name)  \
+    }
+
+    //Initialises vector to an initial length and sets expected item size. Don't mix or match types unless you want to cause overread havoc!
+    int vector_init(struct vector* v, size_t initial_length, size_t item_size);
+    //Reallocates more space for the vector if requried. 
+    int vector_resize(struct vector* v, size_t new_size);
+    //Appends an item of size "item_size" to the back of the list. 
+    int vector_push_back(struct vector* v, void* element);
+    //Delete an item at a particular position, causing other items to shuffle down.
+    int vector_remove_at(struct vector* v, int index);
+    //Inserts an item at a particular location.  
+    int vector_insert_at(struct vector* v, int index, void* element);
+    //Frees dynamic memory allocated during initialisation or list growning as more and more items were added. 
+    int vector_deinit(struct vector* v);
+    //Initialises logging for vector. 
+    int vector_log_init(struct vector* v);
+    //Sets a particular position in the list with a specified value. 
+    int vector_set(struct vector* v, int index, void* data);
+    //Clears the entire vector but does not deallocate any dynamically allocated memory. 
+    int vector_clear(struct vector* v);
+    //Copies an item from the vector, deletes it, and returns a pointer to the saved item. 
+    void* vector_pop(struct vector* v);
+    //Copies an item from the vector, and returns a pointer to it. 
+    void* vector_get(struct vector* v, int index);
+    //Gets the allocated size of the list
+    size_t vector_size(struct vector* v);
+    //Gets how many items are stored in the vector at the moment. 
+    size_t vector_length(struct vector* v);
+
+    #endif
+
+We can notice some custom KConfig variables being used here again just like in the Disk API. Here's their definition added to the global KConfig file:
+
+.. code-block:: kconfig
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+    mainmenu "INKI Options"
+
+    config APP_INT_WIPE_STORAGE
+        bool "Option to clear the internal flash area before mounting"
+        help
+        Use this to force an existing file system to be created.
+
+    config APP_EXT_WIPE_STORAGE
+        bool "Option to clear the external flash area before mounting"
+        help
+        Use this to force an existing file system to be created.
+
+    config EFLASH_LOG_LEVEL
+        int "Set log level for External SPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    config IFLASH_LOG_LEVEL
+        int "Set log level for Internal Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+        
+    config QFLASH_LOG_LEVEL
+        int "Set log level for Internal QSPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    config VECTOR_LOG_LEVEL
+        int "Set log level for vector api (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    source "Kconfig.zephyr"
 
 
-XIPA_FS
--------
+And here's the corresponding .c file with the implementations of the function prototypes:
 
- 
+.. code-block:: c
+
+    /*
+
+    __      __       _             
+    \ \    / /      | |            
+     \ \  / /__  ___| |_ ___  _ __ 
+      \ \/ / _ \/ __| __/ _ \| '__|
+       \  /  __/ (__| || (_) | |   
+        \/ \___|\___|\__\___/|_|   
+
+    custom list/vector implementation
+
+    */
+
+    #include "vector.h"
+
+    LOG_LEVEL_SET(LOG_LEVEL_INF);
+
+    struct privatevector //Elements abstracted away to an unknown pointer type on public struct.
+    {
+        //But we know what this struct is and what is supposed to be in its definitions. So we just cast 
+        //the pointer to this type and we get access to everything, but hide it all away from the user. 
+        //Encapsulation!
+        void* items;
+        size_t item_size;
+        size_t capacity;
+        unsigned int num_items;
+        size_t allocated_items;
+        uint32_t max_index;
+    };
+
+    uint8_t* vector_get_index_pointer(struct vector* v, int index);
+
+
+    //It is your responsibility to properly dispose of the generated item by using free!
+    void* vector_get(struct vector* v, int index)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        void* element = k_malloc(ptr->item_size);
+        memcpy(&element, (void*)vector_get_index_pointer(v, index), ptr->item_size);
+        return element; 
+    }
+
+
+    int vector_set(struct vector* v, int index, void* data)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        memcpy(vector_get_index_pointer(v, index), (void*)data, ptr->item_size);
+        return 1;
+    }
+
+    int vector_init(struct vector* v, size_t initial_length, size_t item_size)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        ptr->item_size = item_size;
+        if(initial_length > 0)
+        {
+            ptr->allocated_items = initial_length;
+        }
+        else
+        {
+            ptr->allocated_items = VECTOR_DEFAULT_SIZE;
+        }
+        ptr->num_items = 0;
+        ptr->items = calloc(item_size * ptr->allocated_items);
+        if(ptr->items == NULL)
+        {
+            LOG_INST_ERR(v->log, "Memory not allocated!!");
+            return -1;
+        }
+        LOG_INST_INF(v->log, "Success");
+        return 1;
+    }
+
+    int vector_clear(struct vector* v)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        int rc;
+        for (int i = 0; i < ptr->num_items; i++)
+        {
+            rc = vector_set(v, i, NULL);
+            if(rc < 0)
+            {
+                return rc;
+            }
+        }
+        return 1;
+    }
+
+
+    uint8_t* vector_get_index_pointer(struct vector* v, int index)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        return (uint8_t*)((uint8_t*)ptr->items + (ptr->item_size * index));
+    }
+
+
+    int vector_resize(struct vector* v, size_t new_size)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        //Reallocating for more memory space to fit more items in (or to discard items?)
+        void* new_ptr = realloc(ptr->items, ptr->item_size * new_size);
+        if(new_ptr == NULL)
+        {
+            LOG_INST_ERR(v->log, "Realloc failed. Data saved");
+            return -1;
+        }
+        ptr->items = new_ptr;
+        LOG_INST_INF(v->log, "Success");
+        //Realloc leaves the new allocated memory in an undefined state. We will set everything after the old allocated memory to NULL to allow the removal algorithm to keep track of the max_index. 
+        memset(ptr->items + ((ptr->allocated_items - 1) * ptr->item_size), NULL, (new_size - ptr->allocated_items) * ptr->item_size);  
+        ptr->allocated_items = new_size;
+        return 1;
+    }
+
+    int vector_push_back(struct vector* v, void* element)
+    {
+        return vector_insert_at(v, -1, element);
+    }
+
+    //You must dispose of the return value with free() when you are done!
+    void* vector_pop(struct vector* v)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        void* element = vector_get(v, ptr->num_items-1);
+        int retcode = vector_remove_at(v, ptr->num_items-1);
+        if (retcode != 1)
+        {
+            LOG_INST_ERR(v->log, "Pop failed!");
+            return NULL;
+        }
+        return element;
+    }
+
+    int vector_remove_at(struct vector* v, int index)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        if(index < 0 || index > ptr->max_index)
+        {
+            LOG_INST_ERR(v->log, "Invalid index: %i", index);
+            return -EINVAL;
+        }
+        //If it's the last index then just set it equal to zero. 
+        if(index == ptr->max_index) memset((void*)vector_get_index_pointer(v, max_index), NULL, ptr->item_size);
+        //Otherwise shuffle all the elements down to overwrite the element.
+        else memmove((void*)vector_get_index_pointer(v, index), (void*)vector_get_index_pointer(v, index+1), ptr->item_size);
+        int newindex = 0;
+        //Updating max_index to allow storing at any arbitrary location.
+        for(int i = ptr->max_index; i >= 0; i--)
+        {
+            void* a = vector_get(v, i);
+            if(a = NULL) return -EIO;
+            for(int x = 0; x < item_size; x++)
+            {
+                if(a[x] != NULL) newindex = i;
+            }
+            free(a);
+        }
+        ptr->max_index = newindex;
+        ptr->num_items--;
+
+        return 1;
+    }
+
+    int vector_insert_at(struct vector* v, int index, void* element)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        //Few cases - firstly the index is less than -1, in which case we exit because argument is invalid.
+        if(index < -1)
+        {
+            LOG_INST_ERR(v->log, "Invalid index: %i", index);
+            return -EINVAL;
+        }
+        //Secondly, the index is -1, meaning the item is to be appended to the back of the list.
+        if (index == -1)
+        {
+            index = ptr->num_items;
+        }
+        //Thirdly, the index is greater than the allocated list. In this case
+        //we resize by a factor of 2 until the index is within range to allow breathing room.
+        //Of course people have to be nice and not like allocate the entire memory because of a factor of 10 error because that is seriously uncool. Lot of trust here!
+        int traverse_rc = 1;
+        while(index > ptr->allocated_items)
+        {
+            traverse_rc = vector_resize(v, ptr->allocated_items*2);
+            if(traverse_rc == -1) return -ENOMEM;
+        }
+        
+        if(index < ptr->max_index)
+        {
+            memmove((void*)vector_get_index_pointer(v, index+1), (void*)vector_get_index_pointer(v, index), (ptr->num_items - index) * ptr->item_size);
+        }
+        else
+        {
+            ptr->max_index = index;
+        }
+        memcpy((void*)vector_get_index_pointer(v, index), element, ptr->item_size);
+        ptr->num_items++;
+        return 1;
+    }
+
+    //Lovely little getter methods for the struct properties!
+
+    int vector_deinit(struct vector* v)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        free(ptr->items);
+        return 1;
+    }
+    size_t vector_size(struct vector* v)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        return ptr->item_size * ptr->num_items;
+    }
+    size_t vector_allocated_size(struct vector* v)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        return ptr->item_size * ptr->allocated_items;
+    }
+    unsigned int vector_length(struct vector* v)
+    {
+        struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+        return ptr->num_items;
+    }
+
+All fairly self-documenting. One minor modification I made from the UML design was to add a ``max_index`` property to the private struct, which allows any arbitrary index to be inserted and stored to while optimising memory manipulation and shuffling to only occur on the cases where it is required - i.e when an element is being inserted in a position where there is already surrounding data. 
+
+Now let's take a look at the stack wrapper of this module.
+
+``Stack``
+---------
+
+Here's ``stack.h``
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+    /*
+      _____ _             _    
+     /  ___| |           | |   
+     \ `--.| |_ __ _  ___| | __
+      `--. \ __/ _` |/ __| |/ /
+    / \__/ / || (_| | (__|   < 
+     \____/ \__\__,_|\___|_|\_\
+                            
+    */
+
+    #ifndef INKI_STACK
+    #define INKI_STACK
+
+    #include "../d_vector/vector.h"
+
+    #define STACK_NAME iStack
+
+    //Just a cheeky little wrapper around my vector class to emulate a stack (actually i bet this is extremely close to how a stack really works)
+    //Because of the implementation of the vector class, this stack has an UNBOUNDED SIZE. It will grow as more items are added. Watch out.
+
+    struct stack
+    {
+        LOG_INSTANCE_PTR_DECLARE(log);
+        void* privatevector_ptr;
+    };
+
+    #define STACK_INIT(_name)  \
+    LOG_INSTANCE_REGISTER(VECTOR_NAME, _name, CONFIG_VECTOR_LOG_LEVEL);  \
+    struct stack _name = {  \
+                LOG_INSTANCE_PTR_INIT(log, VECTOR_NAME, _name)  \
+    }
+
+    int stack_init(struct stack* s, size_t initial_length, size_t item_size);
+    int stack_push(struct stack* s, void* element);
+    void* stack_pop(struct stack* s);
+    size_t stack_length(struct stack* s);
+    int stack_destroy(struct stack* s);
+    int stack_clear(struct stack* s);
+
+    #endif
+
+
+And here's ``stack.c``. It really is just a wrapper around ``Vector``.
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+    /*
+      _____ _             _    
+     /  ___| |           | |   
+     \ `--.| |_ __ _  ___| | __
+      `--. \ __/ _` |/ __| |/ /
+    / \__/ / || (_| | (__|   < 
+     \____/ \__\__,_|\___|_|\_\
+                            
+    */
+
+    #include "stack.h"
+
+    LOG_LEVEL_SET(LOG_LEVEL_INF);
+
+    struct privatevector
+    {
+        struct vector stackvec;  
+    };
+
+
+    int stack_init(struct stack* s, size_t initial_length, size_t item_size)
+    {
+        int rc;
+        struct vector* vecptr = &((struct privatevector*) s->privatevector_ptr)->stackvec;
+        
+        rc = vector_init(vecptr, initial_length, item_size);
+
+        return rc;
+    }
+    int stack_push(struct stack* s, void* element)
+    {
+        int rc;
+        struct vector* vecptr = &((struct privatevector*) s->privatevector_ptr)->stackvec;
+        rc = vector_push_back(vecptr, element);
+        return rc;
+    }
+    void* stack_pop(struct stack* s)
+    {
+        void* element;
+        struct vector* vecptr = &((struct privatevector*) s->privatevector_ptr)->stackvec;
+        element = vector_pop(vecptr);
+        return element;
+    }
+    int stack_destroy(struct stack* s)
+    {
+        struct vector* vecptr = &((struct privatevector*) s->privatevector_ptr)->stackvec;
+        int rc = vector_deinit(vecptr);
+        return rc;
+    }
+
+    size_t stack_length(struct stack* s)
+    {
+        struct vector* vecptr = &((struct privatevector*) s->privatevector_ptr)->stackvec;
+        size_t size = vector_length(vecptr);
+        return size;
+    }
+
+    int stack_clear(struct stack* s)
+    {
+        struct vector* vecptr = &((struct privatevector*) s->privatevector_ptr)->stackvec;
+        int rc = vector_clear(vecptr);
+        return rc;
+    }
+
+Both ``Vector`` and ``Stack`` have proven to be invaluable during the implementation of the proceeding modules ``XIPA_FS`` and ``LP_UARTE``, which need dynamic data structures to deal with non-deterministic & variable conditions. The only limitation with ``Stack`` is that it follows the same logging level as ``Vector`` because it internally contains a ``Vector``. 
+
+Now, let's check out the next modules.  
+
+``XIPA_FS``
+-----------
+The Disk, ``Vector``, and ``Stack`` APIs are closer to the core of the OS, so I made do with a ``.c`` and ``.h`` file and added them in the global CMake file. ``XIPA_FS`` however is ideally RTOS and platform agnostic, meaning should be able to operate on any backend storage medium (even a region of RAM!). I thus decided to construct ``XIPA_FS`` as a module which one could "port" to KConfig-enabled environments. This would make ``XIPA_FS`` far more versatile and it could be adopted by many other designers in the same predicament that I am in with trying to execute programs from the XIP region. 
+
+To create a Zephyr module, we first need a ``module.yml`` file that tells the build system where to find the CMake file and the defined KConfig file:
+
+.. code-block:: yaml
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+    build:
+    name: inki_xipa_fs
+    cmake: .
+    kconfig: ./Kconfig
+
+Fairly straightforward. The next thing we need is a KConfig file (called Kconfig here for some reason), which defines configuration options that ``XIPA_FS`` relies on:
+
+.. code-block:: kconfig
+
+    # INKI_XIPA_FS drivers
+
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+
+    menuconfig INKI_XIPA_FS
+        bool "INKI's custom XIPA_FS file system"
+        help
+        Enable INKI_XIPA filesystem
+        
+    config INKI_XIPA_FS
+        bool "INKI's custom XIPA file system"
+        help
+        Enable INKI_XIPA filesystem 
+
+    if INKI_XIPA_FS
+
+    config INKI_XIPA_DRV_EXISTS
+        bool #hidden 
+        help
+        Private! Selected by driver.
+
+    module = INKI_XIPA_FS
+    module-str = inki_xipa_fs
+    source "subsys/logging/Kconfig.template.log_config"
+
+    rsource "drivers/nrf_xip_nor/Kconfig.nrf_xip_nor"
+
+    endif # INKI_XIPA_FS
+
+Since we're trying to make XIPA_FS RTOS and platform agnostic, we are implementing a "device library" that interfaces with the main program logic. We're defining a hidden KConfig option which is supposed to be selected privately by a valid ``XIPA_FS`` driver backend. We can see this in the following KConfig (KConfig.nrf_xip_nor) inside the drivers subdirectory:
+
+.. code-block:: kconfig
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+    #
+    #	Licensed under GPL 3
+
+    config XIPA_FS_NRF5XX
+        bool "INKI-optimised display Drivers"
+        help
+        Enable XIPA_FS driver for Nordic's NRF52 and NRF53 series of Bluetooth LE SoCs. 
+        select INKI_XIPA_DRV_EXISTS
+
+We can see here that if we select the backend ``XIPA_FS_NRF5XX``, then it automatically selects ``INKI_XIPA_DRV_EXISTS``, which we can use during the build process to check whether the user has actually selected a backend required for ``XIPA_FS`` to work. This is where CMake comes in again:
+
+.. code-block:: cmake
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+    zephyr_library_named(inki_xipa_fs)
+
+    zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+    zephyr_library_sources(
+        xipafs.c
+    )
+
+    if(CONFIG_INKI_XIPA_FS)
+        include(${CMAKE_CURRENT_SOURCE_DIR}/drivers/nrf_xip_nor/nrf_xip_nor.cmake})
+        # Add more backends when the time comes!!
+    endif()
+
+
+    if(NOT CONFIG_INKI_XIPA_DRV_EXISTS)
+        message( FATAL_ERROR "No driver selected for XIPA_FS!")
+    endif()
+
+
+We can see here that we're raising an error during the build process if no driver is selected, which will sets ``CONFIG_INKI_XIPA_DRV_EXISTS`` to false. Pretty nifty!
+
+Now let's take a look at the CMake file for our filesystem's driver file:
+
+.. code-block:: cmake
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+    if(XIPA_FS_NRF5XX)
+    #zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../)
+    zephyr_library_sources(
+        nrf_xip_nor.c
+        )
+    endif()
+
+Here's the beauty of KConfig and the beauty of Zephyr - KConfig and CMake work extremely well together. We can use KConfig variables to select which files and which components enter the final build process at every layer. This is a very simple KConfig file that selects a driver, but the infrastructure is now in place to add 30 different drivers for 45 different kinds of processor and flash chip, and produce generation upon generation of INKI watches all building off this future-proof, robust build system. This is awesome. The last step is to tell the global KConfig file about our new network of KConfig files in this module, by appending an ``rsource`` directive pointing to ``XIPA_FS`` 's main KConfig file:
+
+.. code-block:: kconfig
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+    mainmenu "INKI Options"
+
+    config APP_INT_WIPE_STORAGE
+        bool "Option to clear the internal flash area before mounting"
+        help
+        Use this to force an existing file system to be created.
+
+    config APP_EXT_WIPE_STORAGE
+        bool "Option to clear the external flash area before mounting"
+        help
+        Use this to force an existing file system to be created.
+
+    config EFLASH_LOG_LEVEL
+        int "Set log level for External SPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    config IFLASH_LOG_LEVEL
+        int "Set log level for Internal Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+        
+    config QFLASH_LOG_LEVEL
+        int "Set log level for Internal QSPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    config VECTOR_LOG_LEVEL
+        int "Set log level for vector api (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    config XIPAFS_LOG_LEVEL
+        int "Set log level for eXecute In Place AoT File System (XIPAFS) api (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    source "Kconfig.zephyr"
+    rsource "src/lib/fs/Kconfig"
+
+Now, let's take a look at the code that this is building. Here's ``xipafs.h``.
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+    /*
+       _  __ ________  ___         ___________
+      | |/ //  _/ __ \/   |       / ____/ ___/
+      |   / / // /_/ / /| |      / /_   \__ \ 
+     /   |_/ // ____/ ___ |     / __/  ___/ / 
+    /_/|_/___/_/   /_/  |_|____/_/    /____/  
+                        /_____/              
+
+    eXecute In Place Ahead of time File System
+
+    */
+
+    #ifndef INKI_XIPA_FS
+    #define INKI_XIPA_FS
+
+    #include <stdlib.h>
+    #include <stdio.h>
+    #include <fs/fs.h> 
+    #include <storage/flash_map.h>
+    #include "lib/d_vector/vector.h"
+    #include "lib/d_stack/stack.h"
+    #include <logging/log_instance.h>
+    #include <nrfx_qspi.h>
+    #include <logging/log.h>
+    #include <drivers/flash.h>
+
+
+    /*
+
+    Q: WHY DOES THIS EXIST?
+    A: Most, if not all of Zephyr's file systems operate in a "RAM-backed manner". What I mean by this, is that interacting with files is
+    done by copying it into RAM, making changes to that copy, and then writing it back to the disk. 
+    This is great for things like logging, storing configuration files etc.., but very impractical for storing large application binaries.
+
+    External memory connected via QSPI (or in the future, any sort of connection!) provides a great and vital way to extend the
+    capabilities of a low powered MCU like the nRF52 or nRF53 series. 128MB of fast, accessible storage is a huge amount for this
+    sort of chip, the possibilities are effectively endless!
+
+    There are some major issues - The fastest protocol available is usually QSPI, which does not support concurrent reading and writing 
+    operations. Then, these MCUs do not have MMUs, meaning direct code execution from a distributed-sector file system like 
+    LittleFS, FAT32, or EXT4 is extremely difficult as the application binary information is strewn across the storage medium.
+
+    This leaves no option but to copy the entire application into working memory, which in nearly all cases is a fraction of the
+    permanent storage available. For instance, the nRF52840 has 256KB of RAM. That is nowhere near enough to fit in a fat 2-4MB
+    binary that could do lots of very useful things, let alone catering for its heap and stack requirements. 
+
+    Now, many MCUs have a facility called XiP (eXecute in Place) - this can integrate with peripherals like QSPI and bring external storage mediums
+    into memory addressable range. This allows the processing core to access the external storage directly as if it were RAM!
+    It can therefore be leveraged to satisfy the requirement of a contiguous buffer in working memory that we can begin executing an application from. 
+
+    But here, we hit another hurdle - Many XiP regions are READ-ONLY, because QSPI does not support concurrent reads and writes.
+    This means we have to restart the QSPI peripheral into user-accessible DMA mode every time we want to make a change to the 
+    contents of the external flash. Evidently this is something that the MCU cannot handle on its own - it becomes a very sticky
+    and risky ground! If there are applications running from the QSPI flash, we must terminate or suspend them otherwise they will
+    crash when they try to access memory space that no longer exists!!
+
+    This file system aims to bridge this gap - providing a clean interface for files to be stored in contiguous memory buffers, 
+    to be provided to runtimes or native code execution within the main application domain. 
+    There will be no folders, symlinks, or permissions, just an interface to look up file names as strings, and have a memory pointer
+    returned to you with the size of your file! Simple as that! 
+
+    */
+
+    #define XIPA_FS_NAME XiPAFS //for logging purposes 
+    #define NRF_QSPI_XIP_START_ADDR      0x12000000 //unused
+    #define XIPA_JOURNAL_SIZE 0x40 //64 bytes per journal entry
+    #define DEL_NAME (char[4]) {0xFF, 0xFF, 0xFF, '\0'} //Del is defined as all 1s and a null termination for valid extension recognition. We can overwrite data with 1s on NOR Flash. 
+    #define FREE_NAME "fre"
+    //TODO - Add this to mount function to allow for multiple XIPA_FS instances.
+    #define NAME_SIZE 16
+    #define HASH_SIZE 32
+    #define LOC_SIZE 4
+    #define SIZE_SIZE 4
+    #define VER_STR_SIZE 4
+    #define RUN_SIZE 4
+
+    #define __LOC (volatile uint8_t*)(volatile intptr_t)*(volatile uint32_t*) //this macro makes the code a little nicer.
+    //these are a series of casts that takes the value at a specific pointer, which is actually a pointer itself, 
+
+    struct xipafs //Main XIPAFS object
+    {
+        LOG_INSTANCE_PTR_DECLARE(log);
+        void* private_ptr; //Encapsulation and abstraction - lots of internal parameters hidden in a struct defined in the .c file.
+        char* name; //disk name
+        char* mountpoint; //disk mount location
+        uint16_t* id; //disk id
+    };
+
+    struct filerecord
+    {
+        //Constant RAM usage - actual data stored in memory is 64 bytes per file, but we will store some extra data to make life easier for us. 
+        char name[NAME_SIZE];
+        char hash[HASH_SIZE];
+        volatile uint8_t* file_loc;
+        size_t size;
+        char ver_str[VER_STR_SIZE];
+        char run[RUN_SIZE];
+        volatile uint8_t* record_loc;
+    };
+
+    struct xipafs_params
+    {
+        //XIPA_FS' 64 byte journals can have the various bits of data stored in any order as long as it's consistent throughout the filesystem. Here's where that information is given to XIPA_FS so it can read the filesystem correctly.
+        uint8_t name_end_offset; 
+        uint8_t hash_end_offset;
+        uint8_t loc_end_offset;
+        uint8_t size_end_offset;
+        uint8_t vers_end_offset;
+        uint8_t run_end_offset;
+        uintptr_t flash_area_id; //Area ID to select correct flash region during operations. 
+        volatile uint8_t* xip_device_offset; //starting offset of filesystem on logical flash
+        volatile uint8_t* xip_dev_location; //Memory address to where QSPI flash is mapped to in XIP mode. 
+        //size of memory area in bytes
+        uint32_t dev_size; 
+        //desired mountpoint - for future integration with Zephyr virtual filesystem API. 
+        char* path; 
+    };
+
+    struct __attribute__((__packed__)) xipafs_dir_t //we are packing this struct so we can safely copy and receive to/from vector and stack objects. This is not portable across compilers (meaning this is a GCC only directive, but we must use GCC anyway because Nordic doesn't support CLang, so this is fine. 
+    {
+        volatile unsigned int current_record;
+        volatile unsigned int current_records_to_traverse;
+    };
+
+    //We're using the same initialisation macro principle from the Disk API for the logging module.
+    #define XIPAFS_INIT(_name)  \
+    LOG_INSTANCE_REGISTER(XIPA_FS_NAME, _name, CONFIG_XIPAFS_LOG_LEVEL);  \
+    struct xipafs _name = {  \
+                LOG_INSTANCE_PTR_INIT(log, XIPA_FS_NAME, _name)  \
+    }
+
+    //Ensure filesystem is formatted to XIPA_FS before mounting. Returns ENOENT if superblock not found
+    /**
+    * @brief Mount a XIPA partition with specified offset parameters.
+    * 
+    * @param x xipafs disk object
+    * @param params struct containing offset parameters for file parsing and XIP handling.
+    * @return 1 on success, negative err code otherwise. 
+    */
+    int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params);
+
+    /**
+    * @brief Returns the first instance of a file designated by filename in a filerecord f. 
+    * 
+    * @param x xipafs disk object
+    * @param filename Desired filename with extension
+    * @param f Pointer to filerecord to populate with information about the file if found.
+    * @return f -> NULL if file not found, 1 on success, -ENFILE if file not found, negative err code otherwise.
+    */
+    int xipa_fs_get_file(struct xipafs *x, char *filename, struct filerecord* f);
+
+    /**
+     * @brief Traverse through the flash in XIP enable mode.
+     * 
+     * @param x xipafs disk object
+     * @param f pointer to filerecord to fill with file details (including superblock!)
+     * @param dir directory context object
+     * @return 1 on success, -ENOTDIR at end of filesystem, negative err code otherwise.
+     */
+    int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir);
+
+    /**
+     * @brief Initiate write of a new file to the filesystem. Once write is initialised, call xipa_fs_data_store_cb() with your incremental buffer writes. 
+     * 
+     * @param x xipafs disk object
+     * @param filename Desired filename, should not exceed 12 characters (i.e should fit inside a char[12] with null termination)
+     * @param extension Desired extension, should fit inside a char[4] with null terminator, and must be one of the defined extensions in xipa_file_extensions.
+     * @param size Size of new file - MUST BE WORD ALIGNED! (i.e rounded up to nearest multiple of 4 for 32-bit systems)
+     * @param hash SHA-256 hash of new file
+     * @param ver_str Version string of file or app.
+     * @return 1 on success, negative err_code otherwise. 
+     */
+    int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size, char* hash, char* ver_str);
+    /**
+     * @brief Delete the first instance of a particular file with specified name.
+     * @exception 1) IMPORTANT! You must pause any activity on the XIP region to prevent reads to undefined memory locations while deletion takes place.
+     * @exception 2) You must include the extension in the filename.
+     * @exception 3) This will only delete the FIRST instance of a file.
+     * 
+     * @param x xipafs disk object
+     * @param filename char array of length 16 containing name and extension 
+     * @return -EINVAL if there are no files, or if file could not be found. negative err code otherwise. 
+     */
+    int xipa_fs_delete(struct xipafs* x, char* filename);
+
+    /**
+    * @brief Unmount XIPA file system. Ensure all pending operations have been completed.
+    * 
+    * @param x xipafs disk pointer
+    * @return 1 on success, -EBUSY if operations pending, else negative err code.
+    */
+    int xipa_fs_unmount(struct xipafs* x);
+
+    /**
+     * @brief Format the filesystem - hard delete all files and records.
+     * @exception 1) WARNING - FORMAT OPERATION IS IRREVERSIBLE! 
+     * @exception 2) Stop all XIP utilising threads to prevent crashes.
+     * 
+     * @param x xipafs disk object
+     * @return 1 on success, else negative err code. 
+     */
+    int xipa_fs_format(struct xipafs* x);
+
+    /**
+     * @brief This function will use your hardware crypto acceleration (if present) to verify the integrity of a particular file by calculating a SHA-256 hash, and comparing it to the known hash. Ensure the correct drivers and Kconfig directives are selected!  
+     * 
+     * @param x xipafs disk object
+     * @param f_verify filerecord of the desired file to verify
+     * @return 1 on success, -1 if file is corrupt.
+     */
+    int xipa_fs_verify(struct xipafs* x, struct filerecord* f_verify);
+
+    /**
+     * @brief Initialises directory context object from heap for file traversal.
+     * 
+     * @param x xipafs disk object
+     * @param dir xipafs directory pointer
+     * @return 1 on success, else negative err code.
+     */
+    int xipa_fs_dir_init(struct xipafs* x, struct xipafs_dir_t* dir);
+
+    /**
+     * @brief Frees resources allocated for a directory context object.
+     * 
+     * @param x xipafs disk object
+     * @param dir xipafs directory pointer
+     * @return 1 on success
+     */
+    int xipa_fs_dir_deinit(struct xipafs* x, struct xipafs_dir_t* dir);
+
+    /**
+     * @brief Callback function to write contents of file bit by bit. You can use arbitrarily sized buffers and call this function as you receive the data, just please keep them word aligned. You must initialise a write operation first with store().
+     * 
+     * @param x xipafs disk object
+     * @param buf pointer to buffer containing file data
+     * @param buf_size size of data to copy - MUST BE WORD ALIGNED (multiple of 4 on 32-bit systems)!
+     * @return 0 on incremental write success, 1 when all data written successfully, -EINVAL when called uninitialised or if end buffer too large.
+     */
+    int xipa_fs_data_store_cb(struct xipafs* x, void* buf, size_t buf_size);
+
+    #endif
+
+The header file is hopefully self-documenting. We can see the use of the "include guard" again to protect against multiple inclusions during compile & link time. The one funky thing is this line:
+
+.. code-block:: c
+
+    #define __LOC (volatile uint8_t*)(volatile intptr_t)*(volatile uint32_t*) //this macro makes the code a little nicer.
+
+``__LOC`` stands for **Location**. This macro is intended to be used when traversing the filesystem in XIP mode, and we want to get a pointer to the start of a file directly in XIP space. What this code does is:
+
+1) Cast a memory address in XIP space to ``volatile uint32_t*`` - i.e a pointer to a volatile uint32_t (which in this case is the start of the ``file_loc`` information). The volatile keyword simply tells the compiler not to optimise any operations that utilise the value because it might have changed without the knowledge of the compiler. In the case of a filesystem, this seems like a prudent precaution to take. 
+2) We extract the value at that memory location into a known datatype - we know the memory address to the file should be 32bits, so we use the ``*`` operation to "dereference" the pointer into the actual value stored at that memory location. 
+3) We cast the value to a (volatile intptr_t) to tell the compiler that we want to treat this value as a pointer - we could do it straight away to (volatile uint8_t*) but the compiler gets sad about not having an intermediary cast from an integer to a pointer. 
+4) We finally cast to volatile uint8_t*, which we can then use in our pointer arithmetic if required to get the correct XIP offsetted memory address. 
+
+You can notice that we'll be making extensive use of the Vector and Stack classes that we implemented earlier to help keep track of positions and items in the selectively iterative ``traverse()`` functions - just like in the UML design diagram. 
+
+With that said, let's jump into ``xipafs.c`` .
+
+.. code-block:: c
+
+    /*
+       _  __ ________  ___         ___________
+      | |/ //  _/ __ \/   |       / ____/ ___/
+      |   / / // /_/ / /| |      / /_   \__ \ 
+     /   |_/ // ____/ ___ |     / __/  ___/ / 
+    /_/|_/___/_/   /_/  |_|____/_/    /____/  
+                        /_____/              
+
+    eXecute In Place Ahead of time File System
+
+    */
+
+    #include "xipafs.h"
+    #include "xipa_dev.h"
+
+    LOG_LEVEL_SET(LOG_LEVEL_INF);
+
+    //Little macro to streamline error checking and logging - cleans up the code significantly!
+    #define XIPA_ERR_CHECK(logger, message, rc) \
+    if(rc < 0) \
+    { \
+        LOG_INST_ERR(logger, message); \
+        return rc; \
+    }
+
+    /*
+
+    [||||||||||[(  app 1   )(    app 2     )(     app 3      )     free space     ]|||||||||]
+        ^                                          
+        |
+    64KB superblock
+    */
+
+    /* Function prototypes, these will be explained in a bit! */
+    int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int record, volatile uint8_t* tableStart);
+    int xipa_fs_align(struct xipafs *x, struct filerecord f_del);
+    int xipa_fs_verifyparams(struct xipafs_params *ptr);
+    int arr_contains_int(uint8_t array[], uint8_t value, int len);
+    int arr_contains_string(char* array[], char* value, int len);
+    int xipa_fs_check_sizes(uint8_t offsets[6], uint8_t sizes[6], int len);
+    int xipa_fs_traverse_flash_api(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir);
+
+    static char xipa_fs_start_block[8] = {'X', 'I', 'P', 'A', '\0', '\0', '\0', '\0'}; //get rid of null terminator messing up byte sizes. 
+
+    /**
+    * @brief Main container for XIPA_FS implementation. 
+    * 
+    * 
+    */
+    struct privatefs_ptr
+    {
+        /** Current number of files in the filesystem - including superblock records */
+        uint32_t num_files;
+        //struct vector filerecord_list; //now unnecessary as we are not loading the entire table into memory.
+        /** Current number of superblocks in the filesystem - populated at mount time */
+        uint32_t num_superblocks;
+        /** Zephyr struct representing current flash area */
+        const struct flash_area *pfa;
+        /** XIPA_FS parameter struct, containing offsets, XIP region address, and desired XIP offset */
+        struct xipafs_params *param;
+        /** XIPA_FS device struct, exposes APIs for HW specific operations */
+        struct xipa_dev *xip;
+        /** List/vector containing function pointers - TODO: add mutex/lock functionality to lock file system for writes, but reads should still be allowed. for thread safety */
+        struct vector operations; 
+        /** Storing superblock locations during traverse operation to ensure no files are left after a superblock traversal */
+        struct stack superblock_locations;
+        /** Storing superblock locations during traverse operation with FLASH API to ensure no files are left after a superblock traversal */
+        struct stack superblock_flash_dev_locations;
+        /** Internal filerecord */
+        struct filerecord f; 
+        /** Pointer represented as integer pointing to end of the file-system. Subtract from start offset of flash area to get space used. */
+        unsigned int last_file_end;
+        /** Starting offset of filesystem */
+        size_t offset;
+        /** Boolean check to see if filesystem initialised */
+        bool init;
+        /** Indicator value for storing mode and counter for bytes written */
+        int64_t storing;
+    };
+
+What we've done here is encapsulate many parameters away from the end user by hiding them in this ``privatefs_ptr`` struct, and simply having an opaque pointer within the main struct. An opaque pointer is one whose type is not known - which is why it is set to (void*)! While it is in theory possible to deduce the location of certain elements by looking at the C file and abusing the fact that struct elements are guaranteed to appear in order, this struct is NOT packed, meaning the compiler might have inserted padding bytes that mess up the order. This will mean the programmer will have little choice but to use my interface to interact with the filesystem, which is great for security, robustness, and reliability as it lets the filesystem be completely aware of all requests and operations taking place on its data. 
+
+Now let's take a look at the second packed struct:
+
+.. code-block:: c
+
+    struct __attribute__((__packed__)) xipa_superblock_loc //packed to shove into stack safely. is a multiple of 4 bytes so we should be ok.
+    {
+        volatile unsigned int record;
+        volatile uint8_t* superblock_start; //with respect to processor address space!
+    };
+
+It should be noted that we have renamed our "journal" in the UML diagram to "superblock" in the implementation as I felt the name applied better in this context. Otherwise there is absolutely no difference. The struct above keeps track of where it is in the filesystem before embarking onwards to traverse a new superblock by storing the starting address of the old superblock and the current record it was at before it found the new superblock. Since record sizes are constant (64 bytes), this gives the exact location. 
+
+Now, we can explore some of the helper functions and constants that ``XIPA_FS`` uses in the implementation. 
+
+.. code-block:: c
+
+    /**
+    * @brief Helper funcion to return the index of a number stored in an array
+    * 
+    * @param array Input array
+    * @param value Desired integer to find
+    * @param len Length of array
+    * @return Index of element if found, else -1.
+    */
+    int arr_contains_int(uint8_t array[], uint8_t value, int len)
+    {
+        for(int i = 0; i < len; i++)
+        {
+            if(array[i]==value)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }   
+
+    /**
+    * @brief Helper funcion to return the index of a string stored in an array
+    * 
+    * @param array Input array
+    * @param value Desired string to find
+    * @param len Length of array
+    * @return Index of element if found, else -1.
+    */
+    int arr_contains_string(char* array[], char* value, int len)
+    {
+        for(int i = 0; i < len; i++)
+        {
+            if(strcmp(array[i], value))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+
+These are just simple linear searches. Nothing fancy here. Here's the list of valid file extensions:
+
+.. code-block:: c
+
+    const char* xipa_file_extensions[] =
+    {
+        "ext", /** superblock pointer */
+        "pdf", /** pdf */
+        "bin", /** misc binary file */
+        "wsm", /** wasm binary */
+        DEL_NAME, /** file marked for deletion */
+        FREE_NAME, /** freed file after align operation */
+        "ttf", /** font file */
+        "txt", /** text file */
+        "zip", /** zip file */
+        "png", /** PNG image */
+        "jpg", /** JPG image */
+        "svg", /** SVG image (vector) */
+        "bmp", /** Bitmap image */
+        "prt", /** Part download */
+        "jso", /** JSON */
+        "xml", /** XML */
+        "htm", /** HTML */
+        "mp3", /** MP3 - but like is this actually going to be used? */
+        "wav", /** WAV - really?!   */  
+    };
+
+You can notice that all these extensions have 3 characters. This is because C-style strings are always null terminated - i.e the last character is a ``'\0'`` - we can use this property to verify if there might be a valid extension there quickly, rather than trying to linear search something we know is going to be garbage. 
+
+Now comes some of the parameter verification logic:
+
+.. code-block:: c
+
+    //In XIPA_FS, the sizes for the individual fields that make up the 64 bytes are totally fixed.
+    //You have control over the location of each field within the filesystem, so this function
+    //will check if the offsets you've put in correspond to valid sizes!
+    /**
+    * @brief Helper function to help verify user-specified offsets
+    * 
+    * @param offsets Array populated with offsets
+    * @param sizes Expected sizes
+    * @param len Length of 
+    * @return int 
+    */
+    int xipa_fs_check_sizes(uint8_t offsets[6], uint8_t sizes[6], int len)
+    {
+        //finding which offset is first - i.e whichever one subtracted by it's size ends up with zero. if we can't find 
+        //one then the offsets are invalid!
+        uint8_t zero_offset = -1;
+        for(int i = 0; i < len; i ++)
+        {
+            if((offsets[i]-sizes[i])==0)
+            {
+                zero_offset = i;
+                break;
+            }         
+        }
+        if(zero_offset == -1)
+        {
+            return -EINVAL;
+        }
+        for (int i = 0; i < len; i ++)
+        {
+            if(i==zero_offset)
+            {
+                i++;
+            }
+            else
+            {
+                int hyp_index = arr_contains_int(offsets, (offsets[i]-sizes[i]), len); //hypothesized index
+                if(hyp_index == -1 || hyp_index == zero_offset)
+                {
+                    return -1;
+                }
+                /*
+                This code works off the idea that every offset, when subtracted from its corresponding size, 
+                should end up with another offset that exists within the array, apart from the very first offset which will end up 
+                at zero. This is why whenever we reach the offset that we computed earlier, we increment i to skip over it. 
+                */
+            }
+        }
+        if(arr_contains_int(offsets, XIPA_JOURNAL_SIZE, len))
+        {
+            return 1; //theoretically the above check should have checked for this condition, but just to be extra safe
+            //i have explicitly expressed the same check here. 
+        }
+        return -1;
+    }
+
+We're basically using the property that all the end offsets subtracted from their size should match the end offset of another item in the serialised array. 
+Here's the main parameter verification function:
+
+.. code-block:: c
+
+    /**
+    * @brief Function to check if user specified parameters make sense or not. These are basic sanity checks only! 
+    * 
+    * @param ptr Pointer to populated parameter struct.
+    * @return 1 if parameters valid, negative err code otherwise. 
+    */
+    int xipa_fs_verifyparams(struct xipafs_params *ptr)
+    {
+        int rc = 1;
+        //we want to perform lots of very similar checks, so it makes sense to serialise the struct
+        //into an array temporarily and perform our checks.
+        uint8_t serialisecheck[7] = { 0 }; //8 bit array makes sense because are you really, really going to have a record size larger than 255 bytes?
+        serialisecheck[0] = ptr->name_end_offset;
+        serialisecheck[1] = ptr->hash_end_offset;
+        serialisecheck[2] = ptr->loc_end_offset;
+        serialisecheck[3] = ptr->size_end_offset;
+        serialisecheck[4] = ptr->vers_end_offset;
+        serialisecheck[5] = ptr->run_end_offset;
+        uint8_t sizes[6] = {NAME_SIZE, HASH_SIZE, LOC_SIZE, SIZE_SIZE, VER_STR_SIZE, RUN_SIZE};
+
+
+        for (int i = 0; i < ARRAY_SIZE(serialisecheck); i++)
+        {
+            // (1) All offsets must be word aligned   
+            // (2) Offsets cannot be greater than final journal size
+            // (3) None of the offests can be zero otherwise these fields do not exist.       
+            if (serialisecheck[i] % 4 != 0 || serialisecheck[i] > serialisecheck[ARRAY_SIZE(serialisecheck)-1] || serialisecheck[i] == 0)
+            {
+                rc = -EINVAL;
+                return rc;
+            }
+        }
+        if(xipa_fs_check_sizes(serialisecheck, sizes, ARRAY_SIZE(serialisecheck)) == -1)
+        {
+            rc = -EINVAL;
+            return rc;
+        }
+        if(ptr->flash_area_id < 0)
+        {
+            rc = -EINVAL;
+            return rc;
+        }
+        if(ptr->path == NULL)
+        {
+            rc = -EINVAL;
+            return rc;
+        }
+        return rc;
+    }
+
+These are basic sanity checks - they cannot automatically determine if the filesystem in question has data that makes sense as this is beyond the scope for a filesystem. It should be the programmer's responsibility to get the correct parameters, these simply serve as protection against perhaps common mistakes. 
+
+Now here's the main mounting function for ``XIPA_FS`` :
+
+.. code-block:: c
+
+    //Ensure filesystem is formatted to XIPA_FS before mounting. Returns ENOENT if superblock not found
+    /**
+    * @brief Mount a XIPA partition with specified offset parameters.
+    * 
+    * @param x xipafs disk object
+    * @param params struct containing offset parameters for file parsing and XIP handling.
+    * @return 1 on success, negative err code otherwise. 
+    */
+    int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
+    {
+        int rc;
+        char buf[4]; //We are looking for XIPA at the start of the filesystem, effectively a permanent superblock marking a particular
+        //storage medium as XIPA_FS.
+        char check[4] = "XIPA";
+        int fs_param_ret_code = xipa_fs_verifyparams(params);
+        XIPA_ERR_CHECK(x->log, "Invalid parameters, check and remount!", fs_param_ret_code);
+
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        //ptr->f = k_malloc(sizeof(struct filerecord)); //allocating memory from kernel heap to ensure files can still be traversed in low memory conditions
+        ptr->param = params;
+        x->mountpoint = ptr->param->path;
+        //Testing to see if we can indeed open a flash area with the given id. 
+        rc = flash_area_open(ptr->param->flash_area_id, &ptr->pfa);
+        if (rc < 0)
+        {
+            flash_area_close(ptr->pfa);
+            return rc;
+        }
+        //const struct device* fdev = flash_area_get_device((const struct flash_area*)ptr->param->flash_area_id);
+        
+        rc = flash_area_read(ptr->pfa, 0, buf, sizeof(buf)); //we can safely use single word read writes according to nordic product specification, so this is fine.
+        if (rc < 0)
+        {
+            if (rc == -EIO)
+            {
+                LOG_INST_INF(x->log, "I/O Error - could not read device");
+            }
+        }
+        if (strcmp(buf, check) != 0)
+        {
+            LOG_INST_INF(x->log, "Superblock not found! Is filesystem formatted to XIPA?");
+            return -ENOENT;
+        }
+        //char numsuperblocks[4];
+        rc = flash_area_read(ptr->pfa, 4, buf, sizeof(buf)); //getting number of superblocks on filesystem.
+        if (rc < 0)
+        {
+            return rc;
+        }
+        ptr->num_superblocks = (uint32_t) buf;   
+        ptr->offset = ptr->pfa->fa_off;
+        char numfiles[4];
+        rc = flash_area_read(ptr->pfa, sizeof(xipa_fs_start_block), numfiles, 4); //getting number of files on filesystem.
+        if (rc < 0)
+        {
+            return rc;
+        }
+        ptr->num_files = (uint32_t) numfiles;
+        LOG_INST_INF(x->log, "Number of files - %d", ptr->num_files);
+        flash_area_close(ptr->pfa); //NOP right now, but for future compatibility this is fine.
+        ptr->init = true;
+        /*
+        We want to use the stack to keep track of where we've gotten up to in the superblock traversal. 
+        If we end up at a record with file extension "ext", we will store the current value of "record" in the stack
+        and start traversing the new superblock at the given location, and so on so forth. 
+        When the function finishes traversing this level of superblock, it will pop a new record off the stack and 
+        resume where it left off. 
+        */
+        stack_init(&ptr->superblock_locations, ptr->num_superblocks, sizeof(struct xipa_superblock_loc));
+        stack_init(&ptr->superblock_flash_dev_locations, ptr->num_superblocks, sizeof(struct xipa_superblock_loc));
+        struct xipafs_dir_t temp_dir;
+        struct filerecord tempfr;
+        xipa_fs_dir_init(x, &temp_dir); //ignore uninitialised warning
+        //Traversing to find the pointer to the byte after the last byte of occupied memory.  
+        do {
+            rc = xipa_fs_traverse_flash_api(x, &tempfr, &temp_dir);
+            if(rc < 0)
+            {
+                if(rc == -ENOTDIR)
+                {
+                    ptr->last_file_end = (unsigned int)(tempfr.file_loc + tempfr.size);
+                    break;
+                }
+                else return -EIO;
+            }
+        }
+        //Iteration conditions - must be a valid extension & must have a null-terminated name.
+        while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, SIZE_SIZE) && tempfr.name[sizeof(tempfr.name)-1] == '\0');
+        xipa_fs_dir_deinit(x, &temp_dir);
+
+        //Allocate memory from kernel heap for device api to save stack space. 
+        ptr->xip = k_malloc(sizeof(struct xipa_dev));
+        rc = xip_init(ptr->xip);
+        XIPA_ERR_CHECK(x->log, "Could not init XIP!", rc);
+
+        rc = xip_setoffset(ptr->xip, ptr->offset);
+        XIPA_ERR_CHECK(x->log, "Could not set XIP offset!", rc);
+
+        rc = xip_enable(ptr->xip);
+        XIPA_ERR_CHECK(x->log, "Could not enable XIP!", rc);
+
+        //We are not storing data yet, so set the flag to -1. 
+        ptr->storing = -1;
+
+        return 1;
+    }
+
+Most of this is self-explanatory - the cast in the top line converts the opaque pointer to a pointer to the ``privatefs_ptr`` struct that we have the definition for and assigns it to ``ptr`` for ease of coding.  
+For the first time now we're seeing some of the driver specific code being used in an interface manner. ``xip_init()``, ``xip_setoffset()``, and ``xip_enable()`` are all platform specific behaviours with the driver file implementing behaviours. Let's take a step back from ``xipafs.c`` and see how the driver code is implemented. 
+
+The first component is ``xipa_dev.h``, which we saw was included by ``xipafs.h`` :
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+    #include <zephyr/types.h>
+    #include <stddef.h>
+    #include <sys/types.h>
+    #include <device.h>
+
+    struct xipa_dev {
+        const struct xipa_dev_api* api;
+        bool mounted;
+    };
+
+
+    typedef int (*xipa_xip_setoffset)(const struct xipa_dev*, off_t xip_offset);
+    typedef int (*xipa_xip_enable)(const struct xipa_dev*);
+    typedef int (*xipa_xip_disable)(const struct xipa_dev*);
+    typedef int (*xipa_sha256_frag_verif)(const struct xipa_dev*, void* frag_buf, size_t frag_len);
+    typedef int (*xipa_sha256_frag_finish)(const struct xipa_dev* dev, void* hash_buf);
+
+
+    //May add more funcions to api, but this is enough for now!
+    __subsystem struct xipa_dev_api
+    {
+        xipa_sha256_frag_verif verif;
+        xipa_sha256_frag_finish fin;
+        xipa_xip_setoffset setoffset;
+        xipa_xip_enable en;
+        xipa_xip_disable di;
+    };
+
+    //technically inheritance again? fairly similar but we don't also have 
+    //inherited data fields, only exposing a set of common methods -> an interface!!
+
+    static inline int xip_enable(const struct xipa_dev* dev)
+    {
+        return dev->api->en(dev);
+    }
+
+    static inline int xip_disable(const struct xipa_dev* dev)
+    {
+        return dev->api->di(dev);
+    }
+
+    static inline int xip_setoffset(const struct xipa_dev* dev, off_t offset)
+    {
+        return dev->api->setoffset(dev, offset);
+    }
+
+    static inline int xipa_frag_sha256_verif(const struct xipa_dev* dev, void* frag_buf, size_t frag_len)
+    {
+        return dev->api->verif(dev, frag_buf, frag_len);
+    }
+
+
+    static inline int xipa_frag_sha256_fin(const struct xipa_dev* dev, void* hash_buf)
+    {
+        return dev->api->fin(dev, hash_buf);
+    }
+
+    int xip_init(struct xipa_dev* dev);
+
+
+We can see some similar funky behaviour to the DIY polymorphism back with the Disk API, but done slightly differently. Here, we're creating a standard API object, identical to the vtable with pointers in the Disk API, just with some typedefs to make the code look neater. __subsystem is a Zephyr directive that signifies the population and assignment of an API object at boot-time - i.e by the kernel before any user-land code is executed. 
+
+``static inline`` is used as we've directly declared the functions and defined them within the header. This is fine, as we're directly linking the implementation in the driver file, which provides a 1:1 relationship between the driver API and main ``XIPA_FS`` object.
+
+Let's take a look at the driver code (stepping down a rung on the hardware abstraction ladder):
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+
+    #if defined(NRF52840_XXAA)
+        #include <nrf52840.h>
+    #elif defined(CONFIG_SOC_SERIES_NRF53X)
+        #include <nrf5340_application.h>
+    #endif
+
+    #include <zephyr/types.h>
+    #include <sys/types.h>
+    #include <errno.h>
+    #include <hal/nrf_qspi.h>
+    #include <nrfx_qspi.h>
+    #include <../../nrf_cc310_bl/include/nrf_cc310_bl_init.h>
+    #include <../../nrf_cc310_bl/include/nrf_cc310_bl_hash_sha256.h>
+    #include "../../xipa_dev.h"
+
+    #define mod_name nrf_xip_qspi_xipa_drv //module name required for zephyr integration
+    #define drv_name xipa_nrf_qspi //driver name for boot-time initialisation 
+
+    NRF_QSPI_Type nrf_qspi_reg; //QSPI hardware registers 
+    off_t xipo; //Current offset
+    static struct crypto_ctx //Little struct to facilitate file verification process with callback.
+    {
+        int initialised;
+        int64_t bytes_checked;  
+        nrf_cc310_bl_hash_context_sha256_t *const p_hash_context;  
+    };
+
+    //Default state is -1 & -1. 
+    struct crypto_ctx sha_operation = {.bytes_checked = -1, .initialised = -1};
+
+    static int nrf_qspi_xip_init(const struct xipa_dev* dev, off_t xip_offset)
+    {
+        //default offset is zero in the zephyr flash drivers, so as long as our storage partition
+        //is stored at 0x0 offset we should be fine. 
+        xipo = xip_offset;
+        return 1;
+    }
+
+    static int nrf_qspi_xip_fs_set(const struct xipa_dev* dev, bool en)
+    {
+        int rc = 1;
+        if(nrfx_qspi_mem_busy_check()==NRFX_SUCCESS)
+        {
+            #if defined(CONFIG_SOC_SERIES_NRF53X)
+                //This operation is only supported on nRF5340 - nRF52840 has XIP on all the time. 
+                //This just provides extra peace of mind that any application trying to perform an XIP read will be completely crashed while some DMA write is taking place. 
+                nrf_qspi_xip_set(&qspi_reg, en);
+            #endif
+
+        }
+        if(nrf_qspi_reg.XIPOFFSET!=xipo)
+        {
+            nrf_qspi_xip_offset_set(&nrf_qspi_reg, (uint32_t)xipo); 
+        }
+        return rc;
+    }
+
+    static int nrf_qspi_enable_xip(const struct xipa_dev* dev)
+    {
+        return nrf_qspi_xip_fs_set(dev, true);
+    }
+
+    static int nrf_qspi_disable_xip(const struct xipa_dev* dev)
+    {
+        return nrf_qspi_xip_fs_set(dev, false);
+    }
+
+    static int nrf_qspi_sha256_verif(const struct xipa_dev* dev, void* frag_buf, size_t frag_len)
+    {
+        //This is utilising the bootloader crypto library implementing support for the ARM Cortex-M's hardware crypto accelerator - the CryptoCell 310 on nRF52840 & the CryptoCell 312 on nRF5340
+        CRYSError_t err_code;
+        if(sha_operation.initialised == -1)
+        {
+            //Initialising library and checking if initialised correctly (i.e return code 0)
+            if(nrf_cc310_bl_init() != 0)
+            {
+                return -1;
+            }
+            //Register level manipulation
+            NRF_CRYPTOCELL->ENABLE = 1;
+
+            err_code = nrf_cc310_bl_hash_sha256_init(sha_operation.p_hash_context);
+            if(err_code != CRYS_OK) return err_code;
+            sha_operation.initialised = 1;
+            sha_operation.bytes_checked = 0;
+        }
+        //Begins the verification process with the first buffer size. 
+        err_code = nrf_cc310_bl_hash_sha256_update(sha_operation.p_hash_context, (const uint8_t*)frag_buf, (uint32_t)frag_len);
+        return err_code;
+    }
+
+    static int nrf_qspi_sha256_verif_fin(const struct xipa_dev* dev, void* hash_buf)
+    {
+        //Terminates the SHA256 generation process and outputs the final hash into a user-provided 32-byte buffer. 
+        CRYSError_t err_code = nrf_cc310_bl_hash_sha256_finalize(sha_operation.p_hash_context, (uint8_t*)hash_buf);
+        if(err_code = CRYS_OK)
+        {
+            sha_operation.initialised = -1;
+            sha_operation.bytes_checked = 0;
+            //Disabling CryptoCell to save power.
+            NRF_CRYPTOCELL->ENABLE = 0;
+            return 1;
+        }
+        return err_code;
+    }
+
+
+    //Registering the APIs into the vtable
+    static const struct xipa_dev_api nrf_qspi_xip_api = {
+        .di = nrf_qspi_disable_xip,
+        .en = nrf_qspi_enable_xip,
+        .setoffset = nrf_qspi_xip_init,
+        .verif = nrf_qspi_sha256_verif,
+        .fin = nrf_qspi_sha256_verif_fin,
+    };
+
+    //API assignment function (1:1 so we can have the same name, we won't have more than one device with the same driver as QSPI is typically limited to only one device and one XIP allocation area.) 
+    //Potential thing to change in the future though!
+    int xip_init(struct xipa_dev* dev)
+    {
+        dev->api = &nrf_qspi_xip_api;
+        return 1;
+    }
+
+
+There is a reason why I have not chosen to implement my own flash driver. The Zephyr RTOS already has extremely robust and well-proven drivers for pretty much every flash device that one would want to use - anything I write would be less efficient and less safe. So I decided to roll with the Zephyr Flash API, but implement my own XIP handling driver protocol. 
+
+Now, back to the main ``xipafs.c`` . We saw the ``mount()`` function make use of some of our driver abstraction - now let's examine the unmount function. 
+
+.. code-block:: c
+
+    /**
+    * @brief Unmount XIPA file system. Ensure all pending operations have been completed.
+    * 
+    * @param x xipafs disk pointer
+    * @return 1 on success, -EBUSY if operations pending, else negative err code.
+    */
+    int xipa_fs_unmount(struct xipafs *x)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        if (!ptr->init)
+            return -EINVAL;
+        if(vector_length(&ptr->operations) == 0)
+        {
+            //k_free(ptr->f); //free filerecord to prevent further transactions.
+            xip_disable(ptr->xip);
+            k_free(ptr->xip); //free xip to prevent further manipulation
+            //this should leave QSPI peripheral in a state where standard flash manipulation commands should work perfectly
+            //with no XIPA_FS manipulation. 
+            stack_destroy(&ptr->superblock_flash_dev_locations);
+            stack_destroy(&ptr->superblock_locations);
+            vector_deinit(&ptr->operations);
+            ptr->init = false;
+            return 1;
+        }
+        else return -EBUSY;
+    }
+
+Nothing super special here, just freeing up dynamically allocated objects off the heap if the filesystem is ready to be unmounted. We haven't quite implemented thread-safety yet with the vector of operations, that will be a great task to tackle as an extension in the future. 
+
+Here is the directory struct init function:
+
+.. code-block:: c
+
+    /**
+    * @brief Initialises directory context object from heap for file traversal.
+    * 
+    * @param x xipafs disk object
+    * @param dir xipafs directory pointer
+    * @return 1 on success, else negative err code.
+    */
+    int xipa_fs_dir_init(struct xipafs* x, struct xipafs_dir_t* dir)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        dir = malloc(sizeof(struct xipafs_dir_t));
+        if(dir!=NULL)
+        {
+            dir->current_record = 1;
+            dir->current_records_to_traverse = ptr->num_files;
+            return 1;
+        }
+        return -ENOMEM; 
+    }
+
+And the deinit function:
+
+.. code-block:: c
+
+    /**
+    * @brief Frees resources allocated for a directory context object.
+    * 
+    * @param x xipafs disk object
+    * @param dir xipafs directory pointer
+    * @return 1 on success
+    */
+    int xipa_fs_dir_deinit(struct xipafs* x, struct xipafs_dir_t* dir)
+    {
+        free(dir);
+        return 1;
+    }
+
+Now here's an interesting little function. It turns out ``memcpy()`` is not volatile safe, meaning the compiler can optimise out potentially critical copies incorrectly, which is especially bad in the case of a filesystem. So, I got a very simple array copy function that would allow volatile buffers to be copied to each other:
+
+.. code-block:: c
+
+    //https://stackoverflow.com/questions/54964154/is-memcpyvoid-dest-src-n-with-a-volatile-array-safe
+    //This function is a volatile safe memcpy for XIP region reads and validation. 
+    volatile void *xipa_vol_memcpy(volatile void *restrict dest,
+                                const volatile void *restrict src, size_t n) 
+    {
+        const volatile unsigned char *src_c = src;
+        volatile unsigned char *dest_c = dest;
+
+        while (n > 0)
+        {
+            n--;
+            dest_c[n] = src_c[n];
+        }
+        return  dest;
+    }
+
+Here is a function used to serialise filerecord structs into a memory buffer, and a function used to deserialise a memory buffer into a filerecord struct:
+
+.. code-block:: c
+
+    /**
+    * @brief Helper function to translate a filerecord to a buffer of memory, ready to write to filesystem.
+    * 
+    * @param x xipafs disk object
+    * @param f pointer to filerecord
+    * @param record record number to update
+    * @param tableStart pointer to start of memory location.
+    * @return 1 on success, negative err code otherwise.
+    * @exception You must ensure the record and tablestart values make sense - buffer overflow is not checked! 
+    */
+    int xipa_fs_write_temp_record(struct xipafs *x, struct filerecord* f, unsigned int record, volatile uint8_t* tableStart)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        if(!ptr->init)
+            return -EINVAL;
+        if(f->file_loc != NULL && f->hash != NULL && f->name != NULL && f->run != NULL && f->size != 0 && f->ver_str != NULL)
+        {
+            if(ptr->f.file_loc != (volatile uint8_t*)0x0 || ptr->f.size != (size_t)0x0)
+            {
+                volatile uint8_t* journal_loc = (tableStart + ((record-1)<<6));
+                //Basic pointer arithmetic to jump to the correct place in memory, and copy the information into the buffer. 
+                xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->run_end_offset - RUN_SIZE), f->run, RUN_SIZE);
+                xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->name_end_offset - NAME_SIZE), f->name, NAME_SIZE);
+                xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->loc_end_offset - LOC_SIZE), f->file_loc, LOC_SIZE);
+                xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->size_end_offset - SIZE_SIZE), &f->size, SIZE_SIZE);
+                xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->hash_end_offset - HASH_SIZE), f->hash, HASH_SIZE);
+                xipa_vol_memcpy((volatile uint8_t*)(journal_loc + ptr->param->vers_end_offset - VER_STR_SIZE), f->ver_str, VER_STR_SIZE);
+                return 1;
+            }
+            else return -EINVAL;
+        }
+        else return -EINVAL;
+        return -EIO;
+    }
+
+    /**
+    * @brief Helper function to translate a record stored in memory into a filerecord for manipulation.
+    * 
+    * @param x xipafs disk object
+    * @param f pointer to filerecord
+    * @param record record number inside memory region
+    * @param tableStart pointer to memory region.
+    * @return 1 on success, negative err code otherwise
+    * @exception Bounds are not checked! Please ensure your offsets are correct!
+    */
+    int xipa_fs_populate_record(struct xipafs *x, struct filerecord* f, unsigned int record, volatile uint8_t* tableStart)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        if (!ptr->init)
+            return -EINVAL;
+        //refactored the journal arithmetic to make it more readable.
+        volatile uint8_t* journal_location = (volatile uint8_t*)(tableStart + ((record-1)<<6));
+        xipa_vol_memcpy(ptr->f.run, journal_location + ptr->param->run_end_offset - RUN_SIZE, RUN_SIZE);
+        if(ptr->f.run != NULL)
+        {
+            xipa_vol_memcpy(ptr->f.name, journal_location + ptr->param->name_end_offset - NAME_SIZE, NAME_SIZE);
+            ptr->f.file_loc = __LOC(journal_location + ptr->param->loc_end_offset - LOC_SIZE);
+            ptr->f.size = (size_t)*journal_location + ptr->param->size_end_offset - SIZE_SIZE;
+            if(ptr->f.file_loc != (volatile uint8_t*)0x0 || ptr->f.size != (size_t)0x0)
+            {
+                xipa_vol_memcpy(ptr->f.hash, journal_location + ptr->param->hash_end_offset - HASH_SIZE, HASH_SIZE);
+                xipa_vol_memcpy(ptr->f.ver_str, journal_location + ptr->param->vers_end_offset - VER_STR_SIZE, VER_STR_SIZE);
+                ptr->f.record_loc = journal_location;
+                f = &ptr->f;
+                return 1;
+            }
+            else {
+                f = NULL;
+                return -EINVAL;
+            }
+        }
+        else
+        {
+            f = NULL;
+            return -EINVAL;
+        }
+        return -EIO;
+    }
+
+Now here's a significant function. This is the second version of the file traversal algorithm using the DMA-based driver. It's used during the aligning routine.
+
+.. code-block:: c
+
+    /**
+    * @brief Traverse through the flash - but using the flash driver in XIP disable mode.
+    * 
+    * @param x xipafs disk object
+    * @param f pointer to filerecord to fill with file details (including superblock!)
+    * @param dir directory context object
+    * @return 1 on success, -ENOTDIR at end of filesystem, negative err code otherwise.
+    */
+    int xipa_fs_traverse_flash_api(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        if (!ptr->init)
+            return -EINVAL;
+        const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
+        volatile uint8_t* tableStart = (volatile uint8_t*)(ptr->offset + sizeof(ptr->num_files) + sizeof(xipa_fs_start_block)); //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
+        if(dir->current_records_to_traverse > 1)
+        {
+            char journal[XIPA_JOURNAL_SIZE];
+            //Reading entire superblock into memory first before making operations
+            flash_read(flash_dev, (off_t)tableStart+(dir->current_record*XIPA_JOURNAL_SIZE), journal, XIPA_JOURNAL_SIZE);
+            struct filerecord temp_fr;
+            //Deserialise memory location into filerecord
+            xipa_fs_populate_record(x, &temp_fr, 1, journal);
+            //Checking to see if we've found a superblock
+            if(strcmp(temp_fr.run, "ext") == 0)
+            {
+                if(ptr->num_superblocks < 2) return -EIO;
+                xipa_fs_populate_record(x, f, 1, journal);
+                volatile struct xipa_superblock_loc yeet = {.record = dir->current_record, .superblock_start = tableStart};
+                //This should be ok, stack_push carries out malloc and copies manually internally rather than just storing pointers.
+                stack_push(&ptr->superblock_flash_dev_locations, (struct xipa_superblock_loc*)&yeet);
+                //No memcpy required here as we are reading a known datatype.
+                volatile uint8_t* new_tablestart = temp_fr.file_loc + ptr->offset;
+                tableStart = new_tablestart;
+                dir->current_record = (volatile unsigned int)1;
+            }
+            else if(arr_contains_string((char**)xipa_file_extensions, ptr->f.run, ARRAY_SIZE(xipa_file_extensions))==-1) //Checking if file extension is null or garbage, meaning a valid record does not exist (i.e we have moved into the null area) and we need to stop traversing.
+            {
+                if(stack_length(&ptr->superblock_flash_dev_locations)>0)
+                {
+                    if(ptr->num_superblocks < 2) return -EIO;
+                    //Pop gives you the pointer to a dynamically allocated buffer containing the data. 
+                    volatile struct xipa_superblock_loc* back_ptr = (volatile struct xipa_superblock_loc*)stack_pop(&ptr->superblock_locations);
+                    //We dereference the pointer into our local value allocated on stack
+                    volatile struct xipa_superblock_loc back = *back_ptr;
+                    //We free the dynamically allocated memory to prevent a memory leak.
+                    free(back_ptr);
+                    volatile unsigned int records_left = dir->current_records_to_traverse - (dir->current_record - back.record);
+                    tableStart = back.superblock_start;
+                    dir->current_record = back.record;
+                    dir->current_records_to_traverse = dir->current_record + records_left;
+                    if(dir->current_records_to_traverse > ptr->num_files)
+                    {
+                        LOG_INST_ERR(x->log, "IO Error - rtt %i > num_files %i", dir->current_records_to_traverse, ptr->num_files);
+                        return -EIO;
+                    }
+                }
+                else
+                {
+                    dir->current_records_to_traverse = 1;
+                }
+            }
+            else
+            {
+                if(ptr->f.run[RUN_SIZE-1]=='\0')
+                {
+                    int rc = xipa_fs_populate_record(x, f, 1, journal);
+                    XIPA_ERR_CHECK(x->log, "Could not populate record", rc);
+                    return rc;
+                }
+            }
+            dir->current_record++;
+        }
+        else 
+        {
+            return -ENOTDIR;
+            LOG_INST_WRN(x->log, "Reached end of directory, reset dir structure");
+        }
+        return -EIO;
+
+    }
+
+It's pretty much a direct implementation of the flowchart algorithm - we iterate through the records, if we find a superblock we push our current position on the stack, and start traversing the new superblock. We go on until we hit the end of the superblock (i.e hit the area where files are stored after it), upon which we pop the last known position of the stack, and repeat until the stack is empty and we reach the end of the very first superblock. Then, we are done and the supporting directory struct must be reset to point the algorithm to the start of the filesystem once again. The directory struct allows the traversal algorithm to be called as often or infrequently as the calling code likes, and can maintain its state until the directory object is freed or goes out of context. 
+We can see that we're copying values pushed off the stack from the heap to the stack to assign to our stack defined variables, and that we're populating filerecords even for superblocks, which is necessary for the align algorithm to be able to find the superblocks in the filesystem for modification. 
+
+Moving on, we have the first traverse implementation, designed to execute entirely on XIP memory space:
+
+.. code-block:: c
+
+    /**
+    * @brief Traverse through the flash in XIP enable mode.
+    * 
+    * @param x xipafs disk object
+    * @param f pointer to filerecord to fill with file details (including superblock!)
+    * @param dir directory context object
+    * @return 1 on success, -ENOTDIR at end of filesystem, negative err code otherwise.
+    */
+    int xipa_fs_traverse(struct xipafs *x, struct filerecord* f, struct xipafs_dir_t* dir) //every call to this function will update the filerecord with details of the next file, until the end of directory is reached.
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        if (!ptr->init)
+            return -EINVAL;
+        volatile uint8_t *tableStart = (volatile uint8_t*)(ptr->param->xip_dev_location + sizeof(ptr->num_files) + sizeof(xipa_fs_start_block) + sizeof(ptr->num_superblocks)); //first 4 bytes (machine word) is the identifier superblock, next 4 bytes is the number of files.
+        if(dir->current_records_to_traverse > 1)
+        {
+            xipa_vol_memcpy(ptr->f.run, (volatile uint8_t*)(tableStart + ((dir->current_record-1)<<6) + ptr->param->run_end_offset - RUN_SIZE), RUN_SIZE);
+            if(strcmp(ptr->f.run, "ext") == 0)
+            {
+                if(ptr->num_superblocks < 2) return -EIO;
+                volatile struct xipa_superblock_loc yeet = {.record = dir->current_record, .superblock_start = tableStart};
+                //This should be ok, stack_push carries out malloc and copies manually internally rather than just storing pointers.
+                stack_push(&ptr->superblock_locations, (struct xipa_superblock_loc*)&yeet);
+                //No memcpy required here as we are reading a known datatype.
+                //Additionally, since the location offsets are done with respect to the start of the flash, we need to add the xip dev location
+                //and subtract the xip offset to jump to the correct place in XIP memory space.
+                volatile uint8_t* new_tablestart = __LOC(tableStart + ((dir->current_record-1)<<6) + ptr->param->loc_end_offset - LOC_SIZE) + (unsigned int)ptr->param->xip_dev_location - (unsigned int)ptr->param->xip_device_offset;
+                tableStart = new_tablestart;
+                dir->current_record = (volatile unsigned int)1;
+            }
+            else if(arr_contains_string((char**)xipa_file_extensions, ptr->f.run, ARRAY_SIZE(xipa_file_extensions))==-1) //Checking if file extension is null or garbage, meaning a valid record does not exist (i.e we have moved into the null area) and we need to stop traversing.
+            {
+                if(stack_length(&ptr->superblock_locations)>0)
+                {
+                    if(ptr->num_superblocks < 2) return -EIO;
+                    volatile struct xipa_superblock_loc* back_ptr = (volatile struct xipa_superblock_loc*)stack_pop(&ptr->superblock_locations);
+                    volatile struct xipa_superblock_loc back = *back_ptr;
+                    free(back_ptr);
+                    volatile unsigned int records_left = dir->current_records_to_traverse - (dir->current_record - back.record);
+                    tableStart = back.superblock_start;
+                    dir->current_record = back.record;
+                    dir->current_records_to_traverse = dir->current_record + records_left;
+                    if(dir->current_records_to_traverse > ptr->num_files)
+                    {
+                        LOG_INST_ERR(x->log, "IO Error - rtt %i > num_files %i", dir->current_records_to_traverse, ptr->num_files);
+                        return -EIO;
+                    }
+                }
+                else
+                {
+                    dir->current_records_to_traverse = 1;
+                }
+            }
+            else
+            {
+                if(ptr->f.run[RUN_SIZE-1]=='\0')
+                {
+                    int rc = xipa_fs_populate_record(x, f, dir->current_record, tableStart); //eek we're passing the filerecord pointer down three levels...
+                    XIPA_ERR_CHECK(x->log, "Could not populate record", rc);
+                    f->file_loc = f->file_loc + (unsigned int)(ptr->param->xip_dev_location - ptr->param->xip_device_offset);
+                    return rc;
+                }
+            }
+            dir->current_record++;
+        }
+        else 
+        {
+            return -ENOTDIR;
+            LOG_INST_WRN(x->log, "Reached end of directory, reset dir structure");
+        }
+        return -EIO;
+    }
+
+Same basic principle, except we're doing some arithmetic to deal with the XIP offsets and performing byte-level reads to save memory and power. Realistically, it will be faster to traverse with 64 byte reads - this is something we could change dynamically! Nice extension idea. 
+
+Now here's a basic algorithm that uses the previous functions to get first instance of a file, which supports very basic globbing by replacing either the extension, or the filename with a "*" to signify "all".
+
+.. code-block:: c
+
+    /**
+    * @brief Returns the first instance of a file designated by filename in a filerecord f. 
+    * 
+    * @param x xipafs disk object
+    * @param filename Desired filename with extension
+    * @param f Pointer to filerecord to populate with information about the file if found.
+    * @return f -> NULL if file not found, 1 on success, -ENFILE if file not found, negative err code otherwise.
+    */
+    int xipa_fs_get_file(struct xipafs *x, char *filename, struct filerecord* f)
+    {
+        char *fname;
+        char *ext;
+        char *context = NULL;
+        int rc;
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        if (!ptr->init)
+            return -EINVAL;
+        fname = strtok_r(filename, ".", &context);
+        ext = strtok_r(NULL, ".", &context);
+        if (fname == NULL || ext == NULL)
+        {
+            return -EINVAL;
+        }
+        stack_clear(&ptr->superblock_locations);
+        struct xipafs_dir_t dir;
+        xipa_fs_dir_init(x, &dir);
+        //each journal entry is 64 bytes (#wordaligned gang) so we will iterate through until we find our entry!
+        //We maintain the number of files to avoid needessly iterating over the entire 64KB superblock region.
+        //This means that there must be no gaps within the entries!!
+        //*.* is just nonsense so we will return EINVAL.
+        if((strcmp(fname, "*")==0) && (strcmp(ext, "*")==0))
+        {
+            return -EINVAL;
+        }
+        else if((strcmp(fname, "*")==0)) //strtok is null terminated
+        //if the file name is *.extension, this will give the first instance of that extension. 
+        {
+            for(int i = 0; i < ptr->num_files; i ++)
+            {
+                rc = xipa_fs_traverse(x, f, &dir);
+                if(rc < 0)
+                {
+                    LOG_INST_WRN(x->log, "Code: %i", rc);
+                    return rc;
+                }
+                if(strcmp(ptr->f.run, ext)==0)
+                {
+                    return 1;
+                }
+            }
+        }
+        else if(strcmp(ext, "*")==0) //strtok is null terminated
+        //if the file name is name.*, this will give the first instance of that name. 
+        {
+            for(int i = 0; i < ptr->num_files; i ++)
+            {
+                rc = xipa_fs_traverse(x, f, &dir);
+                if(rc < 0)
+                {
+                    LOG_INST_WRN(x->log, "Code: %i", rc);
+                    return rc;
+                }
+                if(strcmp(ptr->f.name, fname)==0)
+                {
+                    return 1;
+                }
+            }
+        }
+        else
+        {
+            for(int i = 0; i < ptr->num_files; i ++)
+            {
+                rc = xipa_fs_traverse(x, f, &dir);
+                if(rc < 0)
+                {
+                    LOG_INST_WRN(x->log, "Code: %i", rc);
+                    return rc;
+                }
+                if((strcmp(ptr->f.name, fname) == 0) && (strcmp(ptr->f.run, ext)==0))
+                {
+                    return 1;
+                }
+            }
+        }
+        return -ENFILE;
+        //stack is not cleared until next read operation, should traverse be a private method?
+    }
+
+I have partially duplicated the for loops on purpose - it moves the "checking which condition to check for" logic out of the main loop, speeding up execution and reducing latency. We're using our directory object and higher level functions to either compare extensions, filenames, or both to return what the user desires.
+
+Here's the subroutine to format the filesystem, this can be used on flash areas which are not XIPA formatted to convert them to the correct type. 
+
+.. code-block:: c
+
+    /**
+    * @brief Format the filesystem - hard delete all files and records.
+    * @exception 1) WARNING - FORMAT OPERATION IS IRREVERSIBLE! 
+    * @exception 2) Stop all XIP utilising threads to prevent crashes.
+    * 
+    * @param x xipafs disk object
+    * @return 1 on success, else negative err code. 
+    */
+    int xipa_fs_format(struct xipafs* x)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        /*
+        if(!ptr->init) -> only set after a successful mount
+        {
+            LOG_INST_ERR(x->log, "XIPA not initialised!");
+            return -EINVAL;
+        }
+        */
+        int rc = flash_area_open(ptr->pfa->fa_id, &ptr->pfa);
+        XIPA_ERR_CHECK(x->log, "Could not open flash area", rc);
+
+        LOG_INST_WRN(x->log, "Formatting filesystem to XIPA!");
+        //Bounding erase logic not required as we are erasing entirety of flash, which is a multiple of 4096 as it's all the sectors.
+        rc = flash_area_erase(ptr->pfa, 0, ptr->pfa->fa_size);
+        XIPA_ERR_CHECK(x->log, "Format failed", rc);
+
+        rc = flash_area_write(ptr->pfa, 0, xipa_fs_start_block, sizeof(xipa_fs_start_block)); //writing identifier block
+        XIPA_ERR_CHECK(x->log, "Could not write identifier block", rc);
+
+        rc = flash_area_write(ptr->pfa, (off_t)sizeof(xipa_fs_start_block), 0, sizeof(int)); //writing file number block
+        XIPA_ERR_CHECK(x->log, "Could not write file number block", rc);
+
+        flash_area_close(ptr->pfa);
+        return 1;
+    } 
+
+Here's the subroutine for storing a file:
+
+.. code-block:: c
+
+    /**
+    * @brief Initiate write of a new file to the filesystem. Once write is initialised, call xipa_fs_data_store_cb() with your incremental buffer writes. 
+    * 
+    * @param x xipafs disk object
+    * @param filename Desired filename, should not exceed 12 characters (i.e should fit inside a char[12] with null termination)
+    * @param extension Desired extension, should fit inside a char[4] with null terminator, and must be one of the defined extensions in xipa_file_extensions.
+    * @param size Size of new file - MUST BE WORD ALIGNED! (i.e rounded up to nearest multiple of 4 for 32-bit systems)
+    * @param hash SHA-256 hash of new file
+    * @param ver_str Version string of file or app.
+    * @return 1 on success, negative err_code otherwise. 
+    */
+   int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size, char* hash, char* ver_str)
+   {
+       struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+       //Basic sanity checks on the inputs
+       if(ptr->storing > 0) return -EINVAL;
+       if(strlen(filename) > NAME_SIZE) return -EINVAL;
+       if(strlen(extension) > RUN_SIZE) return -EINVAL;
+       if(strlen(hash) != HASH_SIZE) return -EINVAL;
+       if(strlen(ver_str) > VER_STR_SIZE) return -EINVAL;
+       int extension_index = arr_contains_string((char**)xipa_file_extensions, extension, RUN_SIZE);
+       if(extension_index == -1) return -EINVAL;
+       if(size % 4 != 0) return -EINVAL;
+       if(ptr->last_file_end + size > ptr->param->dev_size) return -EINVAL;
+       //we want to get location of file record for very last file. we will append our new data onto the end of the corresponding superblock. 
+       struct xipafs_dir_t tempdir;
+       xipa_fs_dir_init(x, &tempdir);
+       struct filerecord tempfr;
+       int traverse_rc = 0;
+       int rc = 0;
+       while(traverse_rc != -ENOTDIR)
+       {
+           xipa_fs_traverse_flash_api(x, &tempfr, &tempdir);
+           XIPA_ERR_CHECK(x->log, "IO Error - filesystem corrupted?", traverse_rc);
+       }
+       //We're checking if the end file pointer is equal to what we think it should be based on mounting operation
+       if((unsigned int)(tempfr.file_loc + tempfr.size) != ptr->last_file_end) return -EIO;
+       //Creating new superblock entry
+       char newJournalEntry[XIPA_JOURNAL_SIZE];
+       tempfr.file_loc = (volatile uint8_t*)ptr->last_file_end;
+       memcpy(tempfr.name, filename, NAME_SIZE);
+       memcpy(tempfr.run, extension, RUN_SIZE);
+       memcpy(tempfr.hash, hash, HASH_SIZE);
+       memcpy(tempfr.ver_str, ver_str, VER_STR_SIZE);
+       tempfr.size = size;
+       //we need to do low level block access so we need to get the underlying device.
+       const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
+       unsigned int new_record_loc = (unsigned int)(tempfr.record_loc + XIPA_JOURNAL_SIZE);
+       XIPA_ERR_CHECK(x->log, "IO Error - temporary record construction failed", rc);
+       //We're checking if we're at the end of the current superblock / if it's run out of space
+       if(tempdir.current_record == 1023)
+       {
+           // if so, we create a new superblock, and write it to the end of the filesystem.
+           struct filerecord new_superblock;
+           new_superblock.file_loc = (volatile uint8_t*)ptr->last_file_end;
+           memcpy(new_superblock.run, xipa_file_extensions[0], RUN_SIZE);
+           snprintf(new_superblock.name, NAME_SIZE, "superblock%d", ++ptr->num_superblocks);
+           memset(new_superblock.hash, 1, HASH_SIZE);
+           new_superblock.size = XIPA_JOURNAL_SIZE * 1024;
+           memcpy(new_superblock.ver_str, "1.0", VER_STR_SIZE);
+           char new_superblock_entry[XIPA_JOURNAL_SIZE];
+           xipa_fs_write_temp_record(x, &new_superblock, 1, new_superblock_entry);
+           flash_write(flash_dev, ptr->last_file_end, new_superblock_entry, XIPA_JOURNAL_SIZE);
+           ptr->last_file_end += new_superblock.size;
+           new_record_loc = ptr->last_file_end;
+       }
+       //We're writing the new file's record to the new end of the filesystem, whether or not we wrote a new superblock just now. 
+       rc = xipa_fs_write_temp_record(x, &tempfr, 0, newJournalEntry);
+       XIPA_ERR_CHECK(x->log, "IO Error - new record creation failed", rc);
+       rc = flash_write(flash_dev, new_record_loc, newJournalEntry, XIPA_JOURNAL_SIZE);
+       XIPA_ERR_CHECK(x->log, "IO Error - new record write failed", rc);
+       ptr->last_file_end += size;
+       xipa_fs_dir_deinit(x, &tempdir);
+       ptr->storing = 0;
+       ptr->f = tempfr;
+       return 1;
+   }
+
+
+This function puts the file system in "File storing mode" by setting the storing flag to 0. To make the aligning logic simpler later on, you can only write one file at a time to the file system. There is a lot of flexibility with this however, you can write data as you receive it with variably sized buffers with the following callback function:
+
+.. code-block:: c
+
+    /**
+    * @brief Callback function to write contents of file bit by bit. You can use arbitrarily sized buffers and call this function as you receive the data, just please keep them word aligned. You must initialise a write operation first with store().
+    * 
+    * @param x xipafs disk object
+    * @param buf pointer to buffer containing file data
+    * @param buf_size size of data to copy - MUST BE WORD ALIGNED (multiple of 4 on 32-bit systems)!
+    * @return 0 on incremental write success, 1 when all data written successfully, -EINVAL when called uninitialised or if end buffer too large.
+    */
+    int xipa_fs_data_store_cb(struct xipafs* x, void* buf, size_t buf_size)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        if(ptr->storing == -1) return -EINVAL;
+        const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
+        flash_write(flash_dev, (unsigned int)(ptr->f.file_loc + ptr->storing), buf, buf_size);
+        ptr->storing += buf_size;
+        if(ptr->storing == ptr->f.size)
+        {
+            ptr->storing = -1;
+            return 1;
+        }
+        if(ptr->storing > ptr->f.size) return -EINVAL;
+        return 0;
+    }
+
+Here's how we verify a file iteratively using the driver backend to hardware accelerate the SHA256 calculation:
+
+.. code-block:: c
+
+    /**
+    * @brief This function will use your hardware crypto acceleration (if present) to verify the integrity of a particular file by calculating a SHA-256 hash, and comparing it to the known hash. Ensure the correct drivers and Kconfig directives are selected!  
+    * 
+    * @param x xipafs disk object
+    * @param f_verify filerecord of the desired file to verify
+    * @return 1 on success, -1 if file is corrupt.
+    */
+    int xipa_fs_verify(struct xipafs* x, struct filerecord* f_verify)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        xip_enable(ptr->xip);
+        uint32_t passes = 0;
+        //we are hardcoding a 1024 byte pass here, not really any need for more.
+        volatile uint8_t* start_addr = f_verify->file_loc + (unsigned int)(ptr->param->xip_dev_location);// - (unsigned int)(ptr->param->xip_device_offset);
+        while(start_addr + (passes * 1024) < f_verify->file_loc + f_verify->size)
+        {
+            xipa_frag_sha256_verif(ptr->xip, start_addr + (passes++ * 1024), 1024);
+        }
+        xipa_frag_sha256_verif(ptr->xip, start_addr+(passes * 1024), f_verify->size-(passes * 1024));
+        char hash[32];
+        xipa_frag_sha256_fin(ptr->xip, hash);
+        if(strcmp(f_verify->hash, hash) == 0) return 1;
+        return -1;
+    }
+
+Now let's see how we can delete a file from the filesystem:
+
+.. code-block:: c
+
+    /**
+    * @brief Delete the first instance of a particular file with specified name.
+    * @exception 1) IMPORTANT! You must pause any activity on the XIP region to prevent reads to undefined memory locations while deletion takes place.
+    * @exception 2) You must include the extension in the filename.
+    * @exception 3) This will only delete the FIRST instance of a file.
+    * 
+    * @param x xipafs disk object
+    * @param filename char array of length 16 containing name and extension 
+    * @return -EINVAL if there are no files, or if file could not be found. negative err code otherwise. 
+    */
+    int xipa_fs_delete(struct xipafs* x, char* filename)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        if(ptr->num_files == 0) return -EINVAL;
+        volatile uint8_t* record_offset = 0;
+        struct filerecord tempfr;
+        int rc = xipa_fs_get_file(x, filename, &tempfr); 
+        XIPA_ERR_CHECK(x->log, "Could not get file name!", rc);
+        if(tempfr.record_loc==(volatile uint8_t*)0 || tempfr.file_loc==(volatile uint8_t*)0 || tempfr.size==0)
+        {
+            LOG_INST_ERR(x->log, "Offsets zero!");
+            return -EINVAL;
+        }
+
+        //switching to xip disable mode and using flash driver to delete the file.
+        xip_disable(ptr->xip);
+        rc = flash_area_open(ptr->pfa->fa_id, &ptr->pfa);
+        XIPA_ERR_CHECK(x->log, "Could not open flash area!", rc);
+
+        /* We are already erasing the flash sector by sector during align operation, no point doing it again!
+        rc = flash_area_erase(ptr->pfa, (off_t)(tempfr.file_loc-ptr->param->xip_dev_location), size);
+        XIPA_ERR_CHECK(x->log, "Could not erase file!", rc);
+        LOG_INST_INF(x->log, "Erased %i byte file data at %i (0-based offset)", size, (off_t)(deletion_offset-ptr->param->xip_dev_location));
+        */
+        //We're basically setting the extension bits to zero in the record, which will let the aligning algorithm find it when aligning the main memory blocks. 
+        rc = flash_area_write(ptr->pfa, (off_t)(tempfr.record_loc-ptr->param->xip_dev_location+ptr->param->run_end_offset-RUN_SIZE), DEL_NAME, RUN_SIZE);
+        XIPA_ERR_CHECK(x->log, "Could not erase file record!", rc);
+        LOG_INST_INF(x->log, "Marked %i byte file record at %i (0-based offset) as erased", XIPA_JOURNAL_SIZE, (off_t)(record_offset-ptr->param->xip_dev_location));
+        flash_area_close(ptr->pfa);
+        if(ptr->num_files > 0) rc = xipa_fs_align(x, tempfr); //this function will align the main memory blocks 
+        if(rc < 0) return rc;
+        xip_enable(ptr->xip);
+        return 1;
+    }
+
+
+Now, let's see the most important algorithm of this entire file system, the behemoth ``align()``.
+
+.. code-block:: c
+
+    /**
+    * @brief Internal function to align physical memory after a delete operation. ONLY ACCESS VIA xipa_fs_delete() !
+    * 
+    * @param x xipafs disk object
+    * @param f_del filerecord of deleted file
+    * @return 1 on success, negative err code otherwise. 
+    */
+    int xipa_fs_align(struct xipafs *x, struct filerecord f_del)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        struct filerecord tempfr;
+        struct xipafs_dir_t dir;
+        int rc;
+        volatile uint8_t* deletion_offset = f_del.file_loc - (uint32_t)ptr->param->xip_dev_location + ptr->offset;
+        volatile uint8_t* record_offset = f_del.record_loc - (uint32_t)ptr->param->xip_dev_location + (uint32_t)ptr->offset;
+        if(ptr->num_files == 0) return -EINVAL;
+            
+        int flash_init_rc = flash_area_open(ptr->pfa->fa_id, &ptr->pfa);
+        /*
+            user might have TONNES of files, so we are going to trade RAM for CPU cycles and make the CPU traverse the entire filesystem block to find 
+            the next record to update. It should be okay for just a few dozen files which is the general intended use case, but 
+            things might get sticky in the hundreds of thousands of files!!
+            (but then again this filesystem is NOT intended for processors which can access something large enough to warrant having hundreds of thousands of read only files lmao)
+        */
+
+        XIPA_ERR_CHECK(x->log, "Could not open flash area during align", flash_init_rc);
+        //xip_enable(ptr->xip);
+        
+        xipa_fs_dir_init(x, &dir);
+        
+        //also we want to store the superblock offsets:
+        struct vector superblocks;
+        vector_init(&superblocks, ptr->num_superblocks, sizeof(unsigned int)); //there should ideally only be one superblock added here, otherwise
+        //we have quite a cursed situation going on potentially. 
+        struct xipafs_dir_t temp_dir;
+        //check first superblock (i.e start of flash)
+        unsigned int end_of_first_superblock = sizeof(ptr->num_files) + sizeof(ptr->num_superblocks) + sizeof(xipa_fs_start_block) + ptr->offset + (XIPA_JOURNAL_SIZE * 1000);
+        if((unsigned int)record_offset < end_of_first_superblock)
+        {
+            unsigned int sb_ptr = end_of_first_superblock - (XIPA_JOURNAL_SIZE * 1000);
+            vector_push_back(&superblocks, &sb_ptr); //this is fine, sb_ptr can go out of scope because it's safely stored in our vector.
+        }
+        xipa_fs_dir_init(x, &temp_dir); //ignore uninitialised warning
+        do {
+            rc = xipa_fs_traverse_flash_api(x, &tempfr, &temp_dir);
+            if(rc < 0)
+            {
+                if(rc == -ENOTDIR)
+                {
+                    ptr->last_file_end = (unsigned int)(tempfr.file_loc + tempfr.size);
+                    break;
+                }
+                else return -EIO;
+            }
+            //because of how the adding logic will work, superblocks added to the vector must be in logical order,
+            //that is they will appear in order on the physical storage medium. 
+            if(tempfr.run == xipa_file_extensions[0] && //superblock entry
+            (tempfr.file_loc > deletion_offset || //superblock is located beyond the starting offset of the file we are deleting
+            (tempfr.file_loc < deletion_offset && (tempfr.file_loc + 0x10000) > deletion_offset))) //superblock entry located inside the current superblock entry.
+            {
+                unsigned int sb_ptr_sec = (unsigned int)tempfr.file_loc;
+                vector_push_back(&superblocks, &sb_ptr_sec); //safe as it will be copied into the vector memory.
+            }
+        }
+        while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, SIZE_SIZE) && tempfr.name[sizeof(tempfr.name)-1] == '\0');
+
+        //we need to do low level block access so we need to get the underlying device.
+        const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
+        struct flash_pages_info* flash_bound_info;
+        //we must add the device offset now, because we have gone down a layer of abstraction.
+        //off_t prepared_del_off = (off_t)(deletion_offset-ptr->param->xip_dev_location+ptr->param->xip_device_offset);
+        rc = flash_get_page_info_by_offs(flash_dev, (unsigned int)deletion_offset, flash_bound_info);
+        XIPA_ERR_CHECK(x->log, "IO Error - deletion offset outside bounds", rc);
+        size_t size_of_erasearea = flash_bound_info->size+XIPA_JOURNAL_SIZE;
+        char* eraseArea = malloc(size_of_erasearea);
+        //Now we have the actual flash page data.
+        if(eraseArea == NULL)
+        XIPA_ERR_CHECK(x->log, "OOM!!? - could not allocate enough memory to perform deletion operation!", rc);
+
+        //Now, we will calculate how far away we are from the start of the superblock, and divide by XIPA_JOURNAL_SIZE to get
+        //the number of records we are away from the start. 
+
+        int buffer_shift_count = 0;
+        int current_superblock = 0;
+        rc = flash_read(flash_dev, flash_bound_info->start_offset, eraseArea, size_of_erasearea);
+        XIPA_ERR_CHECK(x->log, "Could not read data into memory", rc);
+
+        while(current_superblock < vector_length(&superblocks) - 1)
+        {
+            unsigned int* current_superblock_loc_ptr = (unsigned int*)vector_get(&superblocks, current_superblock);
+            unsigned int current_superblock_loc = *current_superblock_loc_ptr;
+            free(current_superblock_loc_ptr);
+            rc = flash_get_page_info_by_offs(flash_dev, current_superblock_loc, flash_bound_info);
+            XIPA_ERR_CHECK(x->log, "Could not get containing bounds for non-primary superblock", rc);
+            int temp_computed_record = (flash_bound_info->start_offset - current_superblock_loc)/XIPA_JOURNAL_SIZE;
+            int intra_buffer_index = ((off_t)record_offset - flash_bound_info->start_offset)/XIPA_JOURNAL_SIZE;
+            do 
+            {
+                xipa_fs_populate_record(x, &tempfr, intra_buffer_index, eraseArea);
+                tempfr.file_loc -= f_del.size;
+                xipa_fs_write_temp_record(x, &tempfr, intra_buffer_index, eraseArea);
+                if(++intra_buffer_index > flash_bound_info->size / XIPA_JOURNAL_SIZE)
+                {
+                    //erase the block of flash in question
+                    rc = flash_erase(flash_dev, flash_bound_info->start_offset + ((buffer_shift_count) * flash_bound_info->size), flash_bound_info->size); 
+                    XIPA_ERR_CHECK(x->log, "Erase failed", rc);
+                    //now, we are sneaky and we've managed to shift all the data we need into position with one memmove, so let's write it!
+                    rc = flash_write(flash_dev, flash_bound_info->start_offset + ((buffer_shift_count) * flash_bound_info->size), eraseArea, flash_bound_info->size);
+                    XIPA_ERR_CHECK(x->log, "Write failed", rc);
+
+                    //now, let's read the next block of memory.
+                    rc = flash_read(flash_dev, flash_bound_info->start_offset + ((++buffer_shift_count) * flash_bound_info->size), eraseArea, size_of_erasearea);
+                    //eeeeehhh, this could be more elegant by directly updating start_offset, but this makes more sense
+                    //and will hopefully be easier to debug. 
+                    if(current_superblock == 0) // we are only shifting memory in the first superblock as we've deleted a record. 
+                    {
+                        memmove((eraseArea+(intra_buffer_index*XIPA_JOURNAL_SIZE)), 
+                        (eraseArea+(intra_buffer_index+1*XIPA_JOURNAL_SIZE)), 
+                        (size_of_erasearea-((intra_buffer_index)*XIPA_JOURNAL_SIZE)));
+                    }
+                    XIPA_ERR_CHECK(x->log, "Read failed", rc);
+                    intra_buffer_index = 0;
+                    buffer_shift_count++;
+                }
+            }
+            while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, RUN_SIZE) && 
+                tempfr.name[sizeof(tempfr.name)-1] == '\0' &&
+                (temp_computed_record + (buffer_shift_count * (flash_bound_info->size / XIPA_JOURNAL_SIZE))) > 1000);
+            current_superblock ++;
+        }
+
+
+    /*
+        first superblock has now been completely modified. 
+        Time to go through the rest of the files, starting from the end offset, and copy everything right until the end.
+        One limitation here, is that Nordic QSPI is capable of 64KB erase, but Zephyr will generally only expose the ability to erase 4KB at a time.
+        A future TODO might be to add another parameter that defines a user defined erase size, but this is dangerous!! It would be much safer
+        to rely on pre-built drivers. We will see.
+    */   
+        //We have location of last file from first traversal, so now we copy 4096 bytes from end of deleted file, erase starting 4096 bytes, and write the 4096 until our pointer is greater than or equal to the 
+        //ending offset of the filesystem.
+        unsigned int main_align_ptr = (unsigned int)f_del.file_loc;
+        rc = flash_get_page_info_by_offs(flash_dev, main_align_ptr, flash_bound_info); //first we need to get the initial overlap as the files may not be 4096 byte aligned.
+        size_t bytes_to_read_left = main_align_ptr - flash_bound_info->start_offset;
+        size_t bytes_to_read_right = (unsigned int)(flash_bound_info->size - bytes_to_read_left);
+        //we can assume all files will be 4 byte aligned though, sub-word alignment will be hell. Adding function will pad anything up to a multiple of 4.
+        rc = flash_read(flash_dev, main_align_ptr-bytes_to_read_left, eraseArea, bytes_to_read_left);
+        XIPA_ERR_CHECK(x->log, "Read failed", rc);
+
+        rc = flash_read(flash_dev, main_align_ptr+f_del.size, eraseArea, bytes_to_read_right);
+        XIPA_ERR_CHECK(x->log, "Read failed", rc);
+
+        rc = flash_erase(flash_dev, flash_bound_info->start_offset, flash_bound_info->size);
+        XIPA_ERR_CHECK(x->log, "Erase failed", rc);
+
+        rc = flash_write(flash_dev, flash_bound_info->start_offset, eraseArea, flash_bound_info->size);
+        XIPA_ERR_CHECK(x->log, "Write failed", rc);
+
+        unsigned int reach_ptr = (unsigned int)(f_del.file_loc + f_del.size + bytes_to_read_right);
+        unsigned int current_ptr = flash_bound_info->start_offset + flash_bound_info->size;
+        while(reach_ptr < (unsigned int)(ptr->last_file_end + flash_bound_info->size)) //if last bit of last file is in between another sector, we need to copy that sector too. 
+        {
+            rc = flash_read(flash_dev, reach_ptr, eraseArea, flash_bound_info->size);
+            XIPA_ERR_CHECK(x->log, "Read failed", rc);
+
+            rc = flash_erase(flash_dev, current_ptr, flash_bound_info->size);
+            XIPA_ERR_CHECK(x->log, "Erase failed", rc);
+
+            rc = flash_write(flash_dev, current_ptr, eraseArea, flash_bound_info->size);
+            XIPA_ERR_CHECK(x->log, "Write failed", rc);
+
+            reach_ptr += flash_bound_info->size; //moving to next sector in flash
+            current_ptr += flash_bound_info->size;
+        }
+        ptr->last_file_end -= f_del.size;
+        vector_deinit(&superblocks);
+        free(eraseArea);
+        xipa_fs_dir_deinit(x, &temp_dir);
+        return 1;
+    }
+
+Most of ``align()`` is self documenting - the basic principle is finding the superblock/journal holding the record in question, shuffling all the records after the deleted record down one filerecord while subtracting all the file_loc offsets to point to the files' eventual new locations. Then the same process is repeated for all proceeding superblocks - this works because we are assuming superblock entries only appear at the end of 1023 files, but the filesystem is robust enough to handle cases where this isn't true. 
+
+Then all the data is shuffled sector by sector to the start of the free space, thus freeing up the space and minimising the effect of gaps on storage capacity. It's essentially an anti-memory-fragmentation system for the disk itself. 
+
+That wraps up the implementation of ``XIPA_FS`` ! Hooray! The final thing is the additional contents of the main ``prj.conf`` file containing the custom parameters we declared in our KConfig, the parameters required to get external flash working, and the parameters required to enable hardware accelerated crypto. 
+
+.. code-block:: kernel-config
+
+    #QSPI Flash
+    CONFIG_NORDIC_QSPI_NOR=y
+    CONFIG_NRFX_QSPI=y
+    CONFIG_XIP=y
+    CONFIG_INKI_XIPA_FS=y
+    CONFIG_XIPA_FS_NRF5XX=y
+    CONFIG_NORDIC_QSPI_NOR_STACK_WRITE_BUFFER_SIZE=4
+    CONFIG_NORDIC_QSPI_NOR_FLASH_LAYOUT_PAGE_SIZE=4096
+    CONFIG_XIPAFS_LOG_LEVEL=3
+
+    #WASM RUNTIME, ENCRYPTION, AND HASHING
+    CONFIG_STACK_SENTINEL=y
+    CONFIG_ARM_MPU=y
+    CONFIG_NORDIC_SECURITY_BACKEND=y
+    CONFIG_CC3XX_BACKEND=y
+    CONFIG_HW_CC3XX=y
+    CONFIG_MBEDTLS_SHA256_C=y
+    CONFIG_ENTROPY_NRF5_RNG=y
+    CONFIG_HARDWARE_DEVICE_CS_GENERATOR=y
+
+
+Let's move onto ``LP_UARTE`` .
+
+``LP_UARTE``
+------------
+I wanted to follow a similar methodology to the implementation of ``XIPA_FS`` by making it a separate module which could be imported in at compile-time to interface with another ``LP_UARTE`` -enabled device within the system. By keeping the modules all loosely coupled and depending on each other through their specific interfaces, we build a robust and reliable end solution. 
+So, we start again with the KConfig, yaml, and CMake files that define how the module is treated by the build system and compiled. 
+
+Here's the ``module.yml`` for ``LP_UARTE`` :
+
+.. code-block:: c
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+    build:
+    name: inki_lp_uarte
+    cmake: .
+    kconfig: ./Kconfig
+
+Very straightforward and simple. Here's Kconfig:
+
+.. code-block:: kconfig
+
+    # INKI_LP_UARTE drivers
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+    #
+    #	Licensed under GPL 3
+    #
+    #
+
+    menuconfig INKI_LP_UARTE
+        bool "INKI's custom low-power UART communication system"
+        help
+        Enable INKI LP_UARTE subsystem
+        select INKI_ICC_BKEND_EXISTS
+        
+    config INKI_LP_UARTE
+        bool "INKI's custom low-power UART communication system"
+        help
+        Enable INKI LP_UARTE subsystem 
+
+    if INKI_LP_UARTE
+
+    config INKI_LP_UARTE_DRV_EXISTS
+        bool #hidden 
+        help
+        Private! Selected by driver.
+        
+    config INKI_LP_UARTE_RX_BUF_LEN
+        int "Size of RX buffers - double buffered so this value muliplied by 2 is the total memory usage"
+        help
+        Specify size of RX buffer. Internally they are double-buffered, so double this value to get total memory usage.
+
+    config INKI_LP_UARTE_TX_BUF_LEN
+        int "Size of TX buffer - not internally double buffered"
+        help
+        Specify size of TX buffer. Not double-buffered.
+
+    config INKI_LP_UARTE_LOG_LEVEL
+        int "Set desired log level for low-power UARTE peripheral"
+        help
+        Set log level for low power UARTE peripheral: (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    config INKI_LP_UARTE_IDENTIFIER
+        string "Set identifier that MCUs will use to verify messages"
+        help
+        "Set identifier prepended to every packet that MCU will verify (unless in enhanced file-write mode)"
+
+    config INKI_LP_UARTE_CB_PTRS
+        int "Set desired length for internal TX/RX callback function array"
+        help
+        "Set desired length for internal TX/RX callback function array"
+
+    module = INKI_LP_UARTE
+    module-str = inki_lp_uarte
+    source "subsys/logging/Kconfig.template.log_config"
+
+    rsource "drivers/nrf_lp_uarte/Kconfig.nrf_lp_uarte"
+
+    endif # INKI_LP_UARTE
+
+We can see there's quite a lot going on here. The ``source`` directive in this case gets boiler-plate logging configuration to use within the module - ``Kconfig.template.log_config``.
+The different configuration options are self-explanatory - these can be set inside the main prj.conf  
+The ``rsource`` directive is a **relative source**, meaning it will take the path relative to the current directory that the KConfig file is in at the moment.
+
 
 
 .. [41] https://github.com/littlefs-project/littlefs

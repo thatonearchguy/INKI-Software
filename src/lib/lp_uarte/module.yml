@@ -1,6 +1,5 @@
 # Copyright (c) 2022 INKI-Systems Inc
 # Licensed under GPL 3
-# Copyright (c) 2019 Nordic Semiconductor
 
 build:
   name: inki_lp_uarte
