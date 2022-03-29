@@ -27,7 +27,6 @@
 #include "lib/d_stack/stack.h"
 #include <logging/log.h>
 #include <logging/log_instance.h>
-#include "lp_uarte_cfg.h"
 
 struct lp_uarte
 {
@@ -61,10 +60,16 @@ struct lp_uarte _name = {  \
             LOG_INSTANCE_PTR_INIT(log, LP_UARTE_NAME, _name)  \
 }
 
+/**
+ * @brief Initialise low power UART peripheral with DMA
+ * 
+ * @param lp lp_uarte object
+ * @return 1 on success, -EINVAL with invalid parameters.
+ */
 int lp_uarte_init(struct lp_uarte* lp);
 int lp_uarte_tx(struct lp_uarte* lp, void* data, size_t len);
 int lp_uarte_rx(struct lp_uarte* lp);
-int lp_uarte_tx_ft_en(struct lp_uarte* lp, size_t total_file_size);
+int lp_uarte_ft_en(struct lp_uarte* lp, size_t total_file_size);
 
 int lp_uarte_register_rx_isr(struct lp_uarte* lp, void (*func_ptr)());
 int lp_uarte_remove_rx_isr(struct lp_uarte* lp, void (*func_ptr)());

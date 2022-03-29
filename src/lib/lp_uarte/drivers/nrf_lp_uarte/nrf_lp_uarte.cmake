@@ -1,8 +1,6 @@
 # Copyright (c) 2022 INKI-Systems Inc
 # Licensed under GPL 3
 #
-#	Licensed under GPL 3
-
 
 if(LP_UARTE_NRF52)
 

@@ -21,6 +21,7 @@
 
 #include "lp_uarte.h"
 #include "lp_uarte_dev.h"
+#include "lp_uarte_cfg.h"
 #include <sys/crc.h>
 
 
@@ -65,13 +66,19 @@ static int lp_uarte_verify_pins(struct lp_uarte_dev_params* p);
 static int lp_uarte_verify_bools(struct lp_uarte_dev_params* p);
 static int lp_uarte_verify_pointers(struct lp_uarte_dev_params* p);
 int lp_uarte_verify_params(struct lp_uarte_dev_params* p);
-void main_lp_uarte_rx_cb(size_t len, void* data_ptr, void(*self)());
-void main_lp_uarte_tx_cb(void(*self)());
+void main_lp_uarte_rx_cb(size_t len, void* data_ptr, void* troll_ptr);
+void main_lp_uarte_tx_cb(void* troll_ptr);
 volatile int lp_uarte_assemble_pkt(struct lp_uarte* lp, void* data_in, size_t data_len);
 volatile static int lp_uarte_decode_pkt(struct lp_uarte* lp, void* pkt_in, void* data_out, size_t pkt_len);
 
 
-
+/**
+ * @brief Basic sanity checks on pin numbers - checking if they're duplicated
+ * or otherwise invalid.
+ * 
+ * @param p dev parameter struct
+ * @return 1 if valid, negative err code otherwise.
+ */
 static int lp_uarte_verify_pins(struct lp_uarte_dev_params* p)
 {
     uint32_t check_arr[7] = {p->rts_pin, p->cts_pin, p->tx_pin, p->rx_pin, p->s0_pin, p->s1_pin, p->s2_pin};
@@ -85,12 +92,24 @@ static int lp_uarte_verify_pins(struct lp_uarte_dev_params* p)
     return 1;
 }
 
+/**
+ * @brief Verify the booleans are correct
+ * 
+ * @param p dev parameter struct 
+ * @return 1 if valid. 
+ */
 static int lp_uarte_verify_bools(struct lp_uarte_dev_params* p)
 {
     if((p->even_parity) && (p->odd_parity)) return -EINVAL;
     return 1;
 }
 
+/**
+ * @brief Verify pointers are safe
+ * 
+ * @param p dev parameter struct
+ * @return 1 if all valid, negative err code otherwise.
+ */
 static int lp_uarte_verify_pointers(struct lp_uarte_dev_params* p)
 {
     if(p->tx_buf_ptr == NULL || p->rx_buf0_ptr == NULL || p->rx_buf1_ptr == NULL || p->tx_cb == NULL || p->rx_cb == NULL)
@@ -100,6 +119,12 @@ static int lp_uarte_verify_pointers(struct lp_uarte_dev_params* p)
     return 1;
 } 
 
+/**
+ * @brief Basic sanity checks on a provided parameter struct
+ * 
+ * @param p dev parameter struct
+ * @return 1 if valid, negative err code if invalid.
+ */
 int lp_uarte_verify_params(struct lp_uarte_dev_params* p)
 {
     int rc = 1;
@@ -163,7 +188,12 @@ int lp_uarte_init(struct lp_uarte* lp)
     return 1;
 }
 
-
+/**
+ * @brief Prepare the underlying hardware to transmit a packet of data.
+ * 
+ * @param lp LP_UARTE object
+ * @return 1 on success
+ */
 int lp_uarte_tx(struct lp_uarte* lp, void* data, size_t len)
 {
     struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
@@ -195,42 +225,67 @@ int lp_uarte_tx(struct lp_uarte* lp, void* data, size_t len)
     return 1;
 }
 
-int lp_uarte_tx_ft_en(struct lp_uarte* lp, size_t total_file_size)
+/**
+ * @brief Enables filetransfer mode on TX to streamline a file transfer. 
+ * 
+ * @param lp LP_UARTE object
+ * @param total_file_size File size of file to transfer
+ * @return 1 on success
+ */
+int lp_uarte_ft_en(struct lp_uarte* lp, size_t total_file_size)
 {
     struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
     ptr->ft_bytes_left = total_file_size;
     return 1;
 }
 
+/**
+ * @brief Prepare the underlying hardware to receive a packet of data.
+ * 
+ * @param lp LP_UARTE object
+ * @return 1 on success
+ */
 int lp_uarte_rx(struct lp_uarte* lp)
 {
     struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
-    lp_uarte_dev_pkt_rx_rdy(&ptr->dev);
-    return 1;
+    int rc = lp_uarte_dev_pkt_rx_rdy(&ptr->dev);
+    return rc;
 }
 
-void main_lp_uarte_rx_cb(size_t len, void* data_ptr, void(*self)())
+void main_lp_uarte_rx_cb(size_t len, void* data_ptr, void* troll_ptr)
 {
-    struct private_ptr* ptr = CONTAINER_OF(self, struct private_ptr, main_rx_callback);
+    //This is a dirty hack to get the struct containing the particular instance's function pointers. 
+    struct private_ptr* ptr = CONTAINER_OF(troll_ptr, struct private_ptr, rx_buffer_0);
     struct lp_uarte* lp = CONTAINER_OF(ptr, struct lp_uarte, private_ptr);
     void* pkt_data_ptr;
     lp_uarte_decode_pkt(lp, data_ptr, pkt_data_ptr, len);
     if(pkt_data_ptr == NULL) return -EINVAL;
     for(int i = 0; i < CONFIG_INKI_LP_UARTE_CB_PTRS; i++)
     {
+        //Iterate through and execute every callback
         (*ptr->rx_callbacks[i])(pkt_data_ptr, len);
     }
 }
 
-void main_lp_uarte_tx_cb(void(*self)())
+
+void main_lp_uarte_tx_cb(void* troll_ptr)
 {
-    struct private_ptr* ptr = CONTAINER_OF(self, struct private_ptr, main_tx_callback);
+    //This is a dirty hack to get the struct containing the particular instance's function pointers. 
+    struct private_ptr* ptr = CONTAINER_OF(troll_ptr, struct private_ptr, tx_buffer);
     for(int i = 0; i < CONFIG_INKI_LP_UARTE_CB_PTRS; i++)
     {
+        //Iterate through and execute every callback. 
         (*ptr->tx_callbacks[i])();
     }
 }
 
+/**
+ * @brief Register an interrupt service routine in  
+ * the list of RX service routines. 
+ * 
+ * @param lp LP_UARTE object
+ * @return 1 on success, negative err code if the list is full 
+ */
 int lp_uarte_register_rx_isr(struct lp_uarte* lp, void (*func_ptr)())
 {
     struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
@@ -243,6 +298,13 @@ int lp_uarte_register_rx_isr(struct lp_uarte* lp, void (*func_ptr)())
     else return -ENOSPC;
 }
 
+/**
+ * @brief Register an interrupt service routine in  
+ * the list of TX service routines. 
+ * 
+ * @param lp LP_UARTE object
+ * @return 1 on success, negative err code if the list is full 
+ */
 int lp_uarte_register_tx_isr(struct lp_uarte* lp, void (*func_ptr)())
 {
     struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
@@ -255,7 +317,13 @@ int lp_uarte_register_tx_isr(struct lp_uarte* lp, void (*func_ptr)())
     else return -ENOSPC;
 }
 
-
+/**
+ * @brief Remove a particular registered interrupt service routine from 
+ * the list of TX service routines. 
+ * 
+ * @param lp LP_UARTE object
+ * @return 1 on success, negative err-code otherwise 
+ */
 int lp_uarte_remove_tx_isr(struct lp_uarte* lp, void (*func_ptr)())
 {
     struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
@@ -282,6 +350,13 @@ int lp_uarte_remove_tx_isr(struct lp_uarte* lp, void (*func_ptr)())
     return 1;
 }
 
+/**
+ * @brief Remove a particular registered interrupt service routine from 
+ * the list of RX service routines. 
+ * 
+ * @param lp LP_UARTE object
+ * @return 1 on success, negative err code otherwise 
+ */
 int lp_uarte_remove_rx_isr(struct lp_uarte* lp, void (*func_ptr)())
 {
     struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
@@ -308,6 +383,12 @@ int lp_uarte_remove_rx_isr(struct lp_uarte* lp, void (*func_ptr)())
     return 1;
 }
 
+/**
+ * @brief Remove all the registered TX interrupt service routines in one go. 
+ * 
+ * @param lp LP_UARTE object
+ * @return 1 on success 
+ */
 int lp_uarte_clear_all_rx_isrs(struct lp_uarte* lp)
 {
     struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
@@ -316,6 +397,12 @@ int lp_uarte_clear_all_rx_isrs(struct lp_uarte* lp)
     return 1;
 }
 
+/**
+ * @brief Remove all the registered TX interrupt service routines in one go. 
+ * 
+ * @param lp LP_UARTE object
+ * @return 1 on success. 
+ */
 int lp_uarte_clear_all_tx_isrs(struct lp_uarte* lp)
 {
     struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;

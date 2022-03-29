@@ -93,10 +93,12 @@ const int nrfx_err_to_zephyr_err(nrfx_err_t err_code)
         case NRFX_ERROR_INVALID_LENGTH:
         {
             return -EINVAL;
+            break;
         }
         case NRFX_ERROR_INTERNAL:
         {
             return -EINTR;
+            break;
         }
         case NRFX_SUCCESS:
         {
@@ -148,8 +150,8 @@ const int nrfx_err_to_zephyr_err(nrfx_err_t err_code)
     return err_code;
 }
 
-void (*lp_uarte_rx_cb)(size_t len, void* data_ptr, void(*self)());
-void (*lp_uarte_tx_cb)(void(*self)());
+void (*lp_uarte_rx_cb)(size_t len, void* data_ptr);
+void (*lp_uarte_tx_cb)(void* data_ptr);
 
 
 void gpiote_lp_uarte_handler()
@@ -160,7 +162,7 @@ void gpiote_lp_uarte_handler()
     {
         NRF_GPIOTE->EVENTS_IN[0] = 0;
         /** HACK: This is a dirty way to have the callback get the vectors within their own structs. */
-        lp_uarte_rx_cb(0, curr_ptr, lp_uarte_rx_cb); //notify higher-level ISR that new packet is being transferred, QSPI write address must be updated.
+        lp_uarte_rx_cb(0, curr_ptr, rx_buf0_ptr); //notify higher-level ISR that new packet is being transferred, QSPI write address must be updated.
         NRF_GPIOTE->TASKS_SET[2] = 1; //s1 high, ready to receive data without race conditions
     }
     if(NRF_GPIOTE->EVENTS_IN[3])
@@ -169,7 +171,7 @@ void gpiote_lp_uarte_handler()
         NRF_GPIOTE->TASKS_SET[2] = 1; //toggling S1 high to low to acknowledge end of transaction
         NRF_GPIOTE->TASKS_CLR[2] = 1;
         /** HACK: This is a dirty way to have the callback get the vectors within their own structs. */
-        lp_uarte_rx_cb(nrf_uarte_reg.RXD.AMOUNT, curr_ptr, lp_uarte_rx_cb);
+        lp_uarte_rx_cb(nrf_uarte_reg.RXD.AMOUNT, curr_ptr, rx_buf0_ptr);
     }
 }
 
@@ -195,7 +197,7 @@ ISR_DIRECT_DECLARE(uarte_rxtx_handler)
     if(stopped)
     {
         nrf_uarte_event_clear(&nrf_uarte_reg, NRF_UARTE_EVENT_TXSTOPPED);
-        lp_uarte_tx_cb(lp_uarte_rx_cb);
+        lp_uarte_tx_cb(tx_buf0_ptr);
     }
     ISR_DIRECT_PM();
     return 1;

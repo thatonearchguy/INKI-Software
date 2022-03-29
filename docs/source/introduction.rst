@@ -1111,6 +1111,11 @@ Here are the KConfig values required to enable internal flash and SD card manipu
 
 .. code-block:: kernel-config
 
+    CONFIG_MULTITHREADING=y
+    CONFIG_MINIMAL_LIBC_MALLOC=y
+    CONFIG_THREAD_RUNTIME_STATS=y
+    CONFIG_HW_STACK_PROTECTION=y
+
     #Internal Flash
     CONFIG_FLASH_MAP=y
     CONFIG_FLASH_PAGE_LAYOUT=y
@@ -2309,7 +2314,7 @@ Fairly straightforward. The next thing we need is a KConfig file (called Kconfig
 
     module = INKI_XIPA_FS
     module-str = inki_xipa_fs
-    source "subsys/logging/Kconfig.template.log_config"
+    source "subsys/logging/Kconfig.template.log_config" #Boiler plate logger stuff
 
     rsource "drivers/nrf_xip_nor/Kconfig.nrf_xip_nor"
 
@@ -4259,10 +4264,3304 @@ Very straightforward and simple. Here's Kconfig:
 
     endif # INKI_LP_UARTE
 
-We can see there's quite a lot going on here. The ``source`` directive in this case gets boiler-plate logging configuration to use within the module - ``Kconfig.template.log_config``.
-The different configuration options are self-explanatory - these can be set inside the main prj.conf  
-The ``rsource`` directive is a **relative source**, meaning it will take the path relative to the current directory that the KConfig file is in at the moment.
+The different configuration options are self-explanatory - these are set in the main ``prj.conf`` file as follows:
 
+.. code-block:: kernel-config
+
+    #Inter-Core-Communication
+    CONFIG_INKI_LP_UARTE=y
+    CONFIG_INKI_LP_UARTE_RX_BUF_LEN=1024
+    CONFIG_INKI_LP_UARTE_TX_BUF_LEN=1024
+    CONFIG_INKI_LP_UARTE_NRF52=y
+    CONFIG_INKI_LP_UARTE_IDENTIFIER="INKIM1"
+    CONFIG_INKI_LP_UARTE_CB_PTRS=8
+    CONFIG_INKI_LP_UARTE_LOG_LEVEL=3
+
+We can see the subsystem filestructure - you have the main directory, which contains a drivers directory, which contains folders corresponding to a particular piece of hardware, which then contains the relevant .c and .h files required to drive the hardware. Let's check out ``drivers/nrf_lp_uarte/Kconfig.nrf_lp_uarte``, the KConfig file rsourced by our higher level KConfig file:
+
+
+.. code-block:: kernel-config
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+    #
+    #	Licensed under GPL 3
+
+    config INKI_LP_UARTE_NRF52
+        bool "INKI-optimised display Drivers"
+        help
+        Enable LP_IARTE driver for Nordic's NRF52 series of Bluetooth LE SoCs. 
+        select INKI_LP_UARTE_DRV_EXISTS
+
+
+Simple and elegant. Each driver subsystem can have its own kernel configuration option, which can be set as the programmer pleases at compile time.
+
+Let's check out the CMake integration. This is the top level CMake file for ``LP_UARTE`` :
+
+.. code-block:: cmake
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+    zephyr_library_named(inki_lp_uarte)
+
+    zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+    zephyr_library_sources(
+        lp_uarte.c
+    )
+
+    if(CONFIG_INKI_LP_UARTE)
+        include(${CMAKE_CURRENT_SOURCE_DIR}/drivers/nrf_lp_uarte/nrf_lp_uarte.cmake})
+        # Add more when the time comes!!
+    endif()
+
+
+    if(NOT CONFIG_INKI_LP_UARTE_DRV_EXISTS)
+        message( FATAL_ERROR "No driver selected for LP_UartE!")
+    endif()
+
+It is generally best practise to specify all sources explicitly by name in "zephyr_library_sources". If this were to be transformed into a module capable of being built under any KConfig enabled environment and not just Zephyr, it would be possible to use CMake variables to deduce the underlying build-system underneath and use different directives to create a general library, much like how LVGL does this. However for now this is overcomplicating things - I will stick to Zephyr support only for now. 
+
+We can see the KConfig variables being used here prefixed with ``CONFIG`` to include underlying driver CMake files and to throw errors if a valid driver is not selected, just like with ``XIPA_FS``. 
+
+Let's take a look at the lower level CMake file:
+
+.. code-block:: cmake
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+    #
+
+    if(LP_UARTE_NRF52)
+
+    zephyr_library_sources(
+        nrf_lp_uarte.c
+        )
+    endif()
+    if(LP_UARTE_NRF53)
+
+    zephyr_library_sources(
+        nrf53_lp_uarte.c
+        )
+    endif()
+
+Very simple, easy to understand, and elegant. We can have in essence a "driver module" that can select different source files for different pieces of hardware based on KConfig variables set in ``prj.conf`` . This is awesome. 
+
+Now like before, we need to tell KConfig about our new module:
+
+.. code-block:: kconfig
+
+    # Copyright (c) 2022 INKI-Systems Inc
+    # Licensed under GPL 3
+
+    mainmenu "INKI Options"
+
+    config APP_INT_WIPE_STORAGE
+        bool "Option to clear the internal flash area before mounting"
+        help
+        Use this to force an existing file system to be created.
+
+    config APP_EXT_WIPE_STORAGE
+        bool "Option to clear the external flash area before mounting"
+        help
+        Use this to force an existing file system to be created.
+
+    config EFLASH_LOG_LEVEL
+        int "Set log level for External SPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    config IFLASH_LOG_LEVEL
+        int "Set log level for Internal Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+        
+    config QFLASH_LOG_LEVEL
+        int "Set log level for Internal QSPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    config VECTOR_LOG_LEVEL
+        int "Set log level for vector api (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    config XIPAFS_LOG_LEVEL
+        int "Set log level for eXecute In Place AoT File System (XIPAFS) api (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+    source "Kconfig.zephyr"
+    rsource "src/lib/fs/Kconfig"
+    rsource "src/lib/lp_uarte/Kconfig"
+
+Now, I do realise that my own root CMake file contains file globs instead of specifying individual files. This has been done deliberately to ease the development process and prevent messing around with CMake and rather maximise the time spent writing C. 
+
+Let's take a look now at the source code that all this build-system code is responsible for building. Here's the top level header file, ``lp_uarte.h`` .
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+    /*
+    _      ____  __ __   ____  ____  ______    ___ 
+    | |    |    \|  |  | /    ||    \|      |  /  _]
+    | |    |  o  )  |  ||  o  ||  D  )      | /  [_ 
+    | |___ |   _/|  |  ||     ||    /|_|  |_||    _]
+    |     ||  |  |  :  ||  _  ||    \  |  |  |   [_ 
+    |     ||  |  |     ||  |  ||  .  \ |  |  |     |
+    |_____||__|   \__,_||__|__||__|\_| |__|  |_____|
+
+    Low-Power Universal Asynchronous Receiver-Transmitter - with DMA!
+
+    */
+
+    #ifndef INKI_LP_UARTE
+    #define INKI_LP_UARTE
+
+    #include <stdlib.h>
+    #include <stdio.h>
+    #include "lib/d_vector/vector.h"
+    #include "lib/d_stack/stack.h"
+    #include <logging/log.h>
+    #include <logging/log_instance.h>
+    #include "lp_uarte_cfg.h"
+
+    struct lp_uarte
+    {
+        LOG_INSTANCE_PTR_DECLARE(log);
+        struct lp_uarte_dev_params param;
+        void* private_ptr;
+    };
+
+
+    struct lp_uarte_params {
+        unsigned long baud;
+        bool flow_control;
+        bool even_parity;
+        bool odd_parity;
+        char start_byte;
+        char end_byte;
+        uint32_t tx_pin;
+        uint32_t rx_pin;
+        uint32_t cts_pin;
+        uint32_t rts_pin;
+        uint32_t s0_pin;
+        uint32_t s1_pin;
+        uint32_t s2_pin;
+    };
+
+    #define LP_UARTE_NAME "lp_uarte"
+
+    #define LP_UARTE_INIT(_name)  \
+    LOG_INSTANCE_REGISTER(LP_UARTE_NAME, _name, CONFIG_LP_UARTE_);  \
+    struct lp_uarte _name = {  \
+                LOG_INSTANCE_PTR_INIT(log, LP_UARTE_NAME, _name)  \
+    }
+
+    int lp_uarte_init(struct lp_uarte* lp);
+    int lp_uarte_tx(struct lp_uarte* lp, void* data, size_t len);
+    int lp_uarte_rx(struct lp_uarte* lp);
+    int lp_uarte_tx_ft_en(struct lp_uarte* lp, size_t total_file_size);
+
+    int lp_uarte_register_rx_isr(struct lp_uarte* lp, void (*func_ptr)());
+    int lp_uarte_remove_rx_isr(struct lp_uarte* lp, void (*func_ptr)());
+    int lp_uarte_clear_all_rx_isrs(struct lp_uarte* lp);
+
+    int lp_uarte_register_tx_isr(struct lp_uarte* lp, void (*func_ptr)());
+    int lp_uarte_remove_tx_isr(struct lp_uarte* lp, void (*func_ptr)());
+    int lp_uarte_clear_all_tx_isrs(struct lp_uarte* lp);
+
+
+
+    #endif
+
+
+We can see a similar structure to the previous modules, and the fact that we're once again relying on our ``Vector`` and ``Stack`` classes. ``LP_UARTE`` requires several I/O pins to communicate with the other core - in most cases these pins can be arbitrarily defined as the peripherals in the MCUs that INKI-OS targets are typically able to dynamically connect pins with peripherals, in contrast to lower end AVR architecture parts which have fixed pins for things like SPI. To address both use cases, I have given the user the ability to set which pins should be requested. In the future, it might be worth refactoring some of this to directly come from devicetree instead. 
+
+Now, we have hidden some of the implementation details from the user. Let's check out the other header files:
+
+Here's ``lp_uarte_dev.h`` :
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+    #include <zephyr/types.h>
+    #include <stddef.h>
+    #include <sys/types.h>
+    #include <device.h>
+    #include <logging/log.h>
+    #include "lp_uarte_cfg.h"
+
+    struct lp_uarte_dev {
+        const struct lp_uarte_dev_api* api;
+        struct lp_uarte_dev_params p;
+        bool init;
+    };
+
+
+    typedef int (*_lp_uarte_dev_init)(const struct lp_uarte_dev*);
+    typedef int (*_lp_uarte_ft_dev_start)(const struct lp_uarte_dev*);
+    typedef int (*_lp_uarte_dev_deinit)(const struct lp_uarte_dev*);
+    typedef int (*_lp_uarte_dev_pkt_tx)(const struct lp_uarte_dev*);
+    typedef int (*_lp_uarte_dev_pkt_rx)(const struct lp_uarte_dev*);
+    typedef int (*_lp_uarte_get_ft)();
+    typedef int (*_lp_uarte_tx_fin)(const struct lp_uarte_dev*);
+
+    __subsystem struct lp_uarte_dev_api
+    {
+        _lp_uarte_dev_pkt_tx tx;
+        _lp_uarte_dev_pkt_rx rx;
+        _lp_uarte_dev_init init;
+        _lp_uarte_dev_deinit deinit;
+        _lp_uarte_ft_dev_start ft_start;
+        _lp_uarte_get_ft ft_status;
+        _lp_uarte_tx_fin tx_fin;
+    };
+
+    static inline int lp_uarte_dev_ft_start(const struct lp_uarte_dev* dev)
+    {
+        return dev->api->ft_start(dev);
+    }
+
+    static inline int lp_uarte_dev_ft_status(const struct lp_uarte_dev* dev)
+    {
+        return dev->api->ft_status(dev);
+    }
+
+    static inline int lp_uarte_dev_init(const struct lp_uarte_dev* dev)
+    {
+        return dev->api->init(dev);
+    }
+
+    static inline int lp_uarte_dev_deinit(const struct lp_uarte_dev* dev)
+    {
+        return dev->api->deinit(dev);
+    }
+
+    static inline int lp_uarte_dev_pkt_tx_rdy(const struct lp_uarte_dev* dev)
+    {
+        return dev->api->tx(dev);
+    }
+
+    static inline int lp_uarte_dev_pkt_rx_rdy(const struct lp_uarte_dev* dev)
+    {
+        return dev->api->rx(dev);
+    }
+
+    static inline int lp_uarte_dev_tx_fin(const struct lp_uarte_dev* dev)
+    {
+        return dev->api->tx_fin(dev);
+    }
+
+
+    int lp_uarte_drv_init(struct lp_uarte_dev* dev);
+
+
+We can see this is pretty similar to what we had going on with ``XIPA_FS`` 's driver abstraction code. It's the same principle. 
+Let's check out ``lp_uarte_cfg.h`` :
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+
+
+    #ifndef INKI_LP_PARAMS
+    #define INKI_LP_PARAMS
+
+
+    #include <logging/log.h>
+
+    /**
+    * @brief Configuration struct for LP-UARTE, containing TX, RX & HWFC pins, callback function pointers, 
+    * 
+    */
+    struct lp_uarte_dev_params {
+        unsigned long baud;
+        bool flow_control;
+        bool even_parity;
+        bool odd_parity;
+        char start_byte;
+        char end_byte;
+        uint32_t tx_pin;
+        uint32_t rx_pin;
+        uint32_t cts_pin;
+        uint32_t rts_pin;
+        uint32_t s0_pin;
+        uint32_t s1_pin;
+        uint32_t s2_pin;
+        void* tx_buf_ptr;
+        void* rx_buf0_ptr;
+        void* rx_buf1_ptr;
+        void (*tx_cb)();
+        void (*rx_cb)(size_t len, void* data_ptr, void(*self)());
+    };
+
+    #endif
+
+We can see that much of the parameters are shared amongst ``lp_uarte_params`` and ``lp_uarte_dev_params``, this is done intentionally so we can verify all the parameters before we send them to the driver, which must not worry or care about any changes to the main ``lp_uarte_param`` struct. It's only job is to implement the backend behaviour, I don't want to give it parameters it doesn't need by passing it the main parameter struct to save code space. 
+
+
+Now let's check out the high level implementation - ``lp_uarte.c`` which relies on the abstraction of the driver module to operate. 
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+
+    /*
+    _      ____  __ __   ____  ____  ______    ___ 
+    | |    |    \|  |  | /    ||    \|      |  /  _]
+    | |    |  o  )  |  ||  o  ||  D  )      | /  [_ 
+    | |___ |   _/|  |  ||     ||    /|_|  |_||    _]
+    |     ||  |  |  :  ||  _  ||    \  |  |  |   [_ 
+    |     ||  |  |     ||  |  ||  .  \ |  |  |     |
+    |_____||__|   \__,_||__|__||__|\_| |__|  |_____|
+
+    Low-Power Universal Asynchronous Receiver-Transmitter - with DMA!
+
+    */
+
+    #include "lp_uarte.h"
+    #include "lp_uarte_dev.h"
+    #include "lp_uarte_cfg.h"
+    #include <sys/crc.h>
+
+
+    LOG_LEVEL_SET(LOG_LEVEL_INF);
+
+    #define LP_ERR_CHECK(logger, message, rc) \
+    if(rc < 0) \
+    { \
+        LOG_INST_ERR(logger, message); \
+        return rc; \
+    }
+
+    //#define CONTAINER_OF(MemberPtr, StrucType, MemberName) ((StrucType*)( (char*)(MemberPtr) - offsetof(StrucType, MemberName)))
+
+    #define GET_ITM_FROM_VEC(vector, index, name) \
+    void(** CONCAT(vec_pos_, index))()  = (void(**)())vector_get(&vector, index); \
+    void(* name)()  = (void(*)()) *CONCAT(vec_pos_, index); \
+    free(CONCAT(vec_pos_, index)) \
+
+    uint32_t crcTable[256];
+
+    struct private_ptr
+    {
+        bool init;
+        char rx_buffer_0[CONFIG_INKI_LP_UARTE_RX_BUF_LEN];
+        char rx_buffer_1[CONFIG_INKI_LP_UARTE_RX_BUF_LEN];
+        char tx_buffer[CONFIG_INKI_LP_UARTE_TX_BUF_LEN];
+        struct lp_uarte_dev dev;
+        int64_t ft_bytes_left;
+        void (*rx_callbacks[CONFIG_INKI_LP_UARTE_CB_PTRS])();
+        void (*tx_callbacks[CONFIG_INKI_LP_UARTE_CB_PTRS])();
+        uint16_t rx_occupied;
+        uint16_t tx_occupied;
+        void(* main_rx_callback)(size_t len, void* data, void(*self)());
+        void(* main_tx_callback)(void(*self)());
+    };
+
+
+    /* Function prototypes - explained soon */
+    static int lp_uarte_verify_pins(struct lp_uarte_dev_params* p);
+    static int lp_uarte_verify_bools(struct lp_uarte_dev_params* p);
+    static int lp_uarte_verify_pointers(struct lp_uarte_dev_params* p);
+    int lp_uarte_verify_params(struct lp_uarte_dev_params* p);
+    void main_lp_uarte_rx_cb(size_t len, void* data_ptr, void(*self)());
+    void main_lp_uarte_tx_cb(void(*self)());
+    volatile int lp_uarte_assemble_pkt(struct lp_uarte* lp, void* data_in, size_t data_len);
+    volatile static int lp_uarte_decode_pkt(struct lp_uarte* lp, void* pkt_in, void* data_out, size_t pkt_len);
+
+This is the first section of the implementation. We can see a utility macro similar to the one used in ``XIPA_FS`` to check for errors and boot the CPU out of the function if any are encountered while logging the message so I can see it in the debug log.
+
+We can see some of our custom KConfig variables being used already in the definition of the private struct like ``CONFIG_INKI_LP_UARTE_RX_BUF_LEN``, ``CONFIG_INKI_LP_UARTE_TX_BUF_LEN``, and ``CONFIG_INKI_LP_UARTE_CB_PTRS``. Once again, the private struct pointer encapsulates implementation detail like the memory buffers, callback arrays, and other internal variables away from the user.
+
+Finally, we can notice the ``crcTable`` array - this is present to help provide fast, automatic CRC verification of the packets as they come in to double check they've been transferred correctly.  
+
+With all that out of the way, let's dive into the implementation nitty-gritty.
+
+Here's the parameter verification logic:
+
+.. code-block:: c
+
+    /**
+    * @brief Basic sanity checks on pin numbers - checking if they're duplicated
+    * or otherwise invalid.
+    * 
+    * @param p dev parameter struct
+    * @return 1 if valid, negative err code otherwise.
+    */
+    static int lp_uarte_verify_pins(struct lp_uarte_dev_params* p)
+    {
+        uint32_t check_arr[7] = {p->rts_pin, p->cts_pin, p->tx_pin, p->rx_pin, p->s0_pin, p->s1_pin, p->s2_pin};
+        for(int i = 0; i < ARRAY_SIZE(check_arr); i++)
+        {
+            for(int x = 0; x < ARRAY_SIZE(check_arr); x++)
+            {
+                if((x!=i)&&(check_arr[x] == check_arr[i])) return -EINVAL;
+            }
+        }
+        return 1;
+    }
+
+    /**
+    * @brief Verify the booleans are correct
+    * 
+    * @param p dev parameter struct 
+    * @return 1 if valid. 
+    */
+    static int lp_uarte_verify_bools(struct lp_uarte_dev_params* p)
+    {
+        if((p->even_parity) && (p->odd_parity)) return -EINVAL;
+        return 1;
+    }
+
+    /**
+    * @brief Verify pointers are safe
+    * 
+    * @param p dev parameter struct
+    * @return 1 if all valid, negative err code otherwise.
+    */
+    static int lp_uarte_verify_pointers(struct lp_uarte_dev_params* p)
+    {
+        if(p->tx_buf_ptr == NULL || p->rx_buf0_ptr == NULL || p->rx_buf1_ptr == NULL || p->tx_cb == NULL || p->rx_cb == NULL)
+        {
+            return -EINVAL;
+        }
+        return 1;
+    } 
+
+    /**
+    * @brief Basic sanity checks on a provided parameter struct
+    * 
+    * @param p dev parameter struct
+    * @return 1 if valid, negative err code if invalid.
+    */
+    int lp_uarte_verify_params(struct lp_uarte_dev_params* p)
+    {
+        int rc = 1;
+        rc = lp_uarte_verify_bools(p);
+        rc = lp_uarte_verify_pointers(p);
+        rc = lp_uarte_verify_pins(p);
+        rc = (p->start_byte == p->end_byte) ? -1 : 1;
+        return rc;
+    }
+
+Fairly simple and self explanatory. The checking is not foolproof, but it should catch most accidental errors. For better verification, we can extend the module later on to get some parameters from the device-tree, but this is something for another time. 
+
+Here's the initialisation logic:
+
+.. code-block:: c
+
+    /**
+    * @brief Initialise low power UART peripheral with DMA
+    * 
+    * @param lp lp_uarte object
+    * @return 1 on success, -EINVAL with invalid parameters.
+    */
+    int lp_uarte_init(struct lp_uarte* lp)
+    {
+        struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
+
+
+        /** Underlying device driver should not be aware of front-end uarte parameters, so this seems dumb but is intentional. 
+        * The callbacks should be lp_uarte's own functions - so we take a limited subset of 
+        * shared parameters here, validate them, then add the functions we need. 
+        * This will also allow multiple modules to register their own callbacks/notifiers to events. 
+        * */
+        ptr->dev.p.tx_pin = lp->param.tx_pin;
+        ptr->dev.p.rx_pin = lp->param.rx_pin;
+        ptr->dev.p.cts_pin = lp->param.cts_pin;
+        ptr->dev.p.s0_pin = lp->param.s0_pin;
+        ptr->dev.p.s1_pin = lp->param.s1_pin;
+        ptr->dev.p.s2_pin = lp->param.s2_pin;
+        ptr->dev.p.start_byte = lp->param.start_byte;
+        ptr->dev.p.end_byte = lp->param.end_byte;
+        ptr->dev.p.flow_control = lp->param.flow_control;
+        ptr->dev.p.even_parity = lp->param.even_parity;
+        ptr->dev.p.odd_parity = lp->param.odd_parity;
+        ptr->dev.p.baud = lp->param.baud;
+
+        ptr->dev.p.tx_buf_ptr = ptr->tx_buffer;
+        ptr->dev.p.rx_buf0_ptr = ptr->rx_buffer_0;
+        ptr->dev.p.rx_buf1_ptr = ptr->rx_buffer_1;
+
+        int rc = lp_uarte_verify_params(&lp->param);
+        LP_ERR_CHECK(lp->log, "Invalid parameters detected.", rc);
+
+        //Setting all the statically aligned buffers to 0 to prevent any corruption if packet lengths become mismatched. 
+        memset(ptr->rx_buffer_0, 0, sizeof(ptr->rx_buffer_0));
+        memset(ptr->rx_buffer_1, 0, sizeof(ptr->rx_buffer_1));
+        memset(ptr->tx_buffer, 0, sizeof(ptr->tx_buffer));
+
+        rc = lp_uarte_dev_init(&ptr->dev);
+        LP_ERR_CHECK(lp->log, "Could not initialise LP-UART device backend", rc);
+
+        ptr->rx_occupied = 0;
+        ptr->tx_occupied = 0;
+        //Registering main callbacks - I will explain in a moment!
+        ptr->main_rx_callback = main_lp_uarte_rx_cb;
+        ptr->main_tx_callback = main_lp_uarte_tx_cb;
+
+        return 1;
+    }
+
+What we're trying to do is provide the main interrupt handler in the driver backend with a function that we control, so that we can take in callbacks from other modules and notify them when stuff happens. Here's what these callbacks look like:
+
+
+.. code-block:: c
+
+    void main_lp_uarte_rx_cb(size_t len, void* data_ptr, void* troll_ptr)
+    {
+        //This is a dirty hack to get the struct containing the particular instance's function pointers. 
+        struct private_ptr* ptr = CONTAINER_OF(troll_ptr, struct private_ptr, rx_buffer_0);
+        struct lp_uarte* lp = CONTAINER_OF(ptr, struct lp_uarte, private_ptr);
+        void* pkt_data_ptr;
+        lp_uarte_decode_pkt(lp, data_ptr, pkt_data_ptr, len);
+        if(pkt_data_ptr == NULL) return -EINVAL;
+        for(int i = 0; i < CONFIG_INKI_LP_UARTE_CB_PTRS; i++)
+        {
+            //Iterate through and execute every callback
+            (*ptr->rx_callbacks[i])(pkt_data_ptr, len);
+        }
+    }
+
+
+    void main_lp_uarte_tx_cb(void* troll_ptr)
+    {
+        //This is a dirty hack to get the struct containing the particular instance's function pointers. 
+        struct private_ptr* ptr = CONTAINER_OF(troll_ptr, struct private_ptr, tx_buffer);
+        for(int i = 0; i < CONFIG_INKI_LP_UARTE_CB_PTRS; i++)
+        {
+            //Iterate through and execute every callback. 
+            (*ptr->tx_callbacks[i])();
+        }
+    }
+
+
+We've been quite sneaky here. We're abusing the fact that every LP_UARTE instance will have its own TX/RX buffers to avoid clashing with one another. By using the guarantee that elements in a struct appear in order, we can use Zephyr's built in ``CONTAINER_OF`` directive to get the pointer to the original struct. Although the ISRs for one driver cannot be replicated, if we think about it we can only have as many ISRs as we have hardware UART ports. More simply put, the ISRs are in a static context in the driver file - they are totally unaware of the structs being passed around in the middle-ware layer. One struct is going to have one specific driver associated with it, because it doesn't make sense to have two instances of LP_UARTE on the same peripheral. 
+This means that our sneaky little trick here will work despite the ISRs being constant for a particular driver. The only constraint is that of course the programmer must not initialise more than one struct for a particular driver, otherwise the ISR could get confused and assign the wrong callbacks. 
+As we only have one driver module for now, we don't have to worry about this. But a good extension task would be to program in some way for ``LP_UARTE`` to dynamically target a particular driver to have multiple instances of ``LP_UARTE`` that communicate with different MCUs with different peripheral backends. 
+
+Now, I will try to explain how all of this links back to the RX/TX mechanisms and underlying driver code. 
+
+Firstly, here is the higher level code for starting transfer, receiving, and enabling file transfer mode on RX & TX:
+
+.. code-block:: c
+
+    /**
+    * @brief Prepare the underlying hardware to transmit a packet of data.
+    * 
+    * @param lp LP_UARTE object
+    * @return 1 on success
+    */
+    int lp_uarte_tx(struct lp_uarte* lp, void* data, size_t len)
+    {
+        struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
+        //memcpy()
+        if(ptr->ft_bytes_left == -1)
+        {
+            lp_uarte_dev_tx_fin(&ptr->dev);
+        }
+        if(lp_uarte_assemble_pkt(lp, data, len))
+        {
+            lp_uarte_dev_pkt_tx_rdy(&ptr->dev);
+        }
+        else return -EINVAL;
+        if(lp_uarte_dev_ft_status(&ptr->dev) == 1)
+        {
+            if((ptr->ft_bytes_left - len)>=0)
+            {
+                ptr->ft_bytes_left -= len;
+            }
+            else
+            {
+                return -EINVAL;
+            }
+        }
+        if(ptr->ft_bytes_left == 0)
+        {
+            ptr->ft_bytes_left = -1;
+        }
+        return 1;
+    }
+
+    /**
+    * @brief Enables filetransfer mode to streamline a file transfer. 
+    * 
+    * @param lp LP_UARTE object
+    * @param total_file_size File size of file to transfer
+    * @return 1 on success
+    */
+    int lp_uarte_ft_en(struct lp_uarte* lp, size_t total_file_size)
+    {
+        struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
+        ptr->ft_bytes_left = total_file_size;
+        return 1;
+    }
+
+We can see these functions calling the underlying driver code with ``lp_uarte_dev_...()`` calls. Now let's take a look at the ISR management code:
+
+.. code-block:: c
+
+    /**
+    * @brief Register an interrupt service routine in  
+    * the list of RX service routines. 
+    * 
+    * @param lp LP_UARTE object
+    * @return 1 on success, negative err code if the list is full 
+    */
+    int lp_uarte_register_rx_isr(struct lp_uarte* lp, void (*func_ptr)())
+    {
+        struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
+        if(ptr->rx_occupied + 1 < CONFIG_INKI_LP_UARTE_CB_PTRS)
+        {
+            ptr->rx_callbacks[ptr->rx_occupied] = func_ptr;
+            ptr->rx_occupied ++;
+            return 1;
+        }
+        else return -ENOSPC;
+    }
+
+    /**
+    * @brief Register an interrupt service routine in  
+    * the list of TX service routines. 
+    * 
+    * @param lp LP_UARTE object
+    * @return 1 on success, negative err code if the list is full 
+    */
+    int lp_uarte_register_tx_isr(struct lp_uarte* lp, void (*func_ptr)())
+    {
+        struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
+        if(ptr->tx_occupied + 1 < CONFIG_INKI_LP_UARTE_CB_PTRS)
+        {
+            ptr->tx_callbacks[ptr->tx_occupied] = func_ptr;
+            ptr->tx_occupied ++;
+            return 1;
+        }
+        else return -ENOSPC;
+    }
+
+    /**
+    * @brief Remove a particular registered interrupt service routine from 
+    * the list of TX service routines. 
+    * 
+    * @param lp LP_UARTE object
+    * @return 1 on success, negative err-code otherwise 
+    */
+    int lp_uarte_remove_tx_isr(struct lp_uarte* lp, void (*func_ptr)())
+    {
+        struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
+        int foundindex = -1;
+        for(int i = 0; i < ptr->tx_occupied - 1; i ++)
+        {
+            if(ptr->tx_callbacks[i] == func_ptr)
+            {
+                foundindex = i;
+            }
+        }
+        if(foundindex == -1) return -ENOENT;
+        uint32_t start_offset = foundindex*sizeof(void(*)());
+        if(foundindex < ptr->tx_occupied - 1)
+        {
+            uint32_t move_offset = (foundindex+1)*sizeof(void(*)());
+            memmove(ptr->tx_callbacks+start_offset, ptr->tx_callbacks+move_offset, (ptr->tx_occupied - (foundindex+1))*sizeof(void(*)()));
+        }
+        else
+        {
+            memset(ptr->tx_callbacks + start_offset, 0, sizeof(void(*)()));
+        }
+        --ptr->tx_occupied;
+        return 1;
+    }
+
+    /**
+    * @brief Remove a particular registered interrupt service routine from 
+    * the list of RX service routines. 
+    * 
+    * @param lp LP_UARTE object
+    * @return 1 on success, negative err code otherwise 
+    */
+    int lp_uarte_remove_rx_isr(struct lp_uarte* lp, void (*func_ptr)())
+    {
+        struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
+        int foundindex = -1;
+        for(int i = 0; i < ptr->rx_occupied - 1; i ++)
+        {
+            if(ptr->rx_callbacks[i] == func_ptr)
+            {
+                foundindex = i;
+            }
+        }
+        if(foundindex == -1) return -ENOENT;
+        uint32_t start_offset = foundindex*sizeof(void(*)());
+        if(foundindex < ptr->rx_occupied - 1)
+        {
+            uint32_t move_offset = (foundindex+1)*sizeof(void(*)());
+            memmove(ptr->rx_callbacks+start_offset, ptr->rx_callbacks+move_offset, (ptr->rx_occupied - (foundindex+1))*sizeof(void(*)()));
+        }
+        else
+        {
+            memset(ptr->rx_callbacks + start_offset, 0, sizeof(void(*)()));
+        }
+        --ptr->rx_occupied;
+        return 1;
+    }
+
+    /**
+    * @brief Remove all the registered TX interrupt service routines in one go. 
+    * 
+    * @param lp LP_UARTE object
+    * @return 1 on success 
+    */
+    int lp_uarte_clear_all_rx_isrs(struct lp_uarte* lp)
+    {
+        struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
+        memset(ptr->rx_callbacks, 0, ptr->rx_occupied * sizeof(void(*)()));
+        ptr->rx_occupied = 0;
+        return 1;
+    }
+
+    /**
+    * @brief Remove all the registered TX interrupt service routines in one go. 
+    * 
+    * @param lp LP_UARTE object
+    * @return 1 on success. 
+    */
+    int lp_uarte_clear_all_tx_isrs(struct lp_uarte* lp)
+    {
+        struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
+        memset(ptr->tx_callbacks, 0, ptr->tx_occupied * sizeof(void(*)()));
+        ptr->tx_occupied = 0;
+        return 1;
+    }
+
+We're using the internal arrays whose length is specified by the KConfig option ``CONFIG_INKI_LP_UARTE_CB_PTRS``, and keeping track of how many points have been populated so far with the ``tx_occupied`` and ``rx_occupied`` variables that are stored inside the struct. If there are too many ISRs, the calling routine will receive an error and all the routines currently in the array will be saved. 
+
+Now we have the interrupt handling logic, ways for calling functions to subscribe to events that happen during communication, and interfacing logic to instruct the driver to prepare itself for a receiving or transmitting operation, we can take a look at the packet encoding and decoding logic. 
+
+.. code-block:: c
+
+    /**
+    * @brief Volatile function to wrap some data in a packet for transmission. It must be volatile as 
+    * the driver is directly modifying our buffers and we don't want compiler to make guesses on the
+    * contents.
+    *  
+    * 
+    * @param lp lp_uarte object
+    * @param data_in Pointer to data to assemble
+    * @param data_len Length of data in "data_in"
+    * @return 1 on success 
+    */
+    volatile int lp_uarte_assemble_pkt(struct lp_uarte* lp, void* data_in, size_t data_len)
+    {
+        struct private_ptr* ptr = (struct private_ptr*) lp->private_ptr;
+        memcpy(ptr->tx_buffer, CONFIG_INKI_LP_UARTE_IDENTIFIER, sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER));
+        memcpy(ptr->tx_buffer + sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER), data_in, data_len);
+        char crc_res[4];
+        volatile int a = snprintf(crc_res, 4, "%i", crc32_ieee(data_in, data_len + ARRAY_SIZE(CONFIG_INKI_LP_UARTE_IDENTIFIER)));
+        memcpy(ptr->tx_buffer + sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER) + data_len, crc_res, 4);
+        //ignore unused int error, using it to prevent compiler optimising snprintf instruction.
+
+        return (volatile int)1;   
+    }
+
+
+    /**
+    * @brief Volatile function to decode incoming packet, and providing the pointer of the data with
+    * packet information stripped. 
+    * 
+    * @param lp lp_uarte object
+    * @param pkt_in Pointer to packet to decode
+    * @param data_out Pointer to finished data.
+    * @param pkt_len Length of packet
+    * @return 1 on success, negative err code otherwise. In all cases, pointer to data is provided,
+    * but please check err code to see if data is valid or not. 
+    */
+    volatile static int lp_uarte_decode_pkt(struct lp_uarte* lp, void* pkt_in, void* data_out, size_t pkt_len)
+    {
+        char crc_char[4];
+        int errno;
+        int rc;
+        memcpy(crc_char, (char*)pkt_in + pkt_len - 4, 4);
+        uint32_t num = (uint32_t) strtoul(crc_char, NULL, 10);
+        if (num == __UINT32_MAX__ && errno == ERANGE) rc = -1;
+        if(num != crc32_ieee((char*)pkt_in + sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER), pkt_len - 4 - sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER))) rc = -1;
+
+        data_out = (char*)pkt_in + sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER);
+        if(rc == -1)
+        {
+            LOG_INST_ERR(lp->log, "CRC failed on received packet");
+        }
+        return rc;
+    }
+
+We're using the excellent built-in Zephyr CRC library to generate an IEEE compliant CRC32 value, which we tack onto the end of the packet to allow the decoding logic on the other side to verify the packet's integrity. We use a magic identifier value which is set with the KConfig option ``CONFIG_INKI_LP_UARTE_IDENTIFIER`` to identify whether the packet is being sent by the expected device - Both devices in an LP_UARTE link should have these two options the same. It could be defined by factory serial numbers, which could help in encrypting transmissions to prevent sniffing attacks - but this is all way beyond the scope of what we're trying to do here. 
+
+Now, let's take a look at the driver logic. The moment you've been waiting for. 
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+
+    #include <nrf52840.h>
+    #include <hal/nrf_ppi.h> 
+    #include <zephyr/types.h>
+    #include <sys/types.h>
+    #include <errno.h>
+    #include <hal/nrf_uarte.h>
+    //#include <nrfx_uarte.h>
+    //#include <nrfx_gpiote.h>
+    #include <hal/nrf_qspi.h>
+    #include <nrfx_ppi.h>
+    #include <nrfx_qspi.h>
+    #include "../../lp_uarte_dev.h"
+    #include "lib/d_vector/vector.h"
+    #include "lib/inki_gpiote/inki_gpiote.h"
+    #include <stdlib.h>
+
+    #define mod_name nrf_lp_uarte_drv_dev
+    #define drv_name lp_uarte_drv
+
+    #define LP_DRV_ERR_CHECK(rc, message) \
+    if(rc < 0) \
+    { \
+        LOG_INF(message); \
+        return rc; \
+    } 
+
+    #define NRF_UARTE_STATE_UNINIT 1
+    #define NRF_UARTE_STATE_RX_NO_FT 2
+    #define NRF_UARTE_STATE_TX_NO_FT 3
+    #define NRF_UARTE_STATE_RX_FT 4
+    #define NRF_UARTE_STATE_TX_FT 5
+    #define NRF_UARTE_STATE_ERR 6
+    #define NRF_UARTE_STATE_RDY 7
+    #define NRF_UARTE_STATE_ACTIVE_NO_FT 8
+    #define NRF_UARTE_STATE_ACTIVE_FT 9
+
+    LOG_MODULE_DECLARE(lp_uarte_dev, 3);
+
+    #define PPI_CHANNELS_REQUIRED 4 
+    /** This is necessary as vector class is implemented type-agnostically.
+    * 
+    * Here we're just using vector to store pointers to PPI channels, so this is fine and will make code a lot more readable.
+    * */
+    #define GET_PPI_FROM_VEC(vector, index, name) \
+    uint32_t* CONCAT(ppi_ptr_, index) = (uint32_t*)vector_get(&vector, index); \
+    nrf_ppi_channel_t* name = (nrf_ppi_channel_t*) *CONCAT(ppi_ptr_, index); \
+    free(CONCAT(ppi_ptr_, index)); \
+
+    /** Spicy macro to basically reassign a PPI channel back to default state. */
+    #define FREE_REALLOC_PPI(vector, index, name) \
+    GET_PPI_FROM_VEC(vector, index, name); \
+    err_code = nrfx_ppi_channel_free(*name); \
+    LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error unassigning event from task"); \
+    err_code = nrfx_ppi_channel_alloc(name); \
+    LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error reallocating PPI channel"); \
+    uint32_t CONCAT(ppi_, index) = *name; \
+    err_code = vector_set(&vector, index, &CONCAT(ppi_, index)); \
+    LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error reallocating PPI channel"); \
+
+    //Structs containing direct addresses to registers!!
+    nrf_uarte_config_t nrf_config;
+    NRF_UARTE_Type nrf_uarte_reg;
+    NRF_PPI_Type nrf_ppi_reg;
+    static NRF_QSPI_Type nrf_qspi_reg;
+    NRF_GPIOTE_Type nrf_gpiote_reg;
+
+    //Packets received in file transfer mode
+    uint32_t ft_packets_recev;
+    //Vector containing allocated PPI channels.
+    struct vector ppi_channels;
+    //Keeps state stored for ISRs to keep track of what's happening
+    uint32_t curr_state;
+    //Global pointer for ISRs to return which buffer is currently being used. 
+    uint8_t curr_buf;
+    //Buffer pointers provided by the layer above. 
+    void* tx_buf0_ptr;
+    void* rx_buf0_ptr;
+    void* rx_buf1_ptr;
+
+    /* FUNCTION DEFINITIONS */
+    
+    const int nrfx_err_to_zephyr_err(nrfx_err_t err_code); //Convert Nordic specific errors to Zephyr related errors
+    static int nrf_lp_uarte_gpiote_rx_init(const struct lp_uarte_dev* dev, bool ft_en); //Put hardware in RX mode
+    static int nrf_lp_uarte_gpiote_tx_init(const struct lp_uarte_dev* dev, bool ft_en); //Put hardware in TX mode
+    static int nrf_lp_uarte_init(const struct lp_uarte_dev* dev); //Initialise hardware. 
+
+
+Before I continue delving into the driver, it should be known that this targets the nRF52-series of Nordic chips, not the nRF5340. The PPI peripheral that automates interactions between peripherals works differently on the nRF5340 and is instead called ``DPPI``. It has a separate driver which I am still working on. Now, onwards!
+
+Here is the error conversion function. Nordic has been quite clever in using an ``enum`` for their codes - an ``enum`` is essentially describing a finite set of values that a variable can take. We can compare the ``enum`` to the set of defined values and convert each of them to our Zephyr equivalent:
+
+.. code-block:: c
+
+    const int nrfx_err_to_zephyr_err(nrfx_err_t err_code)
+    {
+        switch (err_code)
+        {
+            case NRFX_ERROR_INVALID_LENGTH:
+            {
+                return -EINVAL;
+                break;
+            }
+            case NRFX_ERROR_INTERNAL:
+            {
+                return -EINTR;
+                break;
+            }
+            case NRFX_SUCCESS:
+            {
+                return 1;
+                break;
+            }
+            case NRFX_ERROR_NO_MEM:
+            {
+                return -ENOMEM;
+                break;
+            }
+            case NRFX_ERROR_BUSY:
+            {
+                return -EBUSY;
+                break;
+            }
+            case NRFX_ERROR_INVALID_PARAM:
+            {
+                return -EINVAL;
+                break;
+            }
+            case NRFX_ERROR_INVALID_STATE:
+            {
+                return -EINVAL;
+                break;
+            }
+            case NRFX_ERROR_FORBIDDEN:
+            {
+                return -EPERM;
+                break;
+            }
+            case NRFX_ERROR_INVALID_ADDR:
+            {
+                return -EINVAL;
+                break;
+            }
+            case NRFX_ERROR_NULL:
+            {
+                return -ENOSTR;
+                break;
+            }
+            case NRFX_ERROR_NOT_SUPPORTED:
+            {
+                return -ENOTSUP;
+                break;
+            }
+
+        }
+        return err_code;
+    }  
+
+Another clever thing about ``enum`` is that the compiler is smart enough to know that you're trying to perform a conversion of some sort if you try to stick one into a ``switch()``. If you miss out a possible value, the compiler will give you a warning which is really neat. 
+
+Let's now take a look at the driver initialisation routine:
+
+.. code-block:: c
+
+    /**
+    * @brief Initialise NRF family UARTE - parameters should have been validated beforehand with lp_uarte_verify_params(). 
+    * 
+    * @param dev UARTE device structure
+    * @return 1 on success, negative err code otherwise.
+    */
+    static int nrf_lp_uarte_init(const struct lp_uarte_dev* dev)
+    {
+        nrfx_err_t err_code;
+        /* initialising vector storing PPI pointers */
+        vector_init(&ppi_channels, PPI_CHANNELS_REQUIRED, sizeof(nrf_ppi_channel_t*));
+        /* Configuring NRF PPI peripheral to sync events to S0, S1, S2 GPIO events. */
+        /* We will need at least four PPI channels */
+        for(int i = 0; i < PPI_CHANNELS_REQUIRED; i ++)
+        {
+            nrf_ppi_channel_t* c;
+            err_code = nrfx_ppi_channel_alloc(c);
+            if(err_code == NRFX_SUCCESS)
+            {
+                uint32_t ptr = (uint32_t) c;
+                vector_push_back(&ppi_channels, &ptr);
+            }
+            else
+            {
+                vector_deinit(&ppi_channels);
+                return -nrfx_err_to_zephyr_err(err_code);
+            }
+        }
+
+        //err_code = nrfx_gpiote_init((uint8_t)3);
+        //if(err_code != NRFX_SUCCESS || err_code != NRFX_ERROR_INVALID_STATE ) return nrfx_err_to_zephyr_err(err_code);
+        tx_buf0_ptr = dev->p.tx_buf_ptr;
+        rx_buf0_ptr = dev->p.rx_buf0_ptr;
+        rx_buf1_ptr = dev->p.rx_buf1_ptr;
+        /* Configuring UARTE peripheral */
+        nrf_config.hwfc = (dev->p.flow_control) ? NRF_UARTE_HWFC_ENABLED : NRF_UARTE_HWFC_DISABLED;
+        nrf_config.parity = ((dev->p.even_parity)||(dev->p.odd_parity)) ? NRF_UARTE_PARITY_INCLUDED : NRF_UARTE_PARITY_EXCLUDED;
+        nrf_config.stop = NRF_UARTE_STOP_TWO; //safer than one bit
+        nrf_uarte_enable(&nrf_uarte_reg);
+        nrf_uarte_configure(&nrf_uarte_reg, &nrf_config);
+        #if defined(CONFIG_SOC_SERIES_NRF53X) 
+        if(dev->p.odd_parity == true) nrf_uarte_reg.CONFIG |= (1 << 8);
+        #endif
+        nrf_uarte_txrx_pins_set(&nrf_uarte_reg, dev->p.tx_pin, dev->p.rx_pin);
+        if(dev->p.flow_control) nrf_uarte_hwfc_pins_set(&nrf_uarte_reg, dev->p.rts_pin, dev->p.cts_pin);
+        /** TODO: Find nice way to validate user-defined baud rate. For now let's just set it to maximum baud rate as we want to maximise data throughput. */
+        nrf_uarte_baudrate_set(&nrf_uarte_reg, NRF_UARTE_BAUDRATE_1000000);
+
+        nrf_uarte_rx_buffer_set(&nrf_uarte_reg, rx_buf0_ptr, CONFIG_INKI_LP_UARTE_RX_BUF_LEN);
+        curr_buf = 0;
+
+        lp_uarte_rx_cb = dev->p.rx_cb;
+        lp_uarte_tx_cb = dev->p.tx_cb;
+
+        err_code = inki_gpiote_init();
+        if(err_code < 0) return -EINVAL;
+
+        err_code = nrf_lp_uarte_gpiote_rx_init(dev, false);    
+        /* PPI not required for S2 - we are generating interrupt if S2 goes high, as this signifies the end of the data. */
+        curr_state = NRF_UARTE_STATE_RX_NO_FT;
+
+
+        return 1;
+
+    }
+
+You might notice there's a mix of higher level nrfx drivers and lower level HAL drivers being used here. The reason for this is that the nrfx drivers for PPI are very smart and know which channels are being occupied by the Bluetooth stack. We don't want to interfere with them at all, so there is no reason to go down an abstraction layer needlessly. However, the UARTE peripheral can be manipulated through the HAL, as it connects more directly to the registers which is what I'm looking for.
+In short, this routine allocates the number of PPI channels described by ``PPI_CHANNELS_REQUIRED``, stores them in a shared ``Vector``, then sets up the UARTE and GPIOTE peripherals according to the parameters passed in by the higher level code. Fairly straightforward. Just a reminder - GPIOTE is the peripheral that allows interrupt-based and fully autonomous GPIO interactions using the PPI peripheral (Programmable Peripheral Interconnect). 
+We are also setting the internal callbacks to the pointers specified in the parameter struct, you will see why in a little bit. Finally, it puts the hardware into listening mode, sets the state, and completes. 
+
+Let's see what's happening on the listening initialisation routine (RX):
+
+.. code-block:: c
+
+    static int nrf_lp_uarte_gpiote_rx_init(const struct lp_uarte_dev* dev, bool ft_en)
+    {
+        if(curr_state != ((ft_en) ? NRF_UARTE_STATE_RX_FT : NRF_UARTE_STATE_RX_NO_FT))
+        {
+            nrfx_err_t err_code;
+
+            /* Configure GPIOTE channel 0 as event that occurs when S0 changes from digital lo to hi */
+            NRF_GPIOTE->CONFIG[0] =  (GPIOTE_CONFIG_POLARITY_LoToHi << GPIOTE_CONFIG_POLARITY_Pos)
+                        | (dev->p.s0_pin << GPIOTE_CONFIG_PSEL_Pos)
+                        | (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos);
+        
+            /* Configure GPIOTE channel 1 as event that occurs when S0 changes from digital hi to lo. */
+            NRF_GPIOTE->CONFIG[1] =  (GPIOTE_CONFIG_POLARITY_HiToLo << GPIOTE_CONFIG_POLARITY_Pos)
+                        | (dev->p.s0_pin << GPIOTE_CONFIG_PSEL_Pos)
+                        | (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos);
+
+            /* Configure GPIOTE channel 2 as a task for S1 to be toggled (to save GPIOTE channels) */  
+            NRF_GPIOTE->CONFIG[2] =  (GPIOTE_CONFIG_POLARITY_Toggle << GPIOTE_CONFIG_POLARITY_Pos)
+                        | (dev->p.s1_pin << GPIOTE_CONFIG_PSEL_Pos)
+                        | (GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos);
+
+            /* Configure GPIOTE channel 3 as an event triggered by S2 going from digital lo to hi */  
+            NRF_GPIOTE->CONFIG[3] =  (GPIOTE_CONFIG_POLARITY_LoToHi << GPIOTE_CONFIG_POLARITY_Pos)
+                        | (dev->p.s2_pin << GPIOTE_CONFIG_PSEL_Pos)
+                        | (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos);
+
+            // Interrupt on S2 lo to hi, or if in enhanced filetransfer mode enable interrupt on initial S0 ready state, to set correct QSPI registers
+            // for incremental packet write and setup PPI connection.  
+            NRF_GPIOTE->INTENCLR = GPIOTE_INTENCLR_IN0_Msk | GPIOTE_INTENCLR_IN2_Msk | GPIOTE_INTENCLR_IN3_Msk | GPIOTE_INTENCLR_IN4_Msk | GPIOTE_INTENCLR_IN5_Msk;
+
+            inki_gpiote_register_isr(gpiote_lp_uarte_handler);
+
+            //Could probably do |= but this is more readable.
+            if(ft_en) NRF_GPIOTE->INTENSET = GPIOTE_INTENSET_IN3_Msk | GPIOTE_INTENSET_IN0_Msk;
+            else NRF_GPIOTE->INTENSET = GPIOTE_INTENSET_IN3_Msk;
+
+            // Clear all events.
+            for(int i = 0; i < ARRAY_SIZE(NRF_GPIOTE->EVENTS_IN); i++)
+            {
+                NRF_GPIOTE->EVENTS_IN[i] = 0;
+            }
+
+            GET_PPI_FROM_VEC(ppi_channels, 0, vec_ppi_0);
+            //nrf_uarte_subscribe_set(&nrf_uarte_reg, NRF_UARTE_TASK_STARTRX, *vec_ppi); nrf53 specific
+            err_code = nrfx_ppi_channel_assign(*vec_ppi_0, (uint32_t)&NRF_GPIOTE->EVENTS_IN[0], nrf_uarte_task_address_get(&nrf_uarte_reg, NRF_UARTE_TASK_STARTRX)); //assigning S0 lo-hi to radio RX begin. 
+            LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error assigning S0 rising edge event to STARTRX task");
+
+            GET_PPI_FROM_VEC(ppi_channels, 1, vec_ppi_1);
+            //nrf_uarte_subscribe_set(&nrf_uarte_reg, NRF_UARTE_TASK_STOPRX, *vec_ppi);
+            err_code = nrfx_ppi_channel_assign(*vec_ppi_1, (uint32_t)&NRF_GPIOTE->EVENTS_IN[1], nrf_uarte_task_address_get(&nrf_uarte_reg, NRF_UARTE_TASK_STOPRX));
+            LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error assigning S0 falling edge event to STOPRX task");
+
+            if(ft_en)
+            {
+                GET_PPI_FROM_VEC(ppi_channels, 2, vec_ppi_2);
+                //nrf_uarte_publish_set(&nrf_uarte_reg, NRF_UARTE_EVENT_RXSTARTED, *vec_ppi);
+                err_code = nrfx_ppi_channel_assign(*vec_ppi_2, nrf_uarte_event_address_get(&nrf_uarte_reg, NRF_UARTE_EVENT_ENDRX), nrf_qspi_task_address_get(&nrf_qspi_reg, NRF_QSPI_TASK_WRITESTART));
+                LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error assigning ENDRX event to QSPI write task configured by ISR.");
+
+                GET_PPI_FROM_VEC(ppi_channels, 3, vec_ppi_3);
+                //nrf_uarte_publish_set(&nrf_uarte_reg, NRF_UARTE_EVENT_RXSTARTED, *vec_ppi);
+                err_code = nrfx_ppi_channel_assign(*vec_ppi_3, nrf_qspi_event_address_get(&nrf_qspi_reg, NRF_QSPI_EVENT_READY), (uint32_t)&NRF_GPIOTE->TASKS_CLR[2]);
+                LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error assigning QSPI write complete event to S1 falling edge task");
+            }
+
+            else
+            {
+                GET_PPI_FROM_VEC(ppi_channels, 2, vec_ppi_2);
+                //nrf_uarte_publish_set(&nrf_uarte_reg, NRF_UARTE_EVENT_RXSTARTED, *vec_ppi);
+                err_code = nrfx_ppi_channel_assign(*vec_ppi_2, nrf_uarte_event_address_get(&nrf_uarte_reg, NRF_UARTE_EVENT_RXSTARTED), (uint32_t)&NRF_GPIOTE->TASKS_SET[2]);
+                LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error assigning RXSTARTED event to S1 rising edge task");
+
+                //if enhanced filetransfer mode is activated, the ISR will manually trigger S1 rising edge to prevent race conditions. Other microcontroller will wait until this pin goes up before transferring any data, guaranteeing that no data is lost. 
+                GET_PPI_FROM_VEC(ppi_channels, 3, vec_ppi_3);
+                //nrf_uarte_publish_set(&nrf_uarte_reg, NRF_UARTE_EVENT_RXSTARTED, *vec_ppi);
+                err_code = nrfx_ppi_channel_assign(*vec_ppi_3, nrf_uarte_event_address_get(&nrf_uarte_reg, NRF_UARTE_EVENT_ENDRX), (uint32_t)&NRF_GPIOTE->TASKS_CLR[2]);
+                LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error assigning S1 hi to lo to ENDRX");
+            }
+
+            IRQ_DIRECT_CONNECT(UARTE0_UART0_IRQn, 4, uarte_rxtx_handler, 0);
+            irq_enable(UARTE0_UART0_IRQn);
+            nrf_uarte_int_enable(&nrf_uarte_reg, NRF_UARTE_INT_TXSTOPPED_MASK);
+
+            curr_state = (ft_en) ? NRF_UARTE_STATE_RX_FT : NRF_UARTE_STATE_RX_NO_FT;
+        }
+        return 1;
+    }
+
+What we're doing in this function is:
+
+1) Initialising the GPIOTE channels. We're only using four to keep four free for the tactile buttons - the reason we're interfacing with the registers directly is that the regular nrfx drivers don't allow more than one channel to be assigned to more than one pin, despite offering separate instance detection for rising edge and falling edge signals. At the register level though, anything goes. The switching frequencies are going to be so low realistically that this will work and be just fine. 
+2) Clearing all GPIOTE interrupts to prevent spurious context switching.
+3) Calling our GPIOTE library to register our main ISR function so it gets called when any of the events we configured occur.
+4) Setting up interrupts
+5) Assign the shortcuts from the design section using the PPI peripheral to connect various events and tasks together. The Error messages will show you which event and which task are being assigned to each other. 
+6) There are separate cases for when filetransfer mode is enabled and not enabled - if it's enabled then we need to call a higher level API which manages any writing or transferring that needs to happen with the semi-continuous flow of data, so we configure the ISRs and PPI channels accordingly. 
+7) Connecting UARTE interrupts to our interrupt handler and enabling them.
+
+Here are the interrupt handlers:
+
+.. code-block:: c
+
+    void (*lp_uarte_rx_cb)(size_t len, void* data_ptr); //handler to call into higher level code
+    void (*lp_uarte_tx_cb)(void* data_ptr); //ditto
+
+
+    void gpiote_lp_uarte_handler()
+    {
+        bool a = (curr_state = NRF_UARTE_STATE_RX_FT);
+        void* curr_ptr = (curr_buf == 0) ? rx_buf1_ptr : rx_buf0_ptr; //buffer is immediately updated after RXSTARTED, so the buffer with currently relevant data on it is the OTHER one.
+        if(a && NRF_GPIOTE->EVENTS_IN[0])
+        {
+            NRF_GPIOTE->EVENTS_IN[0] = 0;
+            /** HACK: This is a dirty way to have the callback get the vectors within their own structs. */
+            lp_uarte_rx_cb(0, curr_ptr, rx_buf0_ptr); //notify higher-level ISR that new packet is being transferred, QSPI write address must be updated.
+            NRF_GPIOTE->TASKS_SET[2] = 1; //s1 high, ready to receive data without race conditions
+        }
+        if(NRF_GPIOTE->EVENTS_IN[3])
+        {
+            NRF_GPIOTE->EVENTS_IN[3] = 0;
+            NRF_GPIOTE->TASKS_SET[2] = 1; //toggling S1 high to low to acknowledge end of transaction
+            NRF_GPIOTE->TASKS_CLR[2] = 1;
+            /** HACK: This is a dirty way to have the callback get the vectors within their own structs. */
+            lp_uarte_rx_cb(nrf_uarte_reg.RXD.AMOUNT, curr_ptr, rx_buf0_ptr);
+        }
+    }
+
+    ISR_DIRECT_DECLARE(uarte_rxtx_handler)
+    {
+        bool started = nrf_uarte_event_check(&nrf_uarte_reg, NRF_UARTE_EVENT_RXSTARTED);
+        if(started)
+        {
+            nrf_uarte_event_clear(&nrf_uarte_reg, NRF_UARTE_EVENT_RXSTARTED);
+            if(curr_buf == 1) 
+            {
+                curr_buf = 0;
+                nrf_uarte_rx_buffer_set(&nrf_uarte_reg, rx_buf0_ptr, CONFIG_INKI_LP_UARTE_RX_BUF_LEN);
+            }
+            else if (curr_buf == 0)
+            {
+                curr_buf = 1;
+                nrf_uarte_rx_buffer_set(&nrf_uarte_reg, rx_buf1_ptr, CONFIG_INKI_LP_UARTE_RX_BUF_LEN);
+            }
+        }
+        bool stopped = nrf_uarte_event_check(&nrf_uarte_reg, NRF_UARTE_EVENT_TXSTOPPED);
+        if(stopped)
+        {
+            nrf_uarte_event_clear(&nrf_uarte_reg, NRF_UARTE_EVENT_TXSTOPPED);
+            lp_uarte_tx_cb(tx_buf0_ptr);
+        }
+        ISR_DIRECT_PM(); //Disable power management for best latency after ISR finishes.
+        return 1;
+    }
+
+There is a reason that the GPIOTE handler has not been declared with ``ISR_DIRECT_DECLARE`` like ``uarte_rxtx_handler``. If I take full control of GPIOTE and own the main ISR for it, it will make it impossible for the input handling library in the future to get hold of the GPIOTE channels it needs without knowing about the internal composition of LP_UARTE, which will make these modules dependent on each other instead of loosely coupled. To resolve this, I created a little module that took control of GPIOTE and allows other modules to register callbacks. 
+
+In the UARTE ISR, we automatically swap the RX buffers as soon as the receiving starts as the registers are double-buffered - this increases performance significantly with a very low increase in power consumption. Since we can't register two ISRs for one interrupt, we have this singular interrupt handler deal with both RX and TX use-cases. Here we can see the finalisation of the sneakiness I showed earlier with the struct pointer deduction. We are passing the higher level APIs registered to the ISR a pointer to their own receive and transmit buffers. This allows the generic higher level API to work out the pointer to the struct containing the buffer, and thus the struct with the correct array containing the even higher level callbacks. 
+This is how different modules will be able to register to different communication protocols using the same ``LP_UARTE`` protocol. Awesome!
+
+Now let's look at the transmit initialisation code:
+
+.. code-block:: c
+
+    static int nrf_lp_uarte_gpiote_tx_init(const struct lp_uarte_dev* dev, bool ft_en)
+    {
+        nrfx_err_t err_code;
+        if(curr_state != ((ft_en) ? NRF_UARTE_STATE_TX_FT : NRF_UARTE_STATE_TX_NO_FT))
+        {
+            inki_gpiote_remove_isr(gpiote_lp_uarte_handler);
+            /* Configure GPIOTE channel 0 as a task for S0 to be actuated as toggle to save GPIOTE channels */
+            NRF_GPIOTE->CONFIG[0] =  (GPIOTE_CONFIG_POLARITY_Toggle << GPIOTE_CONFIG_POLARITY_Pos)
+                        | (dev->p.s0_pin << GPIOTE_CONFIG_PSEL_Pos)
+                        | (GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos);
+        
+            /* Configure GPIOTE channel 1 as event that occurs when S1 changes from digital lo to hi. */
+            NRF_GPIOTE->CONFIG[1] =  (GPIOTE_CONFIG_POLARITY_LoToHi << GPIOTE_CONFIG_POLARITY_Pos)
+                        | (dev->p.s1_pin << GPIOTE_CONFIG_PSEL_Pos)
+                        | (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos);
+
+            /* Configure GPIOTE channel 2 as event that occurs when S1 changes from digital hi to lo. */
+            NRF_GPIOTE->CONFIG[2] =  (GPIOTE_CONFIG_POLARITY_HiToLo << GPIOTE_CONFIG_POLARITY_Pos)
+                        | (dev->p.s1_pin << GPIOTE_CONFIG_PSEL_Pos)
+                        | (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos);
+
+            /* Configure GPIOTE channel 3 as a task for S2 to be actuated as toggle to save GPIOTE channels */
+            NRF_GPIOTE->CONFIG[3] =  (GPIOTE_CONFIG_POLARITY_Toggle << GPIOTE_CONFIG_POLARITY_Pos)
+                        | (dev->p.s2_pin << GPIOTE_CONFIG_PSEL_Pos)
+                        | (GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos);
+
+
+
+            // Interrupt on S1 lo to hi in enhanced filetransfer mode to set tx_buffer after every successful write.
+            NRF_GPIOTE->INTENCLR = GPIOTE_INTENCLR_IN0_Msk | GPIOTE_INTENCLR_IN2_Msk | GPIOTE_INTENCLR_IN3_Msk | GPIOTE_INTENCLR_IN4_Msk | GPIOTE_INTENCLR_IN5_Msk;
+           
+            for(int i = 0; i < ARRAY_SIZE(NRF_GPIOTE->EVENTS_IN); i++)
+            {
+                NRF_GPIOTE->EVENTS_IN[i] = 0;
+            }
+
+            GET_PPI_FROM_VEC(ppi_channels, 0, vec_ppi_0);
+            //nrf_uarte_subscribe_set(&nrf_uarte_reg, NRF_UARTE_TASK_STOPRX, *vec_ppi);
+            err_code = nrfx_ppi_channel_assign(*vec_ppi_0, (uint32_t)&NRF_GPIOTE->EVENTS_IN[2], nrf_uarte_task_address_get(&nrf_uarte_reg, NRF_UARTE_TASK_STARTTX));
+            LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error assigning S1 rising edge event to STARTTX task");
+
+
+            GET_PPI_FROM_VEC(ppi_channels, 1, vec_ppi_1);
+            //nrf_uarte_publish_set(&nrf_uarte_reg, NRF_UARTE_EVENT_RXSTARTED, *vec_ppi);
+            err_code = nrfx_ppi_channel_assign(*vec_ppi_1, nrf_uarte_event_address_get(&nrf_uarte_reg, NRF_UARTE_EVENT_ENDTX), (uint32_t)&NRF_GPIOTE->TASKS_CLR[0]);
+            LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error assigning ENDTX event to S0 falling edge task");
+
+            IRQ_DIRECT_CONNECT(UARTE0_UART0_IRQn, 4, uarte_rxtx_handler, 0);
+            irq_enable(UARTE0_UART0_IRQn);
+            nrf_uarte_int_enable(&nrf_uarte_reg, NRF_UARTE_INT_TXSTOPPED_MASK);
+
+            FREE_REALLOC_PPI(ppi_channels, 2, vec_ppi_2);
+            FREE_REALLOC_PPI(ppi_channels, 3, vec_ppi_3);
+
+            curr_state = (ft_en) ? NRF_UARTE_STATE_TX_FT : NRF_UARTE_STATE_TX_NO_FT;
+        }
+        return 1;
+    }
+
+This is following the exact same principle as the RX initialisation code, except because transmitting is a more involved process in the sense that you need to get the data before you can send it, some of the shortcuts are not necessary. We don't want the old RX shortcuts to fire though during a TX operation as this will mess things up. So we will free up, and reassign two PPI channels using the macros we defined earlier. The same 4 GPIOTE channels are used, just reconfigured to fire on different pins and occasions matching the original design in Chapter 2.
+
+Now, let's tie everything together with the final low level API functions and the driver registration:
+
+.. code-block:: c
+
+    static int nrf_lp_uarte_ft_start(const struct lp_uarte_dev* dev)
+    {
+        curr_state = NRF_UARTE_STATE_ACTIVE_FT;
+        return 1;
+    }
+
+    static int nrf_get_ft_status()
+    {
+        return (curr_state == NRF_UARTE_STATE_ACTIVE_FT || curr_state == NRF_UARTE_STATE_RX_FT || curr_state == NRF_UARTE_STATE_TX_FT) ? 1 : 0;
+    }
+
+    static int nrf_lp_uarte_deinit(const struct lp_uarte_dev* dev)
+    {
+        //Disabling UARTE peripheral and hence unloading all configs
+        nrf_uarte_disable(&nrf_uarte_reg);
+        //Clearing all stored ISRS
+        inki_gpiote_remove_isr(gpiote_lp_uarte_handler);
+        //Freeing PPI channels
+        for(int i = 0; i < PPI_CHANNELS_REQUIRED; i ++)
+        {
+            GET_PPI_FROM_VEC(ppi_channels, i, vec_ppi);
+            nrfx_ppi_channel_free(*vec_ppi);
+        }
+        vector_deinit(&ppi_channels);
+        return 1;
+    }
+
+    static int nrf_lp_uarte_tx_fin(const struct lp_uarte_dev* dev)
+    {
+    //Toggling S2 to tell other MCU that transfer is complete.
+        NRF_GPIOTE->TASKS_SET[3];
+        NRF_GPIOTE->TASKS_CLR[3];
+        curr_state = NRF_UARTE_STATE_ACTIVE_NO_FT;
+        int rc = nrf_lp_uarte_gpiote_rx_init(dev, false);
+        return rc;
+    }
+
+    static int nrf_lp_uarte_tx(const struct lp_uarte_dev* dev)
+    {
+        int rc = nrf_lp_uarte_gpiote_tx_init(dev, nrf_get_ft_status()==1);
+        LP_DRV_ERR_CHECK(rc, "Couldn't initialise LP-UARTE in TX mode");
+        nrf_uarte_tx_buffer_set(&nrf_uarte_reg, tx_buf0_ptr, CONFIG_INKI_LP_UARTE_TX_BUF_LEN);
+        NRF_GPIOTE->TASKS_OUT[0] = 1; //trigger S0 to high, with preconfigured PPI this will get the ball rolling 
+        return 1;
+    }
+
+    static int nrf_lp_uarte_rx(const struct lp_uarte_dev* dev)
+    {
+        
+        int rc = nrf_lp_uarte_gpiote_rx_init(dev, nrf_get_ft_status()==1);
+        LP_DRV_ERR_CHECK(rc, "Couldn't initialise LP-UARTE in RX mode");
+        nrf_uarte_rx_buffer_set(&nrf_uarte_reg, rx_buf0_ptr, CONFIG_INKI_LP_UARTE_RX_BUF_LEN);
+
+        curr_buf = 0;
+
+        return 1;
+    }
+
+    static const struct lp_uarte_dev_api nrf_lp_uarte_api = {
+        .tx = nrf_lp_uarte_tx,
+        .rx = nrf_lp_uarte_rx,
+        .init = nrf_lp_uarte_init,
+        .deinit = nrf_lp_uarte_deinit,
+        .ft_start = nrf_lp_uarte_ft_start,
+        .ft_status = nrf_get_ft_status,
+        .tx_fin = nrf_lp_uarte_tx_fin,
+    };
+
+    int lp_uarte_drv_init(struct lp_uarte_dev* dev)
+    {
+        dev->api = &nrf_lp_uarte_api;
+        return 1;
+    }
+
+Pretty similar to ``XIPA_FS``, just with different functions and a very different job. And that wraps up the implementation of ``LP_UARTE`` ! Let's briefly talk about the GPIOTE library that had to be written to resolve the conflict between input handling and ``LP_UARTE`` before we move onto the GUI implementation. 
+
+GPIOTE Mediator
+---------------
+
+This little library has two responsibilities:
+
+1) Take care of the ISR that services GPIOTE interrupts 
+2) Manage registration and deletion of callbacks to higher level code. 
+
+It uses similar logic to the ``LP_UARTE`` library's ISR management, but with the GPIOTE peripheral instead of UARTE. 
+
+Let's take a look at ``inki_gpiote.h``
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+    /*
+    ___      ___    __ _ ___ _ ___ __
+     | |\||/  |    /__|_) | / \ | |_ 
+    _|_| ||\ _|____\_||  _|_\_/ | |__
+
+    INKI Interrupt-based GPIOTE driver
+
+    */
+
+    #ifndef INKI_GPIOTE_DRV
+    #define INKI_GPIOTE_DRV
+
+    #include "lib/d_vector/vector.h"
+    #include "lib/d_stack/stack.h"
+    #include <logging/log.h>
+    #include <hal/nrf_gpiote.h>
+
+    /* This is just a little shell library to allow multiple functions to be executed off one ISR. */
+
+    int inki_gpiote_register_isr(void (*func_ptr)());
+    int inki_gpiote_remove_isr(void (*func_ptr)());
+    int inki_gpiote_clear_all();
+    int inki_gpiote_init();
+
+
+    #endif
+
+Pretty straightforward. Let's take a look at ``inki_gpiote.c``
+
+.. code-block:: c
+
+    /*
+    * Copyright (c) 2022 INKI-Systems Inc.
+    *
+    * Licensed under GPL 3
+    * 
+    */
+
+
+
+    /*
+    ___      ___    __ _ ___ _ ___ __
+     | |\||/  |    /__|_) | / \ | |_ 
+    _|_| ||\ _|____\_||  _|_\_/ | |__
+
+    INKI Interrupt-based GPIOTE driver
+
+    */
+
+
+    #include "inki_gpiote.h"
+
+    LOG_LEVEL_SET(LOG_LEVEL_INF);
+
+    void (*func_ptrs[8])() = {0}; //not using custom stack class for speed.
+    uint32_t occupied;
+
+
+    ISR_DIRECT_DECLARE(gpiote_handler)
+    {
+        if(occupied > 0)
+        {
+            for(int i = 0; i < occupied; i ++)
+            {
+                (*func_ptrs[i])();
+            }
+        }
+        ISR_DIRECT_PM(); //Exit power management state for best latency
+        return 1;
+    }
+
+    int inki_gpiote_init()
+    {
+        occupied = 0;
+        IRQ_DIRECT_CONNECT(GPIOTE_IRQn, 4, gpiote_handler, 0);
+        return 1;
+    }
+
+    int inki_gpiote_register_isr(void (*func_ptr)())
+    {
+        func_ptrs[occupied] = func_ptr;
+        if(occupied++ == 0) irq_enable(GPIOTE_IRQn);
+        return 1;
+    }
+    int inki_gpiote_remove_isr(void (*func_ptr)())
+    {
+        int foundindex = -1;
+        for(int i = 0; i < occupied - 1; i ++)
+        {
+            if(func_ptrs[i] == func_ptr)
+            {
+                foundindex = i;
+            }
+        }
+        if(foundindex == -1) return -ENOENT;
+        uint32_t start_offset = foundindex*sizeof(void(*)());
+        if(foundindex < occupied - 1)
+        {
+            uint32_t move_offset = (foundindex+1)*sizeof(void(*)());
+            memmove(func_ptrs+start_offset, func_ptrs+move_offset, (occupied - (foundindex+1))*sizeof(void(*)()));
+        }
+        else
+        {
+            memset(func_ptrs + start_offset, 0, sizeof(void(*)()));
+        }
+        --occupied;
+        return 1;
+    }
+
+    int inki_gpiote_clear_all()
+    {
+        memset(func_ptrs, 0, occupied * sizeof(void(*)()));
+        occupied = 0;
+        irq_disable(GPIOTE_IRQn);
+        return 1;
+    }
+
+
+Fairly self documenting - the logic is quite similar to ``Vector`` and the ISR handling in ``LP_UARTE``. This was a very handy conflict resolver to keep the modules loosely coupled and doing a specific task each. 
+
+Let's now look at the EPD Display driver.
+
+EPD Display Driver - C++
+------------------------
+Disclaimer: All C++ code was written before I transitioned from Arduino away to Zephyr in January. Due to the complexity of the implementation of ``LP_UARTE`` and ``XIPA_FS``, I was unable to port this code over to C in time. It is certain that I will refactor this code into a separate codebase entirely which will run on the integrated WASM runtime. This code was written to get to grips with C++, LVGL (the graphics library used), and low-level programming in general. 
+
+The first port of call was reading the datasheet and deciphering what I needed to do, with the help of manufacturer provided example code, to drive the display. As it turned out, there was a lovely flow chart in the datasheet that helped a lot with the program flow (this can be found in the design sheet). I also took inspiration from a different manufacturer's driver code and added some extra functionality. Let's check out the main header file:
+
+.. code-block:: c++
+
+
+    #include <Arduino.h>
+    #include "SEGGER_RTT.h"
+    #include "nrfx_config.h"
+    #include "SPI.h"
+    #include "nrfx_gpiote.h"
+    #include "nrf_svc.h"
+    #include "nrf_nvic.h"
+    /**
+    *  @brief   :   Parts of this driver are built in the same way as 
+    *               the Waveshare EPD driver by Yehui as there are many identical operations
+    *               between my driver and the Waveshare one, despite the different display controllers.
+    *               These controllers are so similar that I have no choice but to duplicate some code. 
+    *               I decided to change a few things to improve the driver for this EPD, hence I have written this code.
+    *  @author  :   Yuvraj Dubey, with help from GoodDisplay's sample code for GDEH0154D67 for initialisation routine and Yehui from Waveshare's code for SSD1608.
+    *
+    */
+    #ifndef EPDIN54_H_4G
+    #define EPDIN54_H_4G
+
+    #define EPD_WIDTH 200
+    #define EPD_HEIGHT 200
+    #define EPD_WHITE 0xFFFF
+    #define EPD_BLACK 0x0000
+    #define EPD_LGRAY 0x00FF
+    #define EPD_DGRAY 0xFF00
+
+    //EPD COMMAND TABLE - taken from SSD1681 datasheet
+    #define DRIVER_OUTPUT_CONTROL           0x01
+    #define GATE_DRIVE_VOLTAGE_CONTROL      0x03
+    #define SOURCE_DRIVE_VOLTAGE_CONTROL    0x04  
+    #define INITIAL_CODE_SET_OTP            0x08    //Program initial code setting
+    #define INITAL_CODE_WRITE_REG           0x09
+    #define INITAL_CODE_READ_REG            0x0A   
+    #define BOOSTER_SOFT_START_CONTROL      0x0C 
+    #define DEEP_SLEEP_MODE                 0x10    //00 - normal, 01 - DeepSleep1, 02 - DeepSleep2. BUSY-high, send HWRESET to exit
+    #define DATA_ENTRY_MODE_SETTING         0x11    //Define data entry sequence. Y decrement/X decrement / increment permutations
+    #define SW_RESET                        0x12    //Resets commands and parameters to SW default. RAM UNAFFECTED - BUSY high
+    #define HV_READY_DETECTION              0x14    
+    #define VCI_DETECTION                   0x15    //VCI Level detection
+    #define TEMPERATURE_SENSOR_CONTROL      0x18    //Temperature Sensor Selection (48h = ext, 80h = int)
+    #define TEMPERATURE_SENSOR_WRITE        0x1A    //Write to temperature register
+    #define TEMPERATURE_SENSOR_READ         0x1B    //Read from temperature register
+    #define TEMPERATURE_SENSOR_COMMAND      0x1C    //Write command to external temperature sensor
+    #define MASTER_ACTIVATION               0x20    //Activate display Update Sequence. BUSY Will be HIGH during operation. 
+    #define DISPLAY_UPDATE_CONTROL_1        0x21    //RAM Content for Display
+    #define DISPLAY_UPDATE_CONTROL_2        0x22
+    #define WRITE_RAM_1                     0x24    //SSD1681 - two buffers. 1->Black/White
+    #define WRITE_RAM_2                     0x26    //SSD1681 - two buffers. 2->Grays || Red
+    #define READ_RAM                        0x27
+    #define VCOM_SENSE                      0x28    //ENTER VCOM Sensing mode for length defined in 29h before reading VCOM value.
+    #define VCOM_SENSE_DURATION             0x29    //Stabling time between entering VCOM sensing mode and reading acquired.
+    #define PROGRAM_VCOM_OTP                0x2A    //Program VCOM register into OTP
+    #define VCOM_CONTROL_REG_WRITE          0x2B    //Reduce glitch when ACVCOM toggle -> data
+    #define VCOM_REG_WRITE                  0x2C    //Write VCOM register from MCU
+    #define OTP_REG_READ_DISP_OPT           0x2D    //Read register for display option. 
+    #define USER_ID_READ                    0x2E    //Read 10 byte UserID stored in OTP.
+    #define STATUS_BIT_READ                 0x2F    //Read IC status bit - HV ready/VCI detection flags
+    #define PROGRAM_WS_OTP                  0x30    //Program waveform OTP. Write framebuffer to RAM before sending this command. BUSY=high
+    #define LOAD_WS_OTP                     0x31    //Load waveform OTP. BUSY=high
+    #define WRITE_LUT_REGISTER              0x32    //Write LUT register
+    #define CRC_CALC                        0x34    //CRC calculation - BUSY high
+    #define CRC_STATUS_READ                 0x35    //CRC status read
+    #define PROGRAM_OTP_SELECTION           0x36    //Program OTP selection according to OTP selection control
+    #define WRITE_REG_DISP_OPT              0x37    //Write register for display option. 
+    #define WRITE_REG_USER_ID               0x38    //Write UserID register
+    #define OTP_PROGRAM_MODE                0x39    //00 - normal, 11 - internal generated OTP programming voltage. (FOLLOW EXACT CODE SEQUENCES)
+    #define BORDER_WAVEFORM_CONTROL         0x3C    //Set border waveform
+    #define END_OPTION                      0x3F    //Option for LUT end
+    #define READ_RAM_OPTION                 0x41    //Read RAM option - 0->RAM1, 1->RAM2
+    #define SET_RAM_X_ADDRESS_START_END_POS 0x44    //Specify start/end position of the window address in the X direction by an address unit for RAM
+    #define SET_RAM_Y_ADDRESS_START_END_POS 0x45    //Specify start/end position of the window address in the Y direction by an address unit for RAM
+    #define AUTO_WRITE_RED_RAM              0x46    //FOR REGULAR PATTERN
+    #define AUTO_WRITE_BW_RAM               0x47    //FOR REGULAR PATTERN
+    #define SET_RAM_X_ADDRESS_COUNTER       0x4E    //Set initial address counter for RAM X addresses
+    #define SET_RAM_Y_ADDRESS_COUNTER       0x4F    //Set initial address counter for RAM Y addresses
+    #define NOP                             0x7F    //No operation
+
+
+
+    class EPD_4 {
+    public:
+        EPD_4(int epd_busy, int epd_reset, int epd_dc, 
+            int epd_cs, int epd_mosi, int epd_miso, int epd_sck, bool debug);
+        ~EPD_4();
+        int Init(bool gray, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity));
+        void SendCommand(unsigned char command);
+        void SendData(unsigned char data);
+        void BusyWait(void);
+        void BusyCallBack(void);
+        void Reset(void);
+        void CopyFrameBufferToRAM(
+            const unsigned char* ram1_buffer,
+            const unsigned char* ram2_buffer,
+            int x,
+            int y,
+            int image_width,
+            int image_height
+        );
+        void BlanketBomb(uint16_t);
+        void FullUpdate(void);
+        void PartUpdate(void);
+        void Sleep(void);
+        void HybridRefresh(uint8_t threshold);
+        nrfx_err_t CallBackInit(void);
+
+    private:
+        void (*_busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity);
+        void SetLookUpTable(const unsigned char* lut);
+        unsigned int _reset_pin;
+        unsigned int _partial_refreshes;
+        unsigned int _dc_pin;
+        unsigned int _cs_pin;
+        unsigned int _busy_pin;
+        unsigned int _spi_miso;
+        unsigned int _spi_mosi;
+        unsigned int _spi_sck;
+        bool _first_init = true;
+        bool _asleep = false;
+        bool _gray;
+        void SetMemoryWindow(int x_start, int y_start, int x_end, int y_end);
+        const unsigned char _lut_4_gray[159] = {
+        0x40, 0x48, 0x80, 0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,
+        0x8,  0x48, 0x10, 0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,
+        0x2,  0x48, 0x4,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,
+        0x20, 0x48, 0x1,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,
+        0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,
+        0xA,  0x19, 0x0,  0x3,  0x8,  0x0,  0x0,  0x14, 0x1,  0x0,  0x14, 0x1,  
+        0x0,  0x3,  0xA,  0x3,  0x0,  0x8,  0x19, 0x0,  0x0,  0x1,  0x0,  0x0,  
+        0x0,  0x0,  0x0,  0x1,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  
+        0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  
+        0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  
+        0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  
+        0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,  0x0,
+        0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x0,  0x0,  0x0,  0x22, 0x17, 0x41, 
+        0x0,  0x32, 0x1C
+        };  
+        unsigned int _partials;
+        SPIClass* _epd_spi;
+        SPISettings _epd_spi_settings;
+    };
+
+    #endif
+
+We can see that we're using encapsulation in a much more structured environment - we're able to explicitly state private parameters in the same header file instead of hiding them in another struct. This way is neater, but it's awesome that we can still implement the same kind of functionality in C. 
+Most of this is self-explanatory - apart from ``_lut_4_gray``. This is the waveform provided by GoodDisplay to manipulate the pixels using data stored in the two different buffers built into the SSD1681 controller IC to draw two extra shades. I tried my best to implement 4-gray partial refreshing with this waveform, but it was well beyond my ability and very difficult to do without manufacturer assistance.
+We're also keeping track of the sleep/wake status of the EPD so we can automatically initialise it if it's sleeping. 
+
+Another thing you might notice ``SPIClass* _epd_spi`` and ``SPISettings _epd_spi_settings`` . These are structs managing SPI access built around the Arduino framework - i.e they are not platform/SDK agnostic. For the purposes of the Arduino development this was fine, but to port this code to C & Zephyr it'll need to be changed. 
+
+Now let's take a look at the .c file:
+
+.. code-block:: c++
+
+    #include "4g-epd1in54.h"
+
+
+    //Documentation says I need the following """C""" snippet to use NVIC...
+    extern "C"
+    {
+        nrf_nvic_state_t nrf_nvic_state = {0}; 
+    }
+    /**
+    * Creates EPD driver instance for SSD1681 GDEH0154D67 display.
+    * @param epd_busy: MCU pin that EPD busy is connected to.
+    * @param epd_reset: MCU pin that EPD reset is connected to.
+    * @param epd_cs: MCU pin that EPD chip select (CS) is connected to.
+    * @param epd_mosi: MCU pin that EPD Master Out/Slave In (MOSI) is connected to.
+    * @param epd_miso: MCU pin that EPD Master In/Slave OUT (MISO) is connected to.
+    * @param epd_sck: MCU pin that EPD Serial Clock (SCK) is connected to.
+    * @param debug: Unused parameter - may introduce SEGGER_RTT debug logs in later revision.
+    */
+    EPD_4::EPD_4(int epd_busy, int epd_reset, int epd_dc, 
+                int epd_cs, int epd_mosi, int epd_miso, int epd_sck, bool debug)
+    {
+        _reset_pin = epd_reset;
+        _busy_pin = epd_busy;
+        _cs_pin = epd_cs;
+        _dc_pin = epd_dc;
+        _spi_miso = epd_miso;
+        _spi_mosi = epd_mosi;
+        _spi_sck = epd_sck;
+        _epd_spi = new SPIClass(NRF_SPIM2, _spi_miso, _spi_sck, _spi_mosi); //I do not want this instance to be destroyed unless I say so, so using "new"
+        _epd_spi_settings = SPISettings(4000000, MSBFIRST, SPI_MODE0);
+    }
+
+    /**
+    * Unloads the SPI instance for destruction, removes the GPIOTE instance from the defined busy pin.
+    */
+    EPD_4::~EPD_4()
+    {
+        _epd_spi->end();
+        nrfx_gpiote_in_event_disable(_busy_pin);
+        nrfx_gpiote_in_uninit(_busy_pin);
+    }
+
+    /**
+    * Runs initialisation routine on EPD. Use this function to wake up EPD after running Sleep().
+    * @param busy_cb Reference to ISR handler which will be called after Partial or Full refresh. Your function will be passed the pin, and polarity (direction) of the interrupt. 
+    * @param pin polarity - ISR handler should input the pin, and the polarity, which will tell your handler what the busy line has done. 
+    */
+    int EPD_4::Init(bool gray, void (*busy_cb)(uint32_t pin, nrf_gpiote_polarity_t polarity))
+    {
+        uint32_t err_code;
+        if(_first_init)
+        {
+            pinMode(_cs_pin, OUTPUT);
+            //pinMode(_busy_pin, INPUT); Unncessary, will conflict with GPIOTE use of _busy_pin.
+            pinMode(_dc_pin, OUTPUT);
+            pinMode(_reset_pin, OUTPUT);
+            _busy_cb = busy_cb; 
+            _epd_spi->begin();
+            _epd_spi->beginTransaction(_epd_spi_settings);
+            err_code = CallBackInit();
+            if(err_code == NRFX_SUCCESS)
+            {
+            _first_init = false;
+            }
+        }
+        //Hardware Reset
+        digitalWrite(_reset_pin, 0);
+        delay(10);
+        digitalWrite(_reset_pin, 1);
+        delay(10);
+        BusyWait();
+        SendCommand(SW_RESET);
+        BusyWait();
+        _asleep = false;
+        _gray = gray;
+        /*
+        WARNING, THESE COMMANDS ARE UNDEFINED FOR SSD1681!!
+        Update :: Spoke to GoodDisplay, it is safe to comment out the next four lines. 
+        SendCommand(0x74); //set analog block control       
+        SendData(0x54);
+        SendCommand(0x7E); //set digital block control          
+        SendData(0x3B);
+        */
+        SendCommand(DRIVER_OUTPUT_CONTROL);     
+        SendData(0xC7);
+        SendData(0x00);
+        SendData(0x00);
+        SendCommand(DATA_ENTRY_MODE_SETTING);   
+        SendData(0x03);
+        SendCommand(SET_RAM_X_ADDRESS_START_END_POS); 
+        SendData(0x00);
+        SendData(EPD_WIDTH /8 - 1);   //EPD width / 8 - 1
+        SendCommand(SET_RAM_Y_ADDRESS_START_END_POS);         
+        SendData(0x00);   
+        SendData(0x00);
+        SendData(EPD_HEIGHT - 1);
+        SendData((EPD_HEIGHT - 1) >> 8); 
+        SendCommand(BORDER_WAVEFORM_CONTROL); 
+        SendData(0x00);  
+        if(gray)
+        {
+            SendCommand(VCOM_REG_WRITE);     //Setting VCOM Voltage
+            SendData(_lut_4_gray[158]);    
+            SendCommand(END_OPTION);    
+            SendData(_lut_4_gray[153]);
+            SendCommand(GATE_DRIVE_VOLTAGE_CONTROL);       
+            SendData(_lut_4_gray[154]);
+            SendCommand(SOURCE_DRIVE_VOLTAGE_CONTROL); //      
+            SendData(_lut_4_gray[155]);    
+            SendData(_lut_4_gray[156]);   
+            SendData(_lut_4_gray[157]);   
+            SetLookUpTable(_lut_4_gray); //Write 4 grayscale waveform 
+        }
+        else
+        {
+            SendCommand(BORDER_WAVEFORM_CONTROL);
+            SendData(0x05);
+            SendCommand(TEMPERATURE_SENSOR_CONTROL);
+            SendData(0x80);
+        }
+        SendCommand(SET_RAM_X_ADDRESS_COUNTER);   // set RAM x address count to denary 0;
+        SendData(0x00);
+        SendCommand(SET_RAM_Y_ADDRESS_COUNTER);   // set RAM y address count to denary 199;    
+        SendData(0xC7);
+        SendData(0x00);
+        BusyWait();
+        err_code = NRF_SUCCESS;
+        return err_code;
+    }
+    /**
+    * Sends a hex command to the EPD. See Solomon SSD1681 datasheet / header file for command table.
+    * @param command 8 bit hex value representing command - e.g 0x10.
+    */
+    void EPD_4::SendCommand(unsigned char command)
+    {
+        digitalWrite(_dc_pin, LOW);
+        digitalWrite(_cs_pin, LOW);
+        _epd_spi->transfer(command);
+        digitalWrite(_cs_pin, HIGH);  
+    }
+    /**
+    * Sends data to the EPD. See Solomon SSD1681 datasheet for valid commands and expected data.
+    * @param command 8 bit hex value representing data - e.g 0x10.
+    */
+    void EPD_4::SendData(unsigned char data)
+    {
+        digitalWrite(_dc_pin, HIGH);
+        digitalWrite(_cs_pin, LOW);
+        _epd_spi->transfer(data);
+        digitalWrite(_cs_pin, HIGH);
+    }
+    /**
+    * Waits for BUSY line to become low indicating EPD is no longer busy and is ready for command input by blocking main thread.
+    */
+    void EPD_4::BusyWait(void)
+    {
+        while(digitalRead(_busy_pin) == HIGH)
+        {
+            delay(10);
+        }
+    }
+    /**
+    * Writes the 153 byte OTP waveform data to the EPD. Done automatically during Init().
+    * @param lut 159 byte char array with waveform and key lookup values.
+    */
+    void EPD_4::SetLookUpTable(const unsigned char* lut)
+    {
+        SendCommand(WRITE_LUT_REGISTER);
+        for(uint8_t count = 0; count < 153; count ++)
+        {
+            SendData(lut[count]);
+        }
+    }
+    /**
+    * Waits for the EPD to refresh without blocking main thread. Enables GPIOTE interrupt that will call interrupt handler specified by busy_cb in Init(). Callback function should disable interrupt once serviced to prevent erroneous interrupts.
+    */
+    void EPD_4::BusyCallBack(void)
+    {
+        nrfx_gpiote_in_event_enable(_busy_pin, true);
+    }
+    /**
+    * Initialises interrupt that will call busy_cb when BUSY line goes to LOW.  
+    */
+    nrfx_err_t EPD_4::CallBackInit(void)
+    {
+        //Assuming GPIOTE driver is already loaded.
+        uint8_t _softdevice_status;
+        sd_softdevice_is_enabled(&_softdevice_status);
+        if(_softdevice_status == 1) {} //Find out which softdevice wrappers needed for gpiote function?? 
+        //This might not work because of the softdevice - might be unreliable. Hopefully ~300ms refresh should be ok.
+        nrfx_err_t err_code;
+        if(!nrfx_gpiote_is_init())
+        {
+            err_code = nrfx_gpiote_init(2);
+            if(err_code != NRFX_SUCCESS)
+            {
+            return err_code;
+            }
+        }
+        //We want to sense when the BUSY line is going from HIGH to LOW, implying that the
+        //EPD is no longer busy. This will then fire an interrupt to the specified callback
+        //function, whose pointer is stored in _busy_cb.
+        nrfx_gpiote_in_config_t cb_int_config = NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
+        cb_int_config.pull = NRF_GPIO_PIN_PULLUP;
+        cb_int_config.hi_accuracy = true;
+        //nrfx_gpiote_evt_handler_t is typedef void, so can be casted safetly.
+        err_code = nrfx_gpiote_in_init(_busy_pin, &cb_int_config, (nrfx_gpiote_evt_handler_t) _busy_cb);
+        return err_code;
+    }
+    /**
+    * Full EPD refresh - takes ~2 seconds. Calls ISR handler specified in Init()
+    */
+    void EPD_4::FullUpdate(void)
+    {   
+        SendCommand(DISPLAY_UPDATE_CONTROL_2); //Display Update Control
+        SendData(0xF7);   
+        SendCommand(MASTER_ACTIVATION); //Activate Display Update Sequence
+        //BusyWait();
+        BusyCallBack();
+    }
+    /**
+    * Partial EPD refresh - takes ~300 milliseconds. Calls ISR handler specified in Init()
+    */
+    void EPD_4::PartUpdate(void)
+    {
+        SendCommand(DISPLAY_UPDATE_CONTROL_2); //Display Update Control 
+        SendData(0xFF);   
+        SendCommand(MASTER_ACTIVATION); //Activate Display Update Sequence
+        BusyCallBack();
+        //BusyWait();      
+    }
+    /**
+    * Hybrid EPD refresh - will perform "threshold" number of partial EPD refreshes before a Full EPD refresh. Calls ISR handler specified in Init().
+    * @param threshold Number of partial refreshes to perform before cleaning display with full refresh.
+    */
+    void EPD_4::HybridRefresh(uint8_t threshold)
+    {
+        if(threshold > _partial_refreshes)
+        {
+            PartUpdate();
+            _partial_refreshes++;
+        }
+        else 
+        {
+            FullUpdate();
+            _partial_refreshes = 0;
+        }
+    }
+    /**
+    * Puts EPD in deep sleep mode 1 (1uA typical consumption) Use Init() to wake EPD.
+    */
+    void EPD_4::Sleep(void)
+    {  
+        SendCommand(DEEP_SLEEP_MODE); //enter deep sleep
+        SendData(0x01); //Deep sleep mode 1 - retains RAM data, can try Deep Sleep Mode 2...
+        digitalWrite(_reset_pin, LOW); 
+        _asleep = true;
+    }
+    /**
+    *   Takes in hex 2-bit colour pattern and turns the entire screen that colour. 
+    *   Note: Uses Full refresh!
+    *   Note: Dark Gray and Light Gray ignored if display not in GRAY mode!
+    * @param  color Hex char - 0x00 = Black, 0x02 = Dark Gray, 0x01 = Light Gray, 0x03 = White
+    * 
+    */  
+    void EPD_4::BlanketBomb(uint16_t color)
+    {
+        SetMemoryWindow(0, 0, 199, 199);
+        SendCommand(WRITE_RAM_1);
+        uint16_t twobyte1 = (color>>8);
+        uint8_t ram1repeat = twobyte1;
+        for (int j = 0; j < 200; j++) {
+            for (int i = 0; i < 200 / 8; i++) {
+            SendData(ram1repeat);
+            }
+        }
+        if(_gray)
+        {
+            uint16_t twobyte2 = (color<<8)>>8; //Getting rid of first bit
+            uint8_t ram2repeat = twobyte2;
+            SetMemoryWindow(0, 0, 199, 199);
+            SendCommand(WRITE_RAM_2);
+            for (int j = 0; j < 200; j++) {
+            for (int i = 0; i < 200 / 8; i++) {
+                SendData(ram2repeat);
+                //This bitwise operation will set the second bit to zero, and leave the first bit
+                //if it is 1.
+            }
+            }
+        }
+        SendCommand(DISPLAY_UPDATE_CONTROL_2); //Display Update Control
+        SendData(0xF7);   
+        SendCommand(MASTER_ACTIVATION); //Activate Display Update Sequence
+        BusyWait();
+    }
+    /**
+    *    Copies split buffers for 4 grayscale into display RAM. Does not update display. Calling thread is responsible for sorting colour information into the buffers!. Coordinates are ZERO-BASED!
+    *    @param ram1_buffer Split data buffer for RAM1
+    *    @param ram2_buffer Split data buffer for RAM2
+    *    @param x Starting x-coordinate
+    *    @param y Starting y-coordinate 
+    *    @param x_end End x-coordinate
+    *    @param y_end End y-coordinate
+    * 
+    */
+    void EPD_4::CopyFrameBufferToRAM(const unsigned char* ram1_buffer, const unsigned char* ram2_buffer, 
+                                    int x, int y, int x_end, int y_end)
+    
+    {
+        /*
+        4 Grayscale operation:
+        RAM 1 |  RAM 2   Colour
+        ______|__________________
+        0     |  0       Black
+        1     |  0       Dark Gray
+        0     |  1       Light Gray
+        1     |  1       White
+        */
+        if (ram1_buffer == NULL || ((ram2_buffer == NULL)&&(_gray==true)) || x < 0 || y < 0) 
+        {
+            return;
+        }
+
+        x &= 0xF8; //Rounding coordinates to lower multiple of 8
+        x_end &= 0xF8; //Rounding coordinates to lower multiple of 8 to turn into byte level copies
+        if(_asleep)
+        {
+            Init(_gray, _busy_cb);
+        }
+        SetMemoryWindow(x, y, x_end, y_end); //Defines start and end areas for memory copy so controller knows what areas to update.
+        //Writing RAM Contents!
+        SendCommand(WRITE_RAM_1);
+        for (int j = 0; j < y_end - y + 1; j++) {
+            for (int i = 0; i < (x_end - x + 1) / 8; i++) {
+                SendData(ram1_buffer[i + j * ((x_end - x) / 8)]);
+            }
+        }
+        if(_gray)
+        {
+            SetMemoryWindow(x, y, x_end, y_end);
+            SendCommand(WRITE_RAM_2);
+            for (int j = 0; j < y_end - y + 1; j++) {
+                for (int i = 0; i < (x_end - x + 1) / 8; i++) {
+                    SendData(ram2_buffer[i + j * ((x_end - x) / 8)]); //writing second buffer to get information for second waveform. 
+                }
+            }
+        }
+    }
+
+    void EPD_4::SetMemoryWindow(int x_start, int y_start, int x_end, int y_end)
+    {
+        SendCommand(SET_RAM_X_ADDRESS_START_END_POS);
+        SendData((x_start >> 3) & 0xFF); //Generating memory unit
+        SendData((x_end >> 3) & 0xFF);
+        SendCommand(SET_RAM_Y_ADDRESS_START_END_POS);
+        SendData(y_start & 0xFF);
+        SendData((y_start >> 8) & 0xFF);
+        SendData(y_end & 0xFF);
+        SendData((y_end >> 8) & 0xFF);
+        SendCommand(SET_RAM_X_ADDRESS_COUNTER);
+        SendData((x_start >> 3) & 0xFF);
+        SendCommand(SET_RAM_Y_ADDRESS_COUNTER);
+        SendData(y_start & 0xFF);
+        SendData((y_start >> 8) & 0xFF);
+        BusyWait();
+    }
+
+Since I have used ``SendData()`` and ``SendCommand()`` throughout the implementation of the display driver, it will be a relatively trivial process to port this to Zephyr when the time comes. The reason why I haven't done this so far is because Zephyr has its own implementation of an SSD1681 driver that seems very robust and slightly over-engineered, and the fact that I am focussing on the low-level detail first before I go back to UI-building. 
+
+Back to the old C++ code, the next port of call was tailoring LVGL to be used nicely with my eInk display. Here's the main configuration file for LVGL, it is designed to be copied to known location and modified to achieve the behaviour and functionality we require (so this is not my code, but my custom configuration parameters). 
+
+.. code-block:: c
+
+    /**
+    * @file lv_conf.h
+    * Configuration file for v8.0.1
+    */
+
+    /*
+    * COPY THIS FILE AS `lv_conf.h` NEXT TO the `lvgl` FOLDER
+    */
+
+    #if 1 /*Set it to "1" to enable content*/
+
+    #ifndef LV_CONF_H
+    #define LV_CONF_H
+    /*clang-format off*/
+
+    #include <stdint.h>
+
+
+    /*====================
+    COLOR SETTINGS
+    *====================*/
+
+    /*Color depth: 1 (1 byte per pixel), 8 (RGB332), 16 (RGB565), 32 (ARGB8888)*/
+    #define LV_COLOR_DEPTH     1
+
+    /*Swap the 2 bytes of RGB565 color. Useful if the display has a 8 bit interface (e.g. SPI)*/
+    #define LV_COLOR_16_SWAP   0
+
+    /*Enable more complex drawing routines to manage screens transparency.
+    *Can be used if the UI is above another layer, e.g. an OSD menu or video player.
+    *Requires `LV_COLOR_DEPTH = 32` colors and the screen's `bg_opa` should be set to non LV_OPA_COVER value*/
+    #define LV_COLOR_SCREEN_TRANSP    0
+
+    /*Images pixels with this color will not be drawn if they are  chroma keyed)*/
+    #define LV_COLOR_CHROMA_KEY    lv_color_hex(0x00ff00)         /*pure green*/
+
+    /*=========================
+    MEMORY SETTINGS
+    *=========================*/
+
+    /*1: use custom malloc/free, 0: use the built-in `lv_mem_alloc()` and `lv_mem_free()`*/
+    #define LV_MEM_CUSTOM      0
+    #if LV_MEM_CUSTOM == 0
+    /*Size of the memory available for `lv_mem_alloc()` in bytes (>= 2kB)*/
+    #  define LV_MEM_SIZE    (32U * 1024U)          /*[bytes]*/
+
+    /*Set an address for the memory pool instead of allocating it as a normal array. Can be in external SRAM too.*/
+    #  define LV_MEM_ADR          0     /*0: unused*/
+    #else       /*LV_MEM_CUSTOM*/
+    #  define LV_MEM_CUSTOM_INCLUDE <stdlib.h>   /*Header for the dynamic memory function*/
+    #  define LV_MEM_CUSTOM_ALLOC     malloc
+    #  define LV_MEM_CUSTOM_FREE      free
+    #  define LV_MEM_CUSTOM_REALLOC   realloc
+    #endif     /*LV_MEM_CUSTOM*/
+
+    /*Use the standard `memcpy` and `memset` instead of LVGL's own functions. (Might or might not be faster).*/
+    #define LV_MEMCPY_MEMSET_STD    0
+
+    /*====================
+    HAL SETTINGS
+    *====================*/
+
+    /*Default display refresh period. LVG will redraw changed ares with this period time*/
+    #define LV_DISP_DEF_REFR_PERIOD     30      /*[ms]*/
+
+    /*Input device read period in milliseconds*/
+    #define LV_INDEV_DEF_READ_PERIOD    30      /*[ms]*/
+
+    /*Use a custom tick source that tells the elapsed time in milliseconds.
+    *It removes the need to manually update the tick with `lv_tick_inc()`)*/
+    #define LV_TICK_CUSTOM     0
+    #if LV_TICK_CUSTOM
+    #define LV_TICK_CUSTOM_INCLUDE  "Arduino.h"         /*Header for the system time function*/
+    #define LV_TICK_CUSTOM_SYS_TIME_EXPR (millis())     /*Expression evaluating to current system time in ms*/
+    #endif   /*LV_TICK_CUSTOM*/
+
+    /*Default Dot Per Inch. Used to initialize default sizes such as widgets sized, style paddings.
+    *(Not so important, you can adjust it to modify default sizes and spaces)*/
+    #define LV_DPI_DEF                  160     /*[px/inch]*/
+
+    /*=======================
+    * FEATURE CONFIGURATION
+    *=======================*/
+
+    /*-------------
+    * Drawing
+    *-----------*/
+
+    /*Enable complex draw engine.
+    *Required to draw shadow, gradient, rounded corners, circles, arc, skew lines, image transformations or any masks*/
+    #define LV_DRAW_COMPLEX 1
+    #if LV_DRAW_COMPLEX != 0
+
+    /*Allow buffering some shadow calculation.
+    *LV_SHADOW_CACHE_SIZE is the max. shadow size to buffer, where shadow size is `shadow_width + radius`
+    *Caching has LV_SHADOW_CACHE_SIZE^2 RAM cost*/
+    #define LV_SHADOW_CACHE_SIZE    0
+    #endif /*LV_DRAW_COMPLEX*/
+
+    /*Default image cache size. Image caching keeps the images opened.
+    *If only the built-in image formats are used there is no real advantage of caching. (I.e. if no new image decoder is added)
+    *With complex image decoders (e.g. PNG or JPG) caching can save the continuous open/decode of images.
+    *However the opened images might consume additional RAM.
+    *0: to disable caching*/
+    #define LV_IMG_CACHE_DEF_SIZE       0
+
+    /*Maximum buffer size to allocate for rotation. Only used if software rotation is enabled in the display driver.*/
+    #define LV_DISP_ROT_MAX_BUF         (10*1024)
+    /*-------------
+    * GPU
+    *-----------*/
+
+    /*Use STM32's DMA2D (aka Chrom Art) GPU*/
+    #define LV_USE_GPU_STM32_DMA2D  0
+    #if LV_USE_GPU_STM32_DMA2D
+    /*Must be defined to include path of CMSIS header of target processor
+    e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
+    #define LV_GPU_DMA2D_CMSIS_INCLUDE
+    #endif
+
+    /*Use NXP's PXP GPU iMX RTxxx platforms*/
+    #define LV_USE_GPU_NXP_PXP      0
+    #if LV_USE_GPU_NXP_PXP
+    /*1: Add default bare metal and FreeRTOS interrupt handling routines for PXP (lv_gpu_nxp_pxp_osa.c)
+    *   and call lv_gpu_nxp_pxp_init() automatically during lv_init(). Note that symbol FSL_RTOS_FREE_RTOS
+    *   has to be defined in order to use FreeRTOS OSA, otherwise bare-metal implementation is selected.
+    *0: lv_gpu_nxp_pxp_init() has to be called manually before lv_init()
+    */
+    #define LV_USE_GPU_NXP_PXP_AUTO_INIT 0
+    #endif
+
+    /*Use NXP's VG-Lite GPU iMX RTxxx platforms*/
+    #define LV_USE_GPU_NXP_VG_LITE   0
+
+    /*-------------
+    * Logging
+    *-----------*/
+
+    /*Enable the log module*/
+    #define LV_USE_LOG      1
+    #if LV_USE_LOG
+
+    /*How important log should be added:
+    *LV_LOG_LEVEL_TRACE       A lot of logs to give detailed information
+    *LV_LOG_LEVEL_INFO        Log important events
+    *LV_LOG_LEVEL_WARN        Log if something unwanted happened but didn't cause a problem
+    *LV_LOG_LEVEL_ERROR       Only critical issue, when the system may fail
+    *LV_LOG_LEVEL_USER        Only logs added by the user
+    *LV_LOG_LEVEL_NONE        Do not log anything*/
+    #  define LV_LOG_LEVEL    LV_LOG_LEVEL_INFO
+
+    /*1: Print the log with 'printf';
+    *0: User need to register a callback with `lv_log_register_print_cb()`*/
+    #  define LV_LOG_PRINTF   0
+
+    /*Enable/disable LV_LOG_TRACE in modules that produces a huge number of logs*/
+    #  define LV_LOG_TRACE_MEM            0
+    #  define LV_LOG_TRACE_TIMER          0
+    #  define LV_LOG_TRACE_INDEV          1
+    #  define LV_LOG_TRACE_DISP_REFR      0
+    #  define LV_LOG_TRACE_EVENT          1
+    #  define LV_LOG_TRACE_OBJ_CREATE     1
+    #  define LV_LOG_TRACE_LAYOUT         1
+    #  define LV_LOG_TRACE_ANIM           1
+
+    #endif  /*LV_USE_LOG*/
+
+    /*-------------
+    * Asserts
+    *-----------*/
+
+    /*Enable asserts if an operation is failed or an invalid data is found.
+    *If LV_USE_LOG is enabled an error message will be printed on failure*/
+    #define LV_USE_ASSERT_NULL          1   /*Check if the parameter is NULL. (Very fast, recommended)*/
+    #define LV_USE_ASSERT_MALLOC        1   /*Checks is the memory is successfully allocated or no. (Very fast, recommended)*/
+    #define LV_USE_ASSERT_STYLE         1  /*Check if the styles are properly initialized. (Very fast, recommended)*/
+    #define LV_USE_ASSERT_MEM_INTEGRITY 0  /*Check the integrity of `lv_mem` after critical operations. (Slow)*/
+    #define LV_USE_ASSERT_OBJ           0   /*Check the object's type and existence (e.g. not deleted). (Slow)*/
+
+    /*Add a custom handler when assert happens e.g. to restart the MCU*/
+    #define LV_ASSERT_HANDLER_INCLUDE   <stdint.h>
+    #define LV_ASSERT_HANDLER   while(1);   /*Halt by default*/
+
+    /*-------------
+    * Others
+    *-----------*/
+
+    /*1: Show CPU usage and FPS count in the right bottom corner*/
+    #define LV_USE_PERF_MONITOR     0
+
+    /*1: Show the used memory and the memory fragmentation  in the left bottom corner
+    * Requires LV_MEM_CUSTOM = 0*/
+    #define LV_USE_MEM_MONITOR      0
+
+    /*1: Draw random colored rectangles over the redrawn areas*/
+    #define LV_USE_REFR_DEBUG       0
+
+    /*Change the built in (v)snprintf functions*/
+    #define LV_SPRINTF_CUSTOM   0
+    #if LV_SPRINTF_CUSTOM
+    #  define LV_SPRINTF_INCLUDE <stdio.h>
+    #  define lv_snprintf     snprintf
+    #  define lv_vsnprintf    vsnprintf
+    #else   /*LV_SPRINTF_CUSTOM*/
+    #  define LV_SPRINTF_USE_FLOAT 0
+    #endif  /*LV_SPRINTF_CUSTOM*/
+
+    #define LV_USE_USER_DATA      1
+
+    /*Garbage Collector settings
+    *Used if lvgl is binded to higher level language and the memory is managed by that language*/
+    #define LV_ENABLE_GC 0
+    #if LV_ENABLE_GC != 0
+    #  define LV_GC_INCLUDE "gc.h"                           /*Include Garbage Collector related things*/
+    #endif /*LV_ENABLE_GC*/
+
+    /*=====================
+    *  COMPILER SETTINGS
+    *====================*/
+
+    /*For big endian systems set to 1*/
+    #define LV_BIG_ENDIAN_SYSTEM    0
+
+    /*Define a custom attribute to `lv_tick_inc` function*/
+    #define LV_ATTRIBUTE_TICK_INC
+
+    /*Define a custom attribute to `lv_timer_handler` function*/
+    #define LV_ATTRIBUTE_TIMER_HANDLER
+
+    /*Define a custom attribute to `lv_disp_flush_ready` function*/
+    #define LV_ATTRIBUTE_FLUSH_READY
+
+    /*Required alignment size for buffers*/
+    #define LV_ATTRIBUTE_MEM_ALIGN_SIZE
+
+    /*Will be added where memories needs to be aligned (with -Os data might not be aligned to boundary by default).
+    * E.g. __attribute__((aligned(4)))*/
+    #define LV_ATTRIBUTE_MEM_ALIGN
+
+    /*Attribute to mark large constant arrays for example font's bitmaps*/
+    #define LV_ATTRIBUTE_LARGE_CONST
+
+    /*Complier prefix for a big array declaration in RAM*/
+    #define LV_ATTRIBUTE_LARGE_RAM_ARRAY
+
+    /*Place performance critical functions into a faster memory (e.g RAM)*/
+    #define LV_ATTRIBUTE_FAST_MEM
+
+    /*Prefix variables that are used in GPU accelerated operations, often these need to be placed in RAM sections that are DMA accessible*/
+    #define LV_ATTRIBUTE_DMA
+
+    /*Export integer constant to binding. This macro is used with constants in the form of LV_<CONST> that
+    *should also appear on LVGL binding API such as Micropython.*/
+    #define LV_EXPORT_CONST_INT(int_value) struct _silence_gcc_warning /*The default value just prevents GCC warning*/
+
+    /*Extend the default -32k..32k coordinate range to -4M..4M by using int32_t for coordinates instead of int16_t*/
+    #define LV_USE_LARGE_COORD  0
+
+    /*==================
+    *   FONT USAGE
+    *===================*/
+
+    /*Montserrat fonts with ASCII range and some symbols using bpp = 4
+    *https://fonts.google.com/specimen/Montserrat*/
+    #define LV_FONT_MONTSERRAT_8     0
+    #define LV_FONT_MONTSERRAT_10    0
+    #define LV_FONT_MONTSERRAT_12    0
+    #define LV_FONT_MONTSERRAT_14    1
+    #define LV_FONT_MONTSERRAT_16    0
+    #define LV_FONT_MONTSERRAT_18    0
+    #define LV_FONT_MONTSERRAT_20    0
+    #define LV_FONT_MONTSERRAT_22    0
+    #define LV_FONT_MONTSERRAT_24    0
+    #define LV_FONT_MONTSERRAT_26    0
+    #define LV_FONT_MONTSERRAT_28    0
+    #define LV_FONT_MONTSERRAT_30    1
+    #define LV_FONT_MONTSERRAT_32    0
+    #define LV_FONT_MONTSERRAT_34    0
+    #define LV_FONT_MONTSERRAT_36    0
+    #define LV_FONT_MONTSERRAT_38    0
+    #define LV_FONT_MONTSERRAT_40    1
+    #define LV_FONT_MONTSERRAT_42    0
+    #define LV_FONT_MONTSERRAT_44    0
+    #define LV_FONT_MONTSERRAT_46    0
+    #define LV_FONT_MONTSERRAT_48    0
+
+    /*Demonstrate special features*/
+    #define LV_FONT_MONTSERRAT_12_SUBPX      0
+    #define LV_FONT_MONTSERRAT_28_COMPRESSED 0  /*bpp = 3*/
+    #define LV_FONT_DEJAVU_16_PERSIAN_HEBREW 0  /*Hebrew, Arabic, Perisan letters and all their forms*/
+    #define LV_FONT_SIMSUN_16_CJK            0  /*1000 most common CJK radicals*/
+
+    /*Pixel perfect monospace fonts*/
+    #define LV_FONT_UNSCII_8        0
+    #define LV_FONT_UNSCII_16       0
+
+    /*Optionally declare custom fonts here.
+    *You can use these fonts as default font too and they will be available globally.
+    *E.g. #define LV_FONT_CUSTOM_DECLARE   LV_FONT_DECLARE(my_font_1) LV_FONT_DECLARE(my_font_2)*/
+    #define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(hyperlegible_20) LV_FONT_DECLARE(hyperlegible_13) LV_FONT_DECLARE(hyperlegible_30) LV_FONT_DECLARE(hyperlegible_72) LV_FONT_DECLARE(hyperlegible_10) LV_FONT_DECLARE(extra_symbols_40);
+
+    /*Always set a default font*/
+    #define LV_FONT_DEFAULT &lv_font_montserrat_14
+
+    /*Enable handling large font and/or fonts with a lot of characters.
+    *The limit depends on the font size, font face and bpp.
+    *Compiler error will be triggered if a font needs it.*/
+    #define LV_FONT_FMT_TXT_LARGE   0
+
+    /*Enables/disables support for compressed fonts.*/
+    #define LV_USE_FONT_COMPRESSED  0
+
+    /*Enable subpixel rendering*/
+    #define LV_USE_FONT_SUBPX       0
+    #if LV_USE_FONT_SUBPX
+    /*Set the pixel order of the display. Physical order of RGB channels. Doesn't matter with "normal" fonts.*/
+    #define LV_FONT_SUBPX_BGR       0  /*0: RGB; 1:BGR order*/
+    #endif
+
+    /*=================
+    *  TEXT SETTINGS
+    *=================*/
+
+    /**
+    * Select a character encoding for strings.
+    * Your IDE or editor should have the same character encoding
+    * - LV_TXT_ENC_UTF8
+    * - LV_TXT_ENC_ASCII
+    */
+    #define LV_TXT_ENC LV_TXT_ENC_UTF8
+
+    /*Can break (wrap) texts on these chars*/
+    #define LV_TXT_BREAK_CHARS                  " ,.;:-_"
+
+    /*If a word is at least this long, will break wherever "prettiest"
+    *To disable, set to a value <= 0*/
+    #define LV_TXT_LINE_BREAK_LONG_LEN          0
+
+    /*Minimum number of characters in a long word to put on a line before a break.
+    *Depends on LV_TXT_LINE_BREAK_LONG_LEN.*/
+    #define LV_TXT_LINE_BREAK_LONG_PRE_MIN_LEN  3
+
+    /*Minimum number of characters in a long word to put on a line after a break.
+    *Depends on LV_TXT_LINE_BREAK_LONG_LEN.*/
+    #define LV_TXT_LINE_BREAK_LONG_POST_MIN_LEN 3
+
+    /*The control character to use for signalling text recoloring.*/
+    #define LV_TXT_COLOR_CMD "#"
+
+    /*Support bidirectional texts. Allows mixing Left-to-Right and Right-to-Left texts.
+    *The direction will be processed according to the Unicode Bidirectioanl Algorithm:
+    *https://www.w3.org/International/articles/inline-bidi-markup/uba-basics*/
+    #define LV_USE_BIDI         0
+    #if LV_USE_BIDI
+    /*Set the default direction. Supported values:
+    *`LV_BASE_DIR_LTR` Left-to-Right
+    *`LV_BASE_DIR_RTL` Right-to-Left
+    *`LV_BASE_DIR_AUTO` detect texts base direction*/
+    #define LV_BIDI_BASE_DIR_DEF  LV_BASE_DIR_AUTO
+    #endif
+
+    /*Enable Arabic/Persian processing
+    *In these languages characters should be replaced with an other form based on their position in the text*/
+    #define LV_USE_ARABIC_PERSIAN_CHARS 0
+
+    /*==================
+    *  WIDGET USAGE
+    *================*/
+
+    /*Documentation of the widgets: https://docs.lvgl.io/latest/en/html/widgets/index.html*/
+
+    #define LV_USE_ARC          1
+
+    #define LV_USE_ANIMIMG	    1
+
+    #define LV_USE_BAR          1
+
+    #define LV_USE_BTN          1
+
+    #define LV_USE_BTNMATRIX    1
+
+    #define LV_USE_CANVAS       1
+
+    #define LV_USE_CHECKBOX     1
+
+
+    #define LV_USE_DROPDOWN     1   /*Requires: lv_label*/
+
+    #define LV_USE_IMG          1   /*Requires: lv_label*/
+
+    #define LV_USE_LABEL        1
+    #if LV_USE_LABEL
+    #  define LV_LABEL_TEXT_SELECTION         1   /*Enable selecting text of the label*/
+    #  define LV_LABEL_LONG_TXT_HINT    1   /*Store some extra info in labels to speed up drawing of very long texts*/
+    #endif
+
+    #define LV_USE_LINE         1
+
+    #define LV_USE_ROLLER       1   /*Requires: lv_label*/
+    #if LV_USE_ROLLER
+    #  define LV_ROLLER_INF_PAGES       7   /*Number of extra "pages" when the roller is infinite*/
+    #endif
+
+    #define LV_USE_SLIDER       1   /*Requires: lv_bar*/
+
+    #define LV_USE_SWITCH    1
+
+    #define LV_USE_TEXTAREA   1     /*Requires: lv_label*/
+    #if LV_USE_TEXTAREA != 0
+    #  define LV_TEXTAREA_DEF_PWD_SHOW_TIME     1500    /*ms*/
+    #endif
+
+    #define LV_USE_TABLE  1
+
+    /*==================
+    * EXTRA COMPONENTS
+    *==================*/
+
+    /*-----------
+    * Widgets
+    *----------*/
+    #define LV_USE_CALENDAR     0
+    #if LV_USE_CALENDAR
+    # define LV_CALENDAR_WEEK_STARTS_MONDAY 0
+    # if LV_CALENDAR_WEEK_STARTS_MONDAY
+    #  define LV_CALENDAR_DEFAULT_DAY_NAMES {"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
+    # else
+    #  define LV_CALENDAR_DEFAULT_DAY_NAMES {"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
+    # endif
+
+    # define LV_CALENDAR_DEFAULT_MONTH_NAMES {"January", "February", "March",  "April", "May",  "June", "July", "August", "September", "October", "November", "December"}
+    # define LV_USE_CALENDAR_HEADER_ARROW       1
+    # define LV_USE_CALENDAR_HEADER_DROPDOWN    1
+    #endif  /*LV_USE_CALENDAR*/
+
+    #define LV_USE_CHART        1
+
+    #define LV_USE_COLORWHEEL   0
+
+    #define LV_USE_IMGBTN       0
+
+    #define LV_USE_KEYBOARD     0
+
+    #define LV_USE_LED          0
+
+    #define LV_USE_LIST         1
+
+    #define LV_USE_METER        1
+
+    #define LV_USE_MSGBOX       1
+
+    #define LV_USE_SPINBOX      1
+
+    #define LV_USE_SPINNER      1
+
+    #define LV_USE_TABVIEW      1
+
+    #define LV_USE_TILEVIEW     1
+
+    #define LV_USE_WIN          1
+
+    #define LV_USE_SPAN         1
+    #if LV_USE_SPAN
+    /*A line text can contain maximum num of span descriptor */
+    #  define LV_SPAN_SNIPPET_STACK_SIZE   64
+    #endif
+
+    /*-----------
+    * Themes
+    *----------*/
+    /*A simple, impressive and very complete theme*/
+    #define LV_USE_THEME_DEFAULT    0
+    #if LV_USE_THEME_DEFAULT
+
+    /*0: Light mode; 1: Dark mode*/
+    # define LV_THEME_DEFAULT_DARK     0
+
+    /*1: Enable grow on press*/
+    # define LV_THEME_DEFAULT_GROW              0
+
+    /*Default transition time in [ms]*/
+    # define LV_THEME_DEFAULT_TRANSITON_TIME    80
+    #endif /*LV_USE_THEME_DEFAULT*/
+
+    /*An very simple them that is a good starting point for a custom theme*/
+    #define LV_USE_THEME_BASIC    0
+
+    /*A theme designed for monochrome displays*/
+    #define LV_USE_THEME_MONO       1
+
+    /*-----------
+    * Layouts
+    *----------*/
+
+    /*A layout similar to Flexbox in CSS.*/
+    #define LV_USE_FLEX     1
+    #define LV_USE_GROUP    1
+
+    /*A layout similar to Grid in CSS.*/
+    #define LV_USE_GRID     1
+
+    /*==================
+    * EXAMPLES
+    *==================*/
+
+    /*Enable the examples to be built with the library*/
+    #define LV_BUILD_EXAMPLES   0
+
+    /*--END OF LV_CONF_H--*/
+
+    #endif /*LV_CONF_H*/
+
+    #endif /*End of "Content enable"*/
+
+
+Since our EPD is monochrome and relatively small, it doesn't make sense to have the bigger colour themes included within the binary executable. We most likely aren't going to be using the "LED" feature, we definitely won't be using the "colorwheel" feature, and we probably won't be using the built-in keyboard as there is not enough room on the display. 
+I have also set the colour depth to 1-bit per pixel within LVGL to allow us to directly cast the colour buffer to a format we can send to the display without any computational expense, and I have set some optional debugging features to make development a little easier. I will elaborate on this further shortly. 
+
+Integration with LVGL was very difficult due to my relative inexperience with C++ and working with hardware at a very low level. It was only possible thanks to LVGL's excellent documentation, the satisfaction I got from getting this section to work is what inspired me to take on the rest of the project and get to where I've got so far. Yes, including the crazy polymorphism on the Disk API!
+
+Since I was using the Arduino framework at this point in time, integration of LVGL within the build system was taken care of for me, leaving me with the nitty C++ gritty to get my hands dirty with. The first step was to get the display object, and define the helper functions that would interface LVGL with the driver we just wrote:
+
+.. code-block:: c++
+
+    #define SCK        40
+    #define MISO       39
+    #define MOSI       38 
+    #define EPD_CS     37
+    #define EPD_DC     36
+    #define SRAM_CS    35
+    #define EPD_RESET  34  // can set to -1 and share with microcontroller Reset!
+    #define EPD_BUSY   33 // can set to -1 to not use a pin (will wait a fixed delay)
+    #define EPD_ENABLE 32
+
+    EPD_4 epd(EPD_BUSY, EPD_RESET, EPD_DC, EPD_CS, MOSI, MISO, SCK, false);
+    void epd_flush( lv_disp_drv_t*, const lv_area_t*, lv_color_t* ); //Memory update function
+    void epd_set_px_cb(lv_disp_drv_t*, uint8_t*, lv_coord_t, lv_coord_t, lv_coord_t, lv_color_t, lv_opa_t); //Pixel painter
+    void epd_rounder( lv_disp_drv_t*, lv_area_t*); //Coordinate rounder
+    void epd_cb_handler()
+    static void button_reader( lv_indev_drv_t*, lv_indev_data_t* ); //Reads button state
+    uint8_t button_interface(); //HW button interface
+    void button_feedback(lv_indev_drv_t*, uint8_t); //Buggy, implements DRV vibration behavior.
+    static uint8_t LV_TICK_INCREMENT_MS = 4;
+    static const uint8_t screenWidth  = 200;
+    static const uint8_t screenHeight = 200;
+    bool refresh = false;
+    bool waiting = false;
+
+    static lv_disp_draw_buf_t draw_buf;
+    static uint8_t buf_1[ screenWidth * screenHeight / 4];
+
+On a side note, when refactoring this code to fit into the Zephyr repository, I will grab the pinouts from the devicetree instead of hardcoding it into the application like I did here. 
+
+Now, we need a little object called a "semaphore" - since LVGL as a library is not thread-safe and in this C++ application I was interacting with LVGL APIs outside of the current thread it was executing in, I had to use a semaphore to guard the LVGL object, preventing it from being corrupted behind its back or falling into an undefined state in the multithreaded environment. In FreeRTOS, we can declare them like this:
+
+.. code-block:: c++
+
+    SemaphoreHandle_t GuiSemaphore;
+
+
+Now, we enter the function context and write definitions for the epd specific prototypes written above:
+
+.. code-block:: c++
+
+    //Callback function on interrupt
+    void epd_driver_callback(uint32_t pin, nrf_gpiote_polarity_t polarity)
+    {
+        waiting = false;
+        if(refresh)
+        {
+            epd.HybridRefresh(10);
+            refresh = false;
+            waiting = true;
+        }
+        else
+        {
+            lv_disp_drv_t* disp = (lv_disp_drv_t*) lv_disp_get_default();
+            lv_disp_flush_ready(disp);
+        }
+    }
+
+    //Blocking EPD flush
+    void epd_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p )
+    {
+        uint8_t *buf = (uint8_t*) color_p;
+        epd.CopyFrameBufferToRAM(buf, NULL, area->x1, area->y1, area->x2, area->y2);
+        if(lv_disp_flush_is_last(disp))
+        {
+            epd.HybridRefresh(10);
+        }
+        lv_disp_flush_ready(disp); 
+    }
+
+    void epd_dma_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p )
+    {
+        if(!waiting)
+        {
+            uint8_t *buf = (uint8_t*) color_p;
+            epd.CopyFrameBufferToRAM(buf, NULL, area->x1, area->y1, area->x2, area->y2);
+            if(lv_disp_flush_is_last(disp))
+            {
+                refresh = true;
+            }
+            waiting = true;
+        }
+    }
+
+    void epd_set_px_cb(lv_disp_drv_t *disp, uint8_t *buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa) 
+    {
+        unsigned char bitIndex, a;
+        uint16_t byteIndex = (y*(buf_w/8))+((x&0xF8)/8);
+        bitIndex = x-(x&0xF8);
+        a = 1;
+        if(lv_color_brightness(color) > 128)
+        {
+            buf[byteIndex] |= a << (7-bitIndex);
+        }
+        else{
+            buf[byteIndex] &= ~(a << (7-bitIndex));
+        }
+    }
+
+    void epd_rounder( lv_disp_drv_t *disp, lv_area_t *area)
+    { 
+        area->x1 = 0;
+        area->x2 = 200;
+    }
+
+These all follow the exact logic we defined in the design section. They look oddly small and elegant, but getting my head around the bitwise manipulation took a very long time. The DMA variants of the functions are only supported with DMA-based SPI, which the Arduino framework did not support. This is a big reason for me switching over to Zephyr. 
+
+Now we need to run some setup code to tell LVGL about the display interfacing callbacks we've just written:
+
+.. code-block:: c++
+
+    GuiSemaphore = xSemaphoreCreateMutex(); //Creating FreeRTOS protection semaphore
+    if (epd.Init(false, &epd_driver_callback) != NRF_SUCCESS) { //Initialising epd driver
+        SEGGER_RTT_WriteString(0, "e-Paper init failure\n");
+        return;
+    }
+    SEGGER_RTT_WriteString(0, "e-Paper init\n");
+
+    epd.BlanketBomb(EPD_BLACK); //Visual test routine, paints screen black, then white. 
+    epd.BlanketBomb(EPD_WHITE);    
+    
+    lv_init(); //Initialisation function for LVGL
+
+    #if LV_USE_LOG != 0
+    lv_log_register_print_cb( my_print ); /* register print function for debugging */
+    #endif
+
+    //Telling LVGL about our drawing buffer and its size
+    lv_disp_draw_buf_init( &draw_buf, buf_1, NULL, screenWidth * screenHeight / 8 );
+
+    /*Initialising LVGL display*/
+    static lv_disp_drv_t disp_drv;
+
+    //Registering callbacks!!
+    lv_disp_drv_init( &disp_drv );
+    disp_drv.draw_buf = &draw_buf;
+    disp_drv.flush_cb = epd_flush;
+    disp_drv.set_px_cb = epd_set_px_cb;
+    disp_drv.rounder_cb = epd_rounder;
+    disp_drv.hor_res = screenWidth;
+    disp_drv.ver_res = screenHeight;
+
+    lv_disp_t* disp;
+    disp = lv_disp_drv_register( &disp_drv );
+    lv_disp_set_default(disp); // to help isr find the display
+
+
+You might notice the line ``lv_log_register_print_cb( my_print );`` . The reason for this is the Arduino framework typically didn't allow access to the underlying debug architecture provided by my dev-board. The dev-board features a very powerful SEGGER JLink debugger ASIC which can speak a debug protocol called "Real Time Transfer" - abbreviated to ``RTT``. ``RTT`` has many advantages over the traditional UART serial that Arduino frameworks typically use.
+
+1) Stores messages internally and delivers them when a suitable debug machine connects and interfaces, so no messages get lost while reconnecting on reboot. 
+2) No fussing about with baud-rates
+3) No need to reconnect the terminal every time you make a change to software and reflash the MCU. 
+
+Luckily all I needed to do was include the Segger_RTT library, and define a custom function that used the RTT hardware to print out a message to my computer:
+
+.. code-block:: c++
+
+    void my_print(const char* buf)
+    {
+        SEGGER_RTT_WriteString(0, buf);
+        SEGGER_RTT_WriteString(0, "\n");
+    }
+
+Pretty straightforward!
+
+Now let's look at input handling. The Arduino's GPIO libraries are quite abstracted away, but for this sort of application they worked great. LVGL's input logic is polling based, but it is possible to implement an input queue which is polled every 30ms when a button is detected. The only issue here was that we didn't have direct access to the GPIOTE peripheral which would allow us to do this because of the abstracted Arduino framework. So I made do with some basic switch statements and macros:
+
+.. code-block:: c++
+
+    #define READ_PREVIOUS digitalRead(PIN_BUTTON2)
+    #define READ_NEXT digitalRead(PIN_BUTTON1)
+    #define READ_ENTER digitalRead(PIN_BUTTON3)
+    #define READ_ESC digitalRead(PIN_BUTTON4)
+    #define PREVIOUS_PRESSED 4
+    #define NEXT_PRESSED 3
+    #define ENTER_PRESSED 1
+    #define ESC_PRESSED 2
+
+    uint8_t button_interface()
+    {
+        if(READ_ENTER==LOW)
+        {
+            return ENTER_PRESSED;
+        } 
+        if(READ_ESC==LOW)
+        {
+            return ESC_PRESSED;
+        } 
+        if(READ_NEXT==LOW)
+        {
+            return NEXT_PRESSED;
+        } 
+        if(READ_PREVIOUS==LOW)
+        {
+            return PREVIOUS_PRESSED;
+        } 
+        else
+        {
+            return 0;
+        } 
+    }
+
+    static uint8_t lastKey = 0;
+
+    void button_reader(lv_indev_drv_t* drv, lv_indev_data_t* data)
+    {
+        uint8_t receivedKey = button_interface();
+        if(receivedKey!=0)
+        {
+            data->state = LV_INDEV_STATE_PR;
+            switch(receivedKey)
+            {
+            case ENTER_PRESSED:
+                receivedKey = LV_KEY_ENTER;
+                break;
+            case ESC_PRESSED:
+                receivedKey = LV_KEY_ESC;
+                break;
+            case NEXT_PRESSED:
+                receivedKey = LV_KEY_NEXT;
+                break;
+            case PREVIOUS_PRESSED:
+                receivedKey = LV_KEY_PREV;
+                break;
+            }
+            lastKey = receivedKey;
+            SEGGER_RTT_WriteString(0, "KEY PRESSED:");
+            SEGGER_RTT_PutChar(0, lastKey);
+            SEGGER_RTT_WriteString(0, "\n");
+        }
+        else
+        {
+            data->state = LV_INDEV_STATE_REL;
+        }
+        data->key = lastKey;
+    }
+
+
+    void button_feedback(lv_indev_drv_t* indev, uint8_t e)
+    {
+        if(pdTRUE==xSemaphoreTake(I2CSemaphore, portMAX_DELAY))
+        {
+            switch(e)
+            {
+            case LV_EVENT_CLICKED:
+                drv.setWaveform(0, 24);
+                drv.setWaveform(1, 0);
+                drv.go();
+                break;
+            case LV_EVENT_FOCUSED:
+                drv.setWaveform(0, 26);
+                drv.setWaveform(1, 0);
+                drv.go();
+                break;
+            case LV_EVENT_LONG_PRESSED:
+                drv.setWaveform(0, 34);
+                drv.setWaveform(1, 0);
+                drv.go();
+                break;
+            }
+        }
+        xSemaphoreGive(I2CSemaphore);
+    }
+
+``button_feedback()`` is an interesting little function. LVGL allows feedback callback functions to latch onto inputs, and do things when particular events are raised. Here, we're using this to implement haptic touch using a DRV2605 vibration controller and disc vibrator. 
+
+Now we can register the input framework and callbacks with LVGL:
+
+.. code-block:: c++
+
+    static lv_indev_drv_t indev_drv;
+    lv_indev_drv_init( &indev_drv );
+    indev_drv.type = LV_INDEV_TYPE_KEYPAD;
+    indev_drv.read_cb = button_reader;
+    indev_drv.feedback_cb = button_feedback;
+    indev_lvgl = lv_indev_drv_register( &indev_drv );
+
+
+LVGL will now poll the input reader every 30 milliseconds - awesome!
+
+At this point we're ready to start implementing some UI. After a lot of trial and error, I came up with this:
+
+.. code-block:: c++
+
+    /* ... */
+    lv_obj_t* home_scr;
+    lv_obj_t* watchface_scr;
+    lv_indev_t* indev_lvgl;
+    lv_group_t* watchface_group;
+    lv_group_t* home_group;
+    /* ... */
+
+    void setup_routine()
+    {
+        /* Continued from above */
+
+        watchface_scr = lv_obj_create(NULL);
+        home_scr = lv_obj_create(NULL);
+        lv_theme_t* theme = lv_theme_mono_init(disp, false, &lv_font_montserrat_30);
+        lv_disp_set_theme(disp, theme);
+        init_watchface_scr(indev_lvgl);
+
+        /* ... */
+    }
+
+
+    void init_watchface_scr(lv_indev_t* indev)
+    {
+        watchface_group = lv_group_create();
+
+        time_label = lv_label_create(watchface_scr);
+        time_label_updater_timer(NULL);
+        lv_obj_set_style_text_font(time_label, &hyperlegible_72, 0);
+        lv_obj_align(time_label, LV_ALIGN_CENTER, 0, 0);
+
+        static lv_style_t containerStyle2;
+        lv_style_init(&containerStyle2);
+        lv_style_set_bg_color(&containerStyle2, lv_color_white());
+        lv_style_set_bg_opa(&containerStyle2, LV_OPA_TRANSP);
+        lv_style_set_border_width(&containerStyle2, 0);
+        lv_style_set_border_color(&containerStyle2, lv_color_white());
+
+        lv_obj_t* centreContainer = lv_obj_create(watchface_scr);
+        lv_obj_set_size(centreContainer, 185, 40);
+        lv_obj_align(centreContainer, LV_ALIGN_CENTER, 0, -3);
+        lv_obj_add_style(centreContainer, &containerStyle2, 0);
+
+        status_above = lv_label_create(centreContainer);
+        lv_label_set_text(status_above, "INKI");
+        lv_obj_set_style_text_font(status_above, &hyperlegible_13, 0);
+        lv_obj_align(status_above, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+        battery_label = lv_label_create(centreContainer);
+        battery_label_update_timer(NULL);
+        lv_obj_set_style_text_font(battery_label, &hyperlegible_13, 0);
+        lv_obj_align(battery_label, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+
+        date_label = lv_label_create(centreContainer);
+        date_label_update_timer(NULL);
+        lv_obj_set_style_text_font(date_label, &hyperlegible_13, 0);
+        lv_obj_align(date_label, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+
+        steps_label = lv_label_create(centreContainer);
+        steps_label_update_timer(NULL);
+        lv_obj_set_style_text_font(steps_label, &hyperlegible_13, 0);
+        lv_obj_align(steps_label, LV_ALIGN_TOP_LEFT, 0, 0);
+
+        static lv_point_t line_points[] = { {5, 0}, {195, 0}};
+        static lv_style_t middle_line;
+        lv_style_init(&middle_line);
+        lv_style_set_line_width(&middle_line, 3);
+        lv_style_set_line_color(&middle_line, lv_color_black());
+        lv_style_set_line_rounded(&middle_line, false);
+        
+        lv_obj_t* watch_line;
+        SEGGER_RTT_WriteString(0, "Applying style\n");
+        watch_line = lv_line_create(watchface_scr);
+        lv_line_set_points(watch_line, line_points, 2);
+        lv_obj_add_style(watch_line, &middle_line, 0);
+        lv_obj_align(watch_line, LV_ALIGN_CENTER, 0, -3);
+
+
+        lv_obj_t* btn_menu = lv_btn_create(watchface_scr);
+        lv_obj_add_event_cb(btn_menu, watchface_cb, LV_EVENT_CLICKED, NULL);
+        lv_obj_add_style(btn_menu, &containerStyle2, 0);
+        lv_obj_align(btn_menu, LV_ALIGN_BOTTOM_MID, 0, 0);
+        lv_group_add_obj(watchface_group, btn_menu);
+        lv_indev_set_group(indev, watchface_group);
+
+    
+    }
+
+In LVGL, objects have hierarchies - meaning every object must have a parent, which must have its own parent, and so on until you reach the base object which has no parent, called a screen. In the main setup routine, we're initialising our watchface object which has been declared in the global scope on the stack. We apply the monochrome theme and the default font, which in this case is the built in "Montserrat". When the setup routine calls into the watchface initialisation function, it passes the pointer to the input group, which allows the UI to create and draw every single object onto the global screen, and then assign any input conditions that LVGL should be aware of and be prepared to react to. For example, in this watchface, we have one hidden button in the bottom middle which the user can select using the tactile buttons, and have LVGL do something with that input. In this case, we're using it to switch to the menu screen - I will elaborate on this in a moment.
+
+But first, let's take a look at all the timer functions and resources that we can see in the code snippets and see what they do:
+
+.. code-block:: c++
+
+    lv_obj_t* time_label;
+    lv_obj_t* date_label;
+    lv_obj_t* steps_label;
+    lv_obj_t* battery_label;
+    lv_obj_t* status_above;
+    lv_obj_t* icon_bar;
+    uint8_t batteryPercentage = 100;
+
+    char icm_activity;
+    unsigned long icm_steps;
+
+    Adafruit_GPS PA1010D(&Wire);
+
+    #define MY_RUN_SYMBOL "\xEF\x9C\x8C"
+    #define MY_HEART_SYMBOL "\xEF\x88\x9E"
+    #define MY_PHONE_SYMBOL "\xEF\x8F\x8D"
+    #define MY_CALENDAR_SYMBOL "\xEF\x81\xB3"
+    #define MY_HOURGLASS_SYMBOL "\xEF\x89\x92"
+
+    char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+    void time_label_updater_timer(lv_timer_t* timer)
+    {
+        char timeBuf[10];
+        sprintf(timeBuf, "%02u\n%02u", PA1010D.hour, PA1010D.minute);
+        if(!(timeBuf==lv_label_get_text(time_label)))
+        {
+            lv_label_set_text(time_label, timeBuf);
+        }
+    }
+
+    char* zellersAlgorithm(int day, int month, int year){
+        char* days[7] = {"SATURDAY", "SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"};
+        int mon;
+        if(month > 2)
+            mon = month; //for march to december month code is same as month
+        else{
+            mon = (12+month); //for Jan and Feb, month code will be 13 and 14
+            year--; //decrease year for month Jan and Feb
+        }
+        int y = year % 100; //last two digit
+        int c = year / 100; //first two digit
+        int w = (day + floor((13*(mon+1))/5) + y + floor(y/4) + floor(c/4) + (5*c));
+        w = w % 7;
+        return days[w];
+    }
+
+    void date_label_update_timer(lv_timer_t* timer)
+    {
+        char dateBuf[25];
+        uint8_t d = PA1010D.day;
+        uint8_t m = PA1010D.month;
+        uint8_t y = PA1010D.year;
+        sprintf(dateBuf, "%.3s %02u", zellersAlgorithm(d, m, y), d);
+        SEGGER_RTT_WriteString(0, dateBuf);
+        lv_label_set_text(date_label, dateBuf);
+        if(!(dateBuf==lv_label_get_text(date_label)))
+        {
+            lv_label_set_text(date_label, dateBuf);
+        }
+    }
+    void steps_label_update_timer(lv_timer_t* timer)
+    {
+        char stepsoutput[40];
+        //icm20948.task();
+        sprintf(stepsoutput, "%li", icm_steps);
+        SEGGER_RTT_WriteString(0, stepsoutput);
+        if(!(stepsoutput == lv_label_get_text(steps_label)))
+        {
+            lv_label_set_text(steps_label, stepsoutput);
+        }
+    }
+    void battery_label_update_timer(lv_timer_t* timer)
+    {
+        char bat[30];
+        uint8_t snapshotbattery = batteryPercentage;
+        sprintf(bat, "%u%% ", snapshotbattery);
+        if(snapshotbattery<=5)
+        {
+            sprintf(bat, "%s%s", bat, LV_SYMBOL_BATTERY_EMPTY);
+        }
+        if(snapshotbattery<=20)
+        {
+            sprintf(bat, "%s%s", bat, LV_SYMBOL_BATTERY_1);
+        }
+        if(snapshotbattery<=40)
+        {
+            sprintf(bat, "%s%s", bat, LV_SYMBOL_BATTERY_2);
+        }
+        if(snapshotbattery<=80)
+        {
+            sprintf(bat, "%s%s", bat, LV_SYMBOL_BATTERY_3);
+        }
+        if(snapshotbattery<=100)
+        {
+            sprintf(bat, "%s%s", bat, LV_SYMBOL_BATTERY_FULL);
+        }
+        if(!(bat==lv_label_get_text(battery_label)))
+        {
+            lv_label_set_text(battery_label, bat);
+        }
+    }
+
+Most of this is self-explanatory, we're essentially checking whether the various bits of information on the watchface have changed from their current values. If they have, then we update the element and LVGL will automatically redraw the screen! There are some symbols that need explaining though. 
+
+``LV_SYMBOL_BATTERY_EMPTY`` to ``LV_SYMBOL_BATTERY_FULL`` are built in symbols that LVGL provides with a symbolic font. We can invoke the symbolic font to get consistent, slick looking icons in a convenient Unicode format. I needed some more symbols apart from these, so I defined my own symbols ``MY_RUN_SYMBOL``, through to ``MY_HOURGLASS_SYMBOL`` and imported a custom font containing the symbols defined in ``lv_conf.h``, the original configuration file tweaking LVGL's behaviour. 
+
+Now let's examine the main menu:
+
+.. code-block:: c++
+    
+    //Repeated from above for clarity
+    lv_obj_t* home_scr;
+    lv_obj_t* watchface_scr;
+    lv_indev_t* indev_lvgl;
+    lv_group_t* watchface_group;
+    lv_group_t* home_group;
+
+    void init_home_scr(lv_indev_t* indev)
+    {
+        home_group = lv_group_create();
+        lv_obj_t* home_btnm_container = lv_obj_create(home_scr);
+        
+        static lv_style_t containerStyle;
+        lv_style_init(&containerStyle);
+        lv_style_set_bg_color(&containerStyle, lv_color_white());
+        lv_style_set_bg_opa(&containerStyle, LV_OPA_0);
+        lv_style_set_border_width(&containerStyle, 1);
+        lv_style_set_outline_width(&containerStyle, 0);
+        lv_style_set_border_opa(&containerStyle, LV_OPA_TRANSP);
+        lv_style_set_outline_opa(&containerStyle, LV_OPA_TRANSP);
+
+        lv_obj_set_size(home_btnm_container, 200, 190);
+        lv_obj_align(home_btnm_container, LV_ALIGN_TOP_MID, 0, 0);
+        lv_obj_add_style(home_btnm_container, &containerStyle, 0);
+        
+        /*Properties to transition*/
+        static lv_style_prop_t props[] = {
+                LV_STYLE_TRANSFORM_WIDTH, LV_STYLE_TRANSFORM_HEIGHT, LV_STYLE_TEXT_LETTER_SPACE, (lv_style_prop_t)0
+        };
+
+        /*Transition descriptor when going back to the default state.
+            *Add some delay to be sure the press transition is visible even if the press was very short*/
+        static lv_style_transition_dsc_t transition_dsc_def;
+        lv_style_transition_dsc_init(&transition_dsc_def, props, lv_anim_path_overshoot, 140, 0, NULL);
+
+        /*Transition descriptor when going to pressed state.
+            *No delay, go to presses state immediately*/
+        static lv_style_transition_dsc_t transition_dsc_pr;
+        lv_style_transition_dsc_init(&transition_dsc_pr, props, lv_anim_path_ease_in_out, 140, 0, NULL);
+
+        /*Add only the new transition to he default state*/
+        static lv_style_t style_def;
+        lv_style_init(&style_def);
+        lv_style_set_transition(&style_def, &transition_dsc_def);
+        lv_style_set_width(&style_def, 58);
+        lv_style_set_height(&style_def, 58);
+        lv_style_set_bg_color(&style_def, lv_color_black());
+        lv_style_set_text_color(&style_def, lv_color_white());
+        lv_style_set_text_font(&style_def, &lv_font_montserrat_40);
+        /*Add the transition and some transformation to the presses state.*/
+        static lv_style_t style_pr;
+        lv_style_init(&style_pr);
+        lv_style_set_transform_width(&style_pr, 5);
+        lv_style_set_transform_height(&style_pr, -5);
+        lv_style_set_text_letter_space(&style_pr, 5);
+        lv_style_set_transition(&style_pr, &transition_dsc_pr);
+        lv_style_set_bg_color(&style_pr, lv_color_black());
+        lv_style_set_text_color(&style_pr, lv_color_white());
+        lv_style_set_text_font(&style_pr, &lv_font_montserrat_40);
+
+        static lv_style_t style_def_mysymbol;
+        lv_style_init(&style_def_mysymbol);
+        lv_style_set_transition(&style_def_mysymbol, &transition_dsc_def);
+        lv_style_set_width(&style_def_mysymbol, 58);
+        lv_style_set_height(&style_def_mysymbol, 58);
+        lv_style_set_bg_color(&style_def_mysymbol, lv_color_black());
+        lv_style_set_text_color(&style_def_mysymbol, lv_color_white());
+        lv_style_set_text_font(&style_def_mysymbol, &extra_symbols_40);
+        /*Add the transition and some transformation to the presses state.*/
+        static lv_style_t style_pr_lv_mysymbol;
+        lv_style_init(&style_pr_lv_mysymbol);
+        lv_style_set_transform_width(&style_pr_lv_mysymbol, 5);
+        lv_style_set_transform_height(&style_pr_lv_mysymbol, -5);
+        lv_style_set_text_letter_space(&style_pr_lv_mysymbol, 5);
+        lv_style_set_transition(&style_pr_lv_mysymbol, &transition_dsc_pr);
+        lv_style_set_bg_color(&style_pr_lv_mysymbol, lv_color_black());
+        lv_style_set_text_color(&style_pr_lv_mysymbol, lv_color_white());
+        lv_style_set_text_font(&style_pr_lv_mysymbol, &extra_symbols_40);
+
+        //LVGL BUILT-IN SYMBOL BUTTONS FIRST
+        lv_obj_t * homebtn = lv_btn_create(home_btnm_container);
+        lv_obj_align(homebtn, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_style(homebtn, &style_pr, LV_STATE_PRESSED);
+        lv_obj_add_style(homebtn, &style_def, 0);
+        lv_obj_t * label = lv_label_create(homebtn);
+        lv_label_set_text(label, LV_SYMBOL_HOME);
+        lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_event_cb(homebtn, load_watchface, LV_EVENT_CLICKED, NULL);
+
+        lv_obj_t * settingsbtn = lv_btn_create(home_btnm_container);
+        lv_obj_align(settingsbtn, LV_ALIGN_TOP_RIGHT, 0, 0);
+        lv_obj_add_style(settingsbtn, &style_pr, LV_STATE_PRESSED);
+        lv_obj_add_style(settingsbtn, &style_def, 0);
+        lv_obj_t * settingslabel = lv_label_create(settingsbtn);
+        lv_label_set_text(settingslabel, LV_SYMBOL_SETTINGS);
+        lv_obj_align(settingslabel, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_event_cb(settingsbtn, event_handler, LV_EVENT_CLICKED, NULL);
+
+        lv_obj_t * audiobtn = lv_btn_create(home_btnm_container);
+        lv_obj_align(audiobtn, LV_ALIGN_RIGHT_MID, 0, 0);
+        lv_obj_add_style(audiobtn, &style_pr, LV_STATE_PRESSED);
+        lv_obj_add_style(audiobtn, &style_def, 0);
+        lv_obj_t * audiolabel = lv_label_create(audiobtn);
+        lv_label_set_text(audiolabel, LV_SYMBOL_AUDIO);
+        lv_obj_align(audiolabel, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_event_cb(audiobtn, event_handler, LV_EVENT_CLICKED, NULL);
+
+        lv_obj_t * notifbtn = lv_btn_create(home_btnm_container);
+        lv_obj_align(notifbtn, LV_ALIGN_TOP_MID, 0, 0);
+        lv_obj_add_style(notifbtn, &style_pr, LV_STATE_PRESSED);
+        lv_obj_add_style(notifbtn, &style_def, 0);
+        lv_obj_t * notiflabel = lv_label_create(notifbtn);
+        lv_label_set_text(notiflabel, LV_SYMBOL_BELL);
+        lv_obj_align(notiflabel, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_event_cb(notifbtn, event_handler, LV_EVENT_CLICKED, NULL);
+
+        //NON LVGL SYMBOL BUTTONS
+
+        lv_obj_t * hrbtn = lv_btn_create(home_btnm_container);
+        lv_obj_align(hrbtn, LV_ALIGN_TOP_LEFT, 0, 0);
+        lv_obj_add_style(hrbtn, &style_pr_lv_mysymbol, LV_STATE_PRESSED);
+        lv_obj_add_style(hrbtn, &style_def_mysymbol, 0);
+        lv_obj_t * hrlabel = lv_label_create(hrbtn);
+        lv_label_set_text(hrlabel, MY_HEART_SYMBOL);
+        lv_obj_align(hrlabel, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_event_cb(hrbtn, event_handler, LV_EVENT_CLICKED, NULL);
+
+        lv_obj_t * exercisebtn = lv_btn_create(home_btnm_container);
+        lv_obj_align(exercisebtn, LV_ALIGN_LEFT_MID, 0, 0);
+        lv_obj_add_style(exercisebtn, &style_pr_lv_mysymbol, LV_STATE_PRESSED);
+        lv_obj_add_style(exercisebtn, &style_def_mysymbol, 0);
+        lv_obj_t * exerciselabel = lv_label_create(exercisebtn);
+        lv_label_set_text(exerciselabel, MY_RUN_SYMBOL);
+        lv_obj_align(exerciselabel, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_event_cb(exercisebtn, event_handler, LV_EVENT_CLICKED, NULL);
+
+        lv_obj_t * schedulebtn = lv_btn_create(home_btnm_container);
+        lv_obj_align(schedulebtn, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+        lv_obj_add_style(schedulebtn, &style_pr_lv_mysymbol, LV_STATE_PRESSED);
+        lv_obj_add_style(schedulebtn, &style_def_mysymbol, 0);
+        lv_obj_t * schedulelabel = lv_label_create(schedulebtn);
+        lv_label_set_text(schedulelabel, MY_CALENDAR_SYMBOL);
+        lv_obj_align(schedulelabel, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_event_cb(schedulebtn, event_handler, LV_EVENT_CLICKED, NULL);
+
+        lv_obj_t * timerbtn = lv_btn_create(home_btnm_container);
+        lv_obj_align(timerbtn, LV_ALIGN_BOTTOM_MID, 0, 0);
+        lv_obj_add_style(timerbtn, &style_pr_lv_mysymbol, LV_STATE_PRESSED);
+        lv_obj_add_style(timerbtn, &style_def_mysymbol, 0);
+        lv_obj_t * timerlabel = lv_label_create(timerbtn);
+        lv_label_set_text(timerlabel, MY_HOURGLASS_SYMBOL);
+        lv_obj_align(timerlabel, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_event_cb(timerbtn, event_handler, LV_EVENT_CLICKED, NULL);
+
+        lv_obj_t * findmebtn = lv_btn_create(home_btnm_container);
+        lv_obj_align(findmebtn, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+        lv_obj_add_style(findmebtn, &style_pr_lv_mysymbol, LV_STATE_PRESSED);
+        lv_obj_add_style(findmebtn, &style_def_mysymbol, 0);
+        lv_obj_t * findmelabel = lv_label_create(findmebtn);
+        lv_label_set_text(findmelabel, MY_PHONE_SYMBOL);
+        lv_obj_align(findmelabel, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_event_cb(findmebtn, event_handler, LV_EVENT_CLICKED, NULL);
+
+        lv_group_add_obj(home_group, hrbtn);
+        lv_group_add_obj(home_group, notifbtn);
+        lv_group_add_obj(home_group, settingsbtn);
+        lv_group_add_obj(home_group, exercisebtn);
+        lv_group_add_obj(home_group, homebtn);
+        lv_group_add_obj(home_group, audiobtn);
+        lv_group_add_obj(home_group, schedulebtn);
+        lv_group_add_obj(home_group, timerbtn);
+        lv_group_add_obj(home_group, findmebtn);
+
+        lv_indev_set_group(indev, home_group);
+    }
+
+All fairly self explanatory - we're able to use our custom font to get slick looking icons and animations on our EPD, and we can register separate event callbacks for every single button press, which we then pass to the main input driver object. 
+
+Now let's examine the actual LVGL-side input handling.
+
+.. code-block:: c++
+
+    static void watchface_cb(lv_event_t* e)
+    {
+        lv_scr_load(home_scr);
+        lv_indev_set_group(indev_lvgl, home_group);
+        SEGGER_RTT_WriteString(0, "Loaded home screen");
+    }
+
+    static void load_watchface(lv_event_t* e)
+    {        
+        lv_scr_load(watchface_scr);
+        lv_indev_set_group(indev_lvgl, watchface_group);
+        SEGGER_RTT_WriteString(0, "Loaded watchface");
+    }
+
+Yes, it's that simple! We register these callbacks when we initialise the watchface and main menu, so all we need to do to trigger the UI is to load one of these screens after we initialise them both by calling ``load_watchface()`` !
+
+When we switch to a different screen, we need to reassign our input driver instance to the new screen, which is why you see we not only perform ``lv_scr_load()`` on the screen in question, we also perform ``lv_indev_set_group()`` on the new screen's group to give it access to our input driver. 
+
+Now, there's one last step to get everything working nicely. LVGL needs a periodic tick/interrupt so that it knows how much time has passed. Getting this to work by bodging in the nrfx drivers into the abstracted Arduino framework took so long that I gave up trying to integrate the other things that needed direct hardware access, like the EPD driver, and I moved to Zephyr. By copying in the driver files from the nrfx repository into exactly the correct locations and updating countless include paths, I managed to set up the RTC peripheral to interrupt our application every 5 milliseconds and provide LVGL with its necessary tick:
+
+.. code-block:: c++
+
+#include "nrfx_gpiote.h"
+#include "nrf_svc.h"
+#include "nrf_nvic.h"
+#include "nrfx_rtc.h"
 
 
 .. [41] https://github.com/littlefs-project/littlefs
