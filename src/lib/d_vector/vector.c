@@ -31,6 +31,7 @@ struct privatevector
     size_t capacity;
     unsigned int num_items;
     size_t allocated_items;
+    uint32_t max_index;
 };
 
 uint8_t* vector_get_index_pointer(struct vector* v, int index);
@@ -92,6 +93,60 @@ int vector_clear(struct vector* v)
 }
 
 
+//It is your responsibility to properly dispose of the generated item by using free!
+void* vector_get(struct vector* v, int index)
+{
+    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+    void* element = k_malloc(ptr->item_size);
+    memcpy(&element, (void*)vector_get_index_pointer(v, index), ptr->item_size);
+    return element; 
+}
+
+
+int vector_set(struct vector* v, int index, void* data)
+{
+    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+    memcpy(vector_get_index_pointer(v, index), (void*)data, ptr->item_size);
+    return 1;
+}
+
+int vector_init(struct vector* v, size_t initial_length, size_t item_size)
+{
+    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+    ptr->item_size = item_size;
+    if(initial_length > 0)
+    {
+        ptr->allocated_items = initial_length;
+    }
+    else
+    {
+        ptr->allocated_items = VECTOR_DEFAULT_SIZE;
+    }
+    ptr->num_items = 0;
+    ptr->items = calloc(ptr->allocated_items, item_size);
+    if(ptr->items == NULL)
+    {
+        LOG_INST_ERR(v->log, "Memory not allocated!!");
+        return -1;
+    }
+    LOG_INST_INF(v->log, "Success");
+    return 1;
+}
+
+int vector_clear(struct vector* v)
+{
+    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
+    int rc;
+    for (int i = 0; i < ptr->num_items; i++)
+    {
+        rc = vector_set(v, i, NULL);
+        if(rc < 0)
+        {
+            return rc;
+        }
+    }
+    return 1;
+}
 
 
 uint8_t* vector_get_index_pointer(struct vector* v, int index)
@@ -104,17 +159,18 @@ uint8_t* vector_get_index_pointer(struct vector* v, int index)
 int vector_resize(struct vector* v, size_t new_size)
 {
     struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
-    if(new_size > ptr->num_items)
+    //Reallocating for more memory space to fit more items in (or to discard items?)
+    void* new_ptr = realloc(ptr->items, ptr->item_size * new_size);
+    if(new_ptr == NULL)
     {
-        ptr->allocated_items = new_size;
-    }
-    ptr->items = realloc(ptr->items, ptr->item_size * ptr->allocated_items);
-    if(ptr->items == NULL)
-    {
-        LOG_INST_ERR(v->log, "Data lost during realloc");
+        LOG_INST_ERR(v->log, "Realloc failed. Data saved");
         return -1;
     }
+    ptr->items = new_ptr;
     LOG_INST_INF(v->log, "Success");
+    //Realloc leaves the new allocated memory in an undefined state. We will set everything after the old allocated memory to NULL to allow the removal algorithm to keep track of the max_index. 
+    memset(ptr->items + ((ptr->allocated_items - 1) * ptr->item_size), NULL, (new_size - ptr->allocated_items) * ptr->item_size);  
+    ptr->allocated_items = new_size;
     return 1;
 }
 
@@ -140,13 +196,30 @@ void* vector_pop(struct vector* v)
 int vector_remove_at(struct vector* v, int index)
 {
     struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
-    if(index < 0 || index > ptr->num_items-1)
+    if(index < 0 || index > ptr->max_index)
     {
         LOG_INST_ERR(v->log, "Invalid index: %i", index);
         return -EINVAL;
     }
-    memmove((void*)vector_get_index_pointer(v, index), (void*)vector_get_index_pointer(v, index+1), ptr->item_size);
+    //If it's the last index then just set it equal to zero. 
+    if(index == ptr->max_index) memset((void*)vector_get_index_pointer(v, ptr->max_index), NULL, ptr->item_size);
+    //Otherwise shuffle all the elements down to overwrite the element.
+    else memmove((void*)vector_get_index_pointer(v, index), (void*)vector_get_index_pointer(v, index+1), ptr->item_size);
+    int newindex = 0;
+    //Updating max_index to allow storing at any arbitrary location.
+    for(int i = ptr->max_index; i >= 0; i--)
+    {
+        void* a = vector_get(v, i);
+        if(a = NULL) return -EIO;
+        for(int x = 0; x < ptr->item_size; x++)
+        {
+            if(((char*)a)[x] != NULL) newindex = i;
+        }
+        free(a);
+    }
+    ptr->max_index = newindex;
     ptr->num_items--;
+
     return 1;
 }
 
@@ -159,8 +232,6 @@ int vector_insert_at(struct vector* v, int index, void* element)
         LOG_INST_ERR(v->log, "Invalid index: %i", index);
         return -EINVAL;
     }
-    char* testing_str = "hello world this is some important binary code";
-
     //Secondly, the index is -1, meaning the item is to be appended to the back of the list.
     if (index == -1)
     {
@@ -169,11 +240,21 @@ int vector_insert_at(struct vector* v, int index, void* element)
     //Thirdly, the index is greater than the allocated list. In this case
     //we resize by a factor of 2 until the index is within range to allow breathing room.
     //Of course people have to be nice and not like allocate the entire memory because of a factor of 10 error because that is seriously uncool. Lot of trust here!
+    int traverse_rc = 1;
     while(index > ptr->allocated_items)
     {
-        vector_resize(v, ptr->allocated_items*2);
+        traverse_rc = vector_resize(v, ptr->allocated_items*2);
+        if(traverse_rc == -1) return -ENOMEM;
     }
-    if(index < ptr->num_items) memmove((void*)vector_get_index_pointer(v, index+1), (void*)vector_get_index_pointer(v, index), (ptr->num_items - index) * ptr->item_size);
+    
+    if(index < ptr->max_index)
+    {
+        memmove((void*)vector_get_index_pointer(v, index+1), (void*)vector_get_index_pointer(v, index), (ptr->num_items - index) * ptr->item_size);
+    }
+    else
+    {
+        ptr->max_index = index;
+    }
     memcpy((void*)vector_get_index_pointer(v, index), element, ptr->item_size);
     ptr->num_items++;
     return 1;
@@ -202,6 +283,7 @@ unsigned int vector_length(struct vector* v)
     struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
     return ptr->num_items;
 }
+
 // A utility function to swap two elements
 void swap(struct vector* v, int* a, int* b)
 {

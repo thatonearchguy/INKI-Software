@@ -64,18 +64,14 @@ struct baseDisk
     struct fs_statvfs vol_stats;
 };
 
-
 #define BASE_DISK_DEFINE(_name)  \
 LOG_INSTANCE_REGISTER(BASEDISK_NAME, _name, CONFIG_LOG_DEFAULT_LEVEL);  \
 struct baseDisk _name = {  \
             LOG_INSTANCE_PTR_INIT(log, BASEDISK_NAME, _name)  \
 }   
-                                                            
-
+                            
 int base_init(struct baseDisk *b, char* label);
 int base_deinit(struct baseDisk *b);
-
-
 
 struct intFlash
 {
@@ -89,8 +85,6 @@ struct intFlash _name = { \
     .super LOG_INSTANCE_PTR_INIT(log, INTFLASH_NAME, _name)    \
 };
 
-int intFlash_init(struct intFlash *i, char* label);
-int intFlash_deinit(struct intFlash *i);
 void intFlash_setup(struct intFlash *i);
 
 
@@ -108,9 +102,6 @@ struct intQSPIFlash _name = {  \
 }; 
                                                              
 
-
-int intQSPIFlash_init(struct intQSPIFlash *q, char* label);
-int intQSPIFlash_deinit(struct intQSPIFlash *q);
 void intQSPIFlash_setup(struct intQSPIFlash *q);
 
 
@@ -123,16 +114,12 @@ struct extSPIFlash
 
 };
 
-
 #define EXT_SPIFLASH_DEFINE(_name)  \
 LOG_INSTANCE_REGISTER(EXTSPIFLASH_NAME, _name, CONFIG_EFLASH_LOG_LEVEL);  \
 struct extSPIFlash _name = {  \
         .super LOG_INSTANCE_PTR_INIT(log, EXTSPIFLASH_NAME, _name)  \
 };  
 
-
-int extSPIFlash_init(struct extSPIFlash *e, char* label);
-int extSPIFlash_deinit(struct extSPIFlash *e);
 void extSPIFlash_setup(struct extSPIFlash *e);
 
 

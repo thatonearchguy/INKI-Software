@@ -327,13 +327,13 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
         LOG_INST_INF(x->log, "Superblock not found! Is filesystem formatted to XIPA?");
         return -ENOENT;
     }
-    //char numsuperblocks[4];
-    rc = flash_area_read(ptr->pfa, 4, buf, sizeof(buf)); //getting number of superblocks on filesystem.
+    char numsuperblocks[4];
+    rc = flash_area_read(ptr->pfa, 4, numsuperblocks, sizeof(numsuperblocks)); //getting number of superblocks on filesystem.
     if (rc < 0)
     {
         return rc;
     }
-    ptr->num_superblocks = (uint32_t) buf;   //we must add the device offset now, because we have gone down a layer of abstraction.
+    memcpy(&ptr->num_superblocks, numsuperblocks, sizeof(ptr->num_superblocks));
     ptr->offset = ptr->pfa->fa_off;
     char numfiles[4];
     rc = flash_area_read(ptr->pfa, sizeof(xipa_fs_start_block), numfiles, 4); //getting number of files on filesystem.
@@ -341,7 +341,7 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
     {
         return rc;
     }
-    ptr->num_files = (uint32_t) numfiles;
+    memcpy(&ptr->num_files, numfiles, sizeof(ptr->num_files));
     LOG_INST_INF(x->log, "Number of files - %d", ptr->num_files);
     flash_area_close(ptr->pfa); //NOP right now, but for future compatibility this is fine.
     ptr->init = true;
@@ -354,23 +354,30 @@ int xipa_fs_mount(struct xipafs* x, struct xipafs_params* params)
     */
     stack_init(&ptr->superblock_locations, ptr->num_superblocks, sizeof(struct xipa_superblock_loc));
     stack_init(&ptr->superblock_flash_dev_locations, ptr->num_superblocks, sizeof(struct xipa_superblock_loc));
-    struct xipafs_dir_t temp_dir;
-    struct filerecord tempfr;
-    xipa_fs_dir_init(x, &temp_dir); //ignore uninitialised warning
-    do {
-        rc = xipa_fs_traverse_flash_api(x, &tempfr, &temp_dir);
-        if(rc < 0)
-        {
-            if(rc == -ENOTDIR)
-            {
-                ptr->last_file_end = (unsigned int)(tempfr.file_loc + tempfr.size);
-                break;
-            }
-            else return -EIO;
-        }
+    if(ptr->num_files == 0)
+    {
+        ptr->last_file_end = 1024 * 64;
     }
-    while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, SIZE_SIZE) && tempfr.name[sizeof(tempfr.name)-1] == '\0');
-    xipa_fs_dir_deinit(x, &temp_dir);
+    else
+    {
+        struct xipafs_dir_t temp_dir;
+        struct filerecord tempfr;
+        xipa_fs_dir_init(x, &temp_dir); //ignore uninitialised warning
+        do {
+            rc = xipa_fs_traverse_flash_api(x, &tempfr, &temp_dir);
+            if(rc < 0)
+            {
+                if(rc == -ENOTDIR)
+                {
+                    ptr->last_file_end = (unsigned int)(tempfr.file_loc + tempfr.size);
+                    break;
+                }
+                else return -EIO;
+            }
+        }
+        while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, SIZE_SIZE) && tempfr.name[sizeof(tempfr.name)-1] == '\0');
+        xipa_fs_dir_deinit(x, &temp_dir);
+    }
 
     ptr->xip = k_malloc(sizeof(struct xipa_dev));
     rc = xip_init(ptr->xip);
@@ -827,12 +834,13 @@ int xipa_fs_verify(struct xipafs* x, struct filerecord* f_verify)
     xip_enable(ptr->xip);
     uint32_t passes = 0;
     //we are hardcoding a 1024 byte pass here, not really any need for more.
+    size_t pass_size = 1024;
     volatile uint8_t* start_addr = f_verify->file_loc + (unsigned int)(ptr->param->xip_dev_location);// - (unsigned int)(ptr->param->xip_device_offset);
-    while(start_addr + (passes * 1024) < f_verify->file_loc + f_verify->size)
+    while(start_addr + (passes * pass_size) < f_verify->file_loc + f_verify->size)
     {
-        xipa_frag_sha256_verif(ptr->xip, start_addr + (passes++ * 1024), 1024);
+        xipa_frag_sha256_verif(ptr->xip, start_addr + (passes++ * pass_size), pass_size);
     }
-    xipa_frag_sha256_verif(ptr->xip, start_addr+(passes * 1024), f_verify->size-(passes * 1024));
+    xipa_frag_sha256_verif(ptr->xip, start_addr+(passes * pass_size), f_verify->size-(passes * pass_size));
     char hash[32];
     xipa_frag_sha256_fin(ptr->xip, hash);
     if(strcmp(f_verify->hash, hash) == 0) return 1;
@@ -1070,6 +1078,27 @@ int xipa_fs_align(struct xipafs *x, struct filerecord f_del)
         current_ptr += flash_bound_info->size;
     }
     ptr->last_file_end -= f_del.size;
+    ptr->num_files -= 1;
+
+    rc = flash_get_page_info_by_offs(flash_dev, ptr->offset, flash_bound_info); //first we need to get the initial overlap as the files may not be 4096 byte aligned.
+    XIPA_ERR_CHECK(x->log, "Couldn't get sector boundaries for start of flash", rc);
+
+    rc = flash_read(flash_dev, flash_bound_info->start_offset, eraseArea, flash_bound_info->size);
+    XIPA_ERR_CHECK(x->log, "Couldn't read magic number block in to memory", rc);
+
+    uint32_t num_file_offset = ptr->offset + sizeof(xipa_fs_start_block) - flash_bound_info->start_offset;
+
+    //Writing new file count to starting magic block
+    memcpy(eraseArea + num_file_offset, &ptr->num_files, sizeof(ptr->num_files));
+    
+    //Erasing magic block
+    rc = flash_erase(flash_dev, flash_bound_info->start_offset, flash_bound_info->size);
+    XIPA_ERR_CHECK(x->log, "Erase failed", rc);
+
+    //Writing new magic block
+    rc = flash_write(flash_dev, flash_bound_info->start_offset, eraseArea, flash_bound_info->size);
+    XIPA_ERR_CHECK(x->log, "Write failed", rc);
+
     vector_deinit(&superblocks);
     free(eraseArea);
     xipa_fs_dir_deinit(x, &temp_dir);
@@ -1122,18 +1151,21 @@ int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size
     const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
     unsigned int new_record_loc = (unsigned int)(tempfr.record_loc + XIPA_JOURNAL_SIZE);
     XIPA_ERR_CHECK(x->log, "IO Error - temporary record construction failed", rc);
-    if(tempdir.current_record == 999)
+    bool superblock_update = false;
+    if(tempdir.current_record == 1023)
     {
         struct filerecord new_superblock;
         new_superblock.file_loc = (volatile uint8_t*)ptr->last_file_end;
         memcpy(new_superblock.run, xipa_file_extensions[0], RUN_SIZE);
         snprintf(new_superblock.name, NAME_SIZE, "superblock%d", ++ptr->num_superblocks);
         memset(new_superblock.hash, 1, HASH_SIZE);
-        new_superblock.size = XIPA_JOURNAL_SIZE * 1000;
+        new_superblock.size = XIPA_JOURNAL_SIZE * 1024;
         memcpy(new_superblock.ver_str, "1.0", VER_STR_SIZE);
         char new_superblock_entry[XIPA_JOURNAL_SIZE];
         xipa_fs_write_temp_record(x, &new_superblock, 1, new_superblock_entry);
         flash_write(flash_dev, ptr->last_file_end, new_superblock_entry, XIPA_JOURNAL_SIZE);
+        ptr->num_superblocks += 1;
+        superblock_update = true;
         ptr->last_file_end += new_superblock.size;
         new_record_loc = ptr->last_file_end;
     }
@@ -1143,6 +1175,35 @@ int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size
     rc = flash_write(flash_dev, new_record_loc, newJournalEntry, XIPA_JOURNAL_SIZE);
     XIPA_ERR_CHECK(x->log, "IO Error - new record write failed", rc);
     ptr->last_file_end += size;
+    ptr->num_files += 1;
+
+    struct flash_pages_info flash_bound_info;
+    rc = flash_get_page_info_by_offs(flash_dev, ptr->offset, &flash_bound_info); //first we need to get the initial overlap as the files may not be 4096 byte aligned.
+    char* eraseArea = malloc(flash_bound_info.size);
+    XIPA_ERR_CHECK(x->log, "Couldn't get sector boundaries for start of flash", rc);
+
+    rc = flash_read(flash_dev, flash_bound_info.start_offset, eraseArea, flash_bound_info.size);
+    XIPA_ERR_CHECK(x->log, "Couldn't read magic number block in to memory", rc);
+
+    uint32_t num_file_offset = ptr->offset + sizeof(xipa_fs_start_block) - flash_bound_info.start_offset;
+
+    //Writing new file count to starting magic block
+    memcpy(eraseArea + num_file_offset, &ptr->num_files, sizeof(ptr->num_files));
+
+    if(superblock_update)
+    {
+        memcpy(eraseArea + num_file_offset - 4, &ptr->num_superblocks, sizeof(ptr->num_superblocks));
+    }
+    
+    //Erasing magic block
+    rc = flash_erase(flash_dev, flash_bound_info.start_offset, flash_bound_info.size);
+    XIPA_ERR_CHECK(x->log, "Erase failed", rc);
+
+    //Writing new magic block
+    rc = flash_write(flash_dev, flash_bound_info.start_offset, eraseArea, flash_bound_info.size);
+    XIPA_ERR_CHECK(x->log, "Write failed", rc);
+
+    
     xipa_fs_dir_deinit(x, &tempdir);
     ptr->storing = 0;
     ptr->f = tempfr;

@@ -32,6 +32,16 @@ static struct fs_mount_t ext_storage_mnt = {
 
 LOG_LEVEL_SET(LOG_LEVEL_INF);
 
+
+
+int intFlash_init(struct intFlash *i, char* label);
+int intFlash_deinit(struct intFlash *i);
+int intQSPIFlash_init(struct intQSPIFlash *q, char* label);
+int intQSPIFlash_deinit(struct intQSPIFlash *q);
+int extSPIFlash_init(struct extSPIFlash *e, char* label);
+int extSPIFlash_deinit(struct extSPIFlash *e);
+
+
 int base_init(struct baseDisk *b, char* label)
 {
 	int retcode = b->vtable->init(b, label);

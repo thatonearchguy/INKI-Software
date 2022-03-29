@@ -761,18 +761,19 @@ UI - Watchface and menu & design language
 -----------------------------------------
 The watchface is a core part of the user's experience, as it's the screen they'll be seeing for the majority of the time. I designed a simple watchface and menu that took some of the design cues I like about the Skagen Falster range of watches [52]_.
 
-**TODO MAKE SOME DRAWINGS AND INSERT THEM**
+The menu is designed to be operable with both the hardware buttons and a touch screen, so I've gone for a design that eliminates unnecessary elements like a menu titlebar, thus maximising touchability. The idea is that hardware buttons can be used to cycle amongst the 9 options, with the possibility of overflowing into several screens. There also needs to be some way to switch between the watchface and menu:
 
-The menu is designed to be operable with both the hardware buttons and a touch screen, so I've gone for a design that eliminates unnecessary elements like a menu titlebar, thus maximising touchability. The idea is that hardware buttons can be used to cycle amongst the 9 options, with the possibility of overflowing into several screens. There also needs to be some way to switch between the watchface and menu. 
-
-**TODO MAKE SOME DRAWINGS AND INSERT THEM**
+.. figure:: guidesign.jpg
+    :width: 50% 
+    :align: center
+    :alt: "Graphical initialisation routine"
 
 We will be using LVGL as the main graphics library - in order to do this we need code that will manipulate LVGL's output into a form that the EPD Driver can understand, transmit, and display on the E-ink panel. 
 
 Here is LVGL's initialisation algorithm:
 
 .. figure:: lvglinit.png
-    :width: 50% 
+    :width: 30% 
     :align: center
     :alt: "Graphical initialisation routine"
 
@@ -783,7 +784,7 @@ LVGL requires a periodic interrupt of a known time so it can tell how much time 
 Here is the naive & inefficient blocking algorithm:
 
 .. figure:: lvglblock.png
-    :width: 70% 
+    :width: 50% 
     :align: center
     :alt: "Slow blocking routine"
 
@@ -2047,7 +2048,7 @@ And here's the corresponding .c file with the implementations of the function pr
             return -EINVAL;
         }
         //If it's the last index then just set it equal to zero. 
-        if(index == ptr->max_index) memset((void*)vector_get_index_pointer(v, max_index), NULL, ptr->item_size);
+        if(index == ptr->max_index) memset((void*)vector_get_index_pointer(v, ptr->max_index), NULL, ptr->item_size);
         //Otherwise shuffle all the elements down to overwrite the element.
         else memmove((void*)vector_get_index_pointer(v, index), (void*)vector_get_index_pointer(v, index+1), ptr->item_size);
         int newindex = 0;
@@ -2056,9 +2057,9 @@ And here's the corresponding .c file with the implementations of the function pr
         {
             void* a = vector_get(v, i);
             if(a = NULL) return -EIO;
-            for(int x = 0; x < item_size; x++)
+            for(int x = 0; x < ptr->item_size; x++)
             {
-                if(a[x] != NULL) newindex = i;
+                if(((char*)a)[x] != NULL) newindex = i;
             }
             free(a);
         }
@@ -2995,7 +2996,6 @@ Now here's the main mounting function for ``XIPA_FS`` :
         //ptr->f = k_malloc(sizeof(struct filerecord)); //allocating memory from kernel heap to ensure files can still be traversed in low memory conditions
         ptr->param = params;
         x->mountpoint = ptr->param->path;
-        //Testing to see if we can indeed open a flash area with the given id. 
         rc = flash_area_open(ptr->param->flash_area_id, &ptr->pfa);
         if (rc < 0)
         {
@@ -3017,13 +3017,13 @@ Now here's the main mounting function for ``XIPA_FS`` :
             LOG_INST_INF(x->log, "Superblock not found! Is filesystem formatted to XIPA?");
             return -ENOENT;
         }
-        //char numsuperblocks[4];
-        rc = flash_area_read(ptr->pfa, 4, buf, sizeof(buf)); //getting number of superblocks on filesystem.
+        char numsuperblocks[4];
+        rc = flash_area_read(ptr->pfa, 4, numsuperblocks, sizeof(numsuperblocks)); //getting number of superblocks on filesystem.
         if (rc < 0)
         {
             return rc;
         }
-        ptr->num_superblocks = (uint32_t) buf;   
+        memcpy(&ptr->num_superblocks, numsuperblocks, sizeof(ptr->num_superblocks));
         ptr->offset = ptr->pfa->fa_off;
         char numfiles[4];
         rc = flash_area_read(ptr->pfa, sizeof(xipa_fs_start_block), numfiles, 4); //getting number of files on filesystem.
@@ -3031,7 +3031,7 @@ Now here's the main mounting function for ``XIPA_FS`` :
         {
             return rc;
         }
-        ptr->num_files = (uint32_t) numfiles;
+        memcpy(&ptr->num_files, numfiles, sizeof(ptr->num_files));
         LOG_INST_INF(x->log, "Number of files - %d", ptr->num_files);
         flash_area_close(ptr->pfa); //NOP right now, but for future compatibility this is fine.
         ptr->init = true;
@@ -3044,27 +3044,31 @@ Now here's the main mounting function for ``XIPA_FS`` :
         */
         stack_init(&ptr->superblock_locations, ptr->num_superblocks, sizeof(struct xipa_superblock_loc));
         stack_init(&ptr->superblock_flash_dev_locations, ptr->num_superblocks, sizeof(struct xipa_superblock_loc));
-        struct xipafs_dir_t temp_dir;
-        struct filerecord tempfr;
-        xipa_fs_dir_init(x, &temp_dir); //ignore uninitialised warning
-        //Traversing to find the pointer to the byte after the last byte of occupied memory.  
-        do {
-            rc = xipa_fs_traverse_flash_api(x, &tempfr, &temp_dir);
-            if(rc < 0)
-            {
-                if(rc == -ENOTDIR)
-                {
-                    ptr->last_file_end = (unsigned int)(tempfr.file_loc + tempfr.size);
-                    break;
-                }
-                else return -EIO;
-            }
+        if(ptr->num_files == 0)
+        {
+            ptr->last_file_end = 1024 * 64;
         }
-        //Iteration conditions - must be a valid extension & must have a null-terminated name.
-        while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, SIZE_SIZE) && tempfr.name[sizeof(tempfr.name)-1] == '\0');
-        xipa_fs_dir_deinit(x, &temp_dir);
+        else
+        {
+            struct xipafs_dir_t temp_dir;
+            struct filerecord tempfr;
+            xipa_fs_dir_init(x, &temp_dir); //ignore uninitialised warning
+            do {
+                rc = xipa_fs_traverse_flash_api(x, &tempfr, &temp_dir);
+                if(rc < 0)
+                {
+                    if(rc == -ENOTDIR)
+                    {
+                        ptr->last_file_end = (unsigned int)(tempfr.file_loc + tempfr.size);
+                        break;
+                    }
+                    else return -EIO;
+                }
+            }
+            while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, SIZE_SIZE) && tempfr.name[sizeof(tempfr.name)-1] == '\0');
+            xipa_fs_dir_deinit(x, &temp_dir);
+        }
 
-        //Allocate memory from kernel heap for device api to save stack space. 
         ptr->xip = k_malloc(sizeof(struct xipa_dev));
         rc = xip_init(ptr->xip);
         XIPA_ERR_CHECK(x->log, "Could not init XIP!", rc);
@@ -3075,7 +3079,7 @@ Now here's the main mounting function for ``XIPA_FS`` :
         rc = xip_enable(ptr->xip);
         XIPA_ERR_CHECK(x->log, "Could not enable XIP!", rc);
 
-        //We are not storing data yet, so set the flag to -1. 
+
         ptr->storing = -1;
 
         return 1;
@@ -3792,72 +3796,99 @@ Here's the subroutine for storing a file:
     * @param ver_str Version string of file or app.
     * @return 1 on success, negative err_code otherwise. 
     */
-   int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size, char* hash, char* ver_str)
-   {
-       struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
-       //Basic sanity checks on the inputs
-       if(ptr->storing > 0) return -EINVAL;
-       if(strlen(filename) > NAME_SIZE) return -EINVAL;
-       if(strlen(extension) > RUN_SIZE) return -EINVAL;
-       if(strlen(hash) != HASH_SIZE) return -EINVAL;
-       if(strlen(ver_str) > VER_STR_SIZE) return -EINVAL;
-       int extension_index = arr_contains_string((char**)xipa_file_extensions, extension, RUN_SIZE);
-       if(extension_index == -1) return -EINVAL;
-       if(size % 4 != 0) return -EINVAL;
-       if(ptr->last_file_end + size > ptr->param->dev_size) return -EINVAL;
-       //we want to get location of file record for very last file. we will append our new data onto the end of the corresponding superblock. 
-       struct xipafs_dir_t tempdir;
-       xipa_fs_dir_init(x, &tempdir);
-       struct filerecord tempfr;
-       int traverse_rc = 0;
-       int rc = 0;
-       while(traverse_rc != -ENOTDIR)
-       {
-           xipa_fs_traverse_flash_api(x, &tempfr, &tempdir);
-           XIPA_ERR_CHECK(x->log, "IO Error - filesystem corrupted?", traverse_rc);
-       }
-       //We're checking if the end file pointer is equal to what we think it should be based on mounting operation
-       if((unsigned int)(tempfr.file_loc + tempfr.size) != ptr->last_file_end) return -EIO;
-       //Creating new superblock entry
-       char newJournalEntry[XIPA_JOURNAL_SIZE];
-       tempfr.file_loc = (volatile uint8_t*)ptr->last_file_end;
-       memcpy(tempfr.name, filename, NAME_SIZE);
-       memcpy(tempfr.run, extension, RUN_SIZE);
-       memcpy(tempfr.hash, hash, HASH_SIZE);
-       memcpy(tempfr.ver_str, ver_str, VER_STR_SIZE);
-       tempfr.size = size;
-       //we need to do low level block access so we need to get the underlying device.
-       const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
-       unsigned int new_record_loc = (unsigned int)(tempfr.record_loc + XIPA_JOURNAL_SIZE);
-       XIPA_ERR_CHECK(x->log, "IO Error - temporary record construction failed", rc);
-       //We're checking if we're at the end of the current superblock / if it's run out of space
-       if(tempdir.current_record == 1023)
-       {
-           // if so, we create a new superblock, and write it to the end of the filesystem.
-           struct filerecord new_superblock;
-           new_superblock.file_loc = (volatile uint8_t*)ptr->last_file_end;
-           memcpy(new_superblock.run, xipa_file_extensions[0], RUN_SIZE);
-           snprintf(new_superblock.name, NAME_SIZE, "superblock%d", ++ptr->num_superblocks);
-           memset(new_superblock.hash, 1, HASH_SIZE);
-           new_superblock.size = XIPA_JOURNAL_SIZE * 1024;
-           memcpy(new_superblock.ver_str, "1.0", VER_STR_SIZE);
-           char new_superblock_entry[XIPA_JOURNAL_SIZE];
-           xipa_fs_write_temp_record(x, &new_superblock, 1, new_superblock_entry);
-           flash_write(flash_dev, ptr->last_file_end, new_superblock_entry, XIPA_JOURNAL_SIZE);
-           ptr->last_file_end += new_superblock.size;
-           new_record_loc = ptr->last_file_end;
-       }
-       //We're writing the new file's record to the new end of the filesystem, whether or not we wrote a new superblock just now. 
-       rc = xipa_fs_write_temp_record(x, &tempfr, 0, newJournalEntry);
-       XIPA_ERR_CHECK(x->log, "IO Error - new record creation failed", rc);
-       rc = flash_write(flash_dev, new_record_loc, newJournalEntry, XIPA_JOURNAL_SIZE);
-       XIPA_ERR_CHECK(x->log, "IO Error - new record write failed", rc);
-       ptr->last_file_end += size;
-       xipa_fs_dir_deinit(x, &tempdir);
-       ptr->storing = 0;
-       ptr->f = tempfr;
-       return 1;
-   }
+    int xipa_fs_store(struct xipafs* x, char* filename, char* extension, size_t size, char* hash, char* ver_str)
+    {
+        struct privatefs_ptr *ptr = (struct privatefs_ptr *)x->private_ptr;
+        if(ptr->storing > 0) return -EINVAL;
+        if(strlen(filename) > NAME_SIZE) return -EINVAL;
+        if(strlen(extension) > RUN_SIZE) return -EINVAL;
+        if(strlen(hash) != HASH_SIZE) return -EINVAL;
+        if(strlen(ver_str) > VER_STR_SIZE) return -EINVAL;
+        int extension_index = arr_contains_string((char**)xipa_file_extensions, extension, RUN_SIZE);
+        if(extension_index == -1) return -EINVAL;
+        if(size % 4 != 0) return -EINVAL;
+        if(ptr->last_file_end + size > ptr->param->dev_size) return -EINVAL;
+        //we want to get location of file record for very last file. we will append our new data onto the end of the corresponding superblock. 
+        struct xipafs_dir_t tempdir;
+        xipa_fs_dir_init(x, &tempdir);
+        struct filerecord tempfr;
+        int traverse_rc = 0;
+        int rc = 0;
+        while(traverse_rc != -ENOTDIR)
+        {
+            xipa_fs_traverse_flash_api(x, &tempfr, &tempdir);
+            XIPA_ERR_CHECK(x->log, "IO Error - filesystem corrupted?", traverse_rc);
+        }
+        if((unsigned int)(tempfr.file_loc + tempfr.size) != ptr->last_file_end) return -EIO;
+        char newJournalEntry[XIPA_JOURNAL_SIZE];
+        tempfr.file_loc = (volatile uint8_t*)ptr->last_file_end;
+        memcpy(tempfr.name, filename, NAME_SIZE);
+        memcpy(tempfr.run, extension, RUN_SIZE);
+        memcpy(tempfr.hash, hash, HASH_SIZE);
+        memcpy(tempfr.ver_str, ver_str, VER_STR_SIZE);
+        tempfr.size = size;
+        //we need to do low level block access so we need to get the underlying device.
+        const struct device* flash_dev = flash_area_get_device((const struct flash_area*)&ptr->pfa);
+        unsigned int new_record_loc = (unsigned int)(tempfr.record_loc + XIPA_JOURNAL_SIZE);
+        XIPA_ERR_CHECK(x->log, "IO Error - temporary record construction failed", rc);
+        bool superblock_update = false;
+        if(tempdir.current_record == 1023)
+        {
+            struct filerecord new_superblock;
+            new_superblock.file_loc = (volatile uint8_t*)ptr->last_file_end;
+            memcpy(new_superblock.run, xipa_file_extensions[0], RUN_SIZE);
+            snprintf(new_superblock.name, NAME_SIZE, "superblock%d", ++ptr->num_superblocks);
+            memset(new_superblock.hash, 1, HASH_SIZE);
+            new_superblock.size = XIPA_JOURNAL_SIZE * 1024;
+            memcpy(new_superblock.ver_str, "1.0", VER_STR_SIZE);
+            char new_superblock_entry[XIPA_JOURNAL_SIZE];
+            xipa_fs_write_temp_record(x, &new_superblock, 1, new_superblock_entry);
+            flash_write(flash_dev, ptr->last_file_end, new_superblock_entry, XIPA_JOURNAL_SIZE);
+            ptr->num_superblocks += 1;
+            superblock_update = true;
+            ptr->last_file_end += new_superblock.size;
+            new_record_loc = ptr->last_file_end;
+        }
+        
+        rc = xipa_fs_write_temp_record(x, &tempfr, 0, newJournalEntry);
+        XIPA_ERR_CHECK(x->log, "IO Error - new record creation failed", rc);
+        rc = flash_write(flash_dev, new_record_loc, newJournalEntry, XIPA_JOURNAL_SIZE);
+        XIPA_ERR_CHECK(x->log, "IO Error - new record write failed", rc);
+        ptr->last_file_end += size;
+        ptr->num_files += 1;
+
+        struct flash_pages_info flash_bound_info;
+        rc = flash_get_page_info_by_offs(flash_dev, ptr->offset, &flash_bound_info); //first we need to get the initial overlap as the files may not be 4096 byte aligned.
+        char* eraseArea = malloc(flash_bound_info.size);
+        XIPA_ERR_CHECK(x->log, "Couldn't get sector boundaries for start of flash", rc);
+
+        rc = flash_read(flash_dev, flash_bound_info.start_offset, eraseArea, flash_bound_info.size);
+        XIPA_ERR_CHECK(x->log, "Couldn't read magic number block in to memory", rc);
+
+        uint32_t num_file_offset = ptr->offset + sizeof(xipa_fs_start_block) - flash_bound_info.start_offset;
+
+        //Writing new file count to starting magic block
+        memcpy(eraseArea + num_file_offset, &ptr->num_files, sizeof(ptr->num_files));
+
+        if(superblock_update)
+        {
+            memcpy(eraseArea + num_file_offset - 4, &ptr->num_superblocks, sizeof(ptr->num_superblocks));
+        }
+        
+        //Erasing magic block
+        rc = flash_erase(flash_dev, flash_bound_info.start_offset, flash_bound_info.size);
+        XIPA_ERR_CHECK(x->log, "Erase failed", rc);
+
+        //Writing new magic block
+        rc = flash_write(flash_dev, flash_bound_info.start_offset, eraseArea, flash_bound_info.size);
+        XIPA_ERR_CHECK(x->log, "Write failed", rc);
+
+        
+        xipa_fs_dir_deinit(x, &tempdir);
+        ptr->storing = 0;
+        ptr->f = tempfr;
+        return 1;
+    }
 
 
 This function puts the file system in "File storing mode" by setting the storing flag to 0. To make the aligning logic simpler later on, you can only write one file at a time to the file system. There is a lot of flexibility with this however, you can write data as you receive it with variably sized buffers with the following callback function:
@@ -3905,12 +3936,13 @@ Here's how we verify a file iteratively using the driver backend to hardware acc
         xip_enable(ptr->xip);
         uint32_t passes = 0;
         //we are hardcoding a 1024 byte pass here, not really any need for more.
+        size_t pass_size = 1024;
         volatile uint8_t* start_addr = f_verify->file_loc + (unsigned int)(ptr->param->xip_dev_location);// - (unsigned int)(ptr->param->xip_device_offset);
-        while(start_addr + (passes * 1024) < f_verify->file_loc + f_verify->size)
+        while(start_addr + (passes * pass_size) < f_verify->file_loc + f_verify->size)
         {
-            xipa_frag_sha256_verif(ptr->xip, start_addr + (passes++ * 1024), 1024);
+            xipa_frag_sha256_verif(ptr->xip, start_addr + (passes++ * pass_size), pass_size);
         }
-        xipa_frag_sha256_verif(ptr->xip, start_addr+(passes * 1024), f_verify->size-(passes * 1024));
+        xipa_frag_sha256_verif(ptr->xip, start_addr+(passes * pass_size), f_verify->size-(passes * pass_size));
         char hash[32];
         xipa_frag_sha256_fin(ptr->xip, hash);
         if(strcmp(f_verify->hash, hash) == 0) return 1;
@@ -4146,6 +4178,27 @@ Now, let's see the most important algorithm of this entire file system, the behe
             current_ptr += flash_bound_info->size;
         }
         ptr->last_file_end -= f_del.size;
+        ptr->num_files -= 1;
+
+        rc = flash_get_page_info_by_offs(flash_dev, ptr->offset, flash_bound_info); //first we need to get the initial overlap as the files may not be 4096 byte aligned.
+        XIPA_ERR_CHECK(x->log, "Couldn't get sector boundaries for start of flash", rc);
+
+        rc = flash_read(flash_dev, flash_bound_info->start_offset, eraseArea, flash_bound_info->size);
+        XIPA_ERR_CHECK(x->log, "Couldn't read magic number block in to memory", rc);
+
+        uint32_t num_file_offset = ptr->offset + sizeof(xipa_fs_start_block) - flash_bound_info->start_offset;
+
+        //Writing new file count to starting magic block
+        memcpy(eraseArea + num_file_offset, &ptr->num_files, sizeof(ptr->num_files));
+        
+        //Erasing magic block
+        rc = flash_erase(flash_dev, flash_bound_info->start_offset, flash_bound_info->size);
+        XIPA_ERR_CHECK(x->log, "Erase failed", rc);
+
+        //Writing new magic block
+        rc = flash_write(flash_dev, flash_bound_info->start_offset, eraseArea, flash_bound_info->size);
+        XIPA_ERR_CHECK(x->log, "Write failed", rc);
+
         vector_deinit(&superblocks);
         free(eraseArea);
         xipa_fs_dir_deinit(x, &temp_dir);
