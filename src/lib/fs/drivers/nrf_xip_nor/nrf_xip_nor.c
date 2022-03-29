@@ -26,7 +26,8 @@
 
 NRF_QSPI_Type nrf_qspi_reg;
 off_t xipo;
-static struct crypto_ctx 
+
+struct crypto_ctx 
 {
     int initialised;
     int64_t bytes_checked;  
@@ -49,7 +50,7 @@ static int nrf_qspi_xip_fs_set(const struct xipa_dev* dev, bool en)
     if(nrfx_qspi_mem_busy_check()==NRFX_SUCCESS)
     {
         #if defined(CONFIG_SOC_SERIES_NRF53X)
-            nrf_qspi_xip_set(&qspi_reg, en);
+            nrf_qspi_xip_set(&nrf_qspi_reg, en);
         #endif
 
     }
@@ -93,7 +94,7 @@ static int nrf_qspi_sha256_verif(const struct xipa_dev* dev, void* frag_buf, siz
 static int nrf_qspi_sha256_verif_fin(const struct xipa_dev* dev, void* hash_buf)
 {
     CRYSError_t err_code = nrf_cc310_bl_hash_sha256_finalize(sha_operation.p_hash_context, (uint8_t*)hash_buf);
-    if(err_code = CRYS_OK)
+    if(err_code == CRYS_OK)
     {
         sha_operation.initialised = -1;
         sha_operation.bytes_checked = 0;

@@ -67,62 +67,6 @@ int vector_init(struct vector* v, size_t initial_length, size_t item_size)
         ptr->allocated_items = VECTOR_DEFAULT_SIZE;
     }
     ptr->num_items = 0;
-    ptr->items = malloc(item_size * ptr->allocated_items);
-    if(ptr->items == NULL)
-    {
-        LOG_INST_ERR(v->log, "Memory not allocated!!");
-        return -1;
-    }
-    LOG_INST_INF(v->log, "Success");
-    return 1;
-}
-
-int vector_clear(struct vector* v)
-{
-    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
-    int rc;
-    for (int i = 0; i < ptr->num_items; i++)
-    {
-        rc = vector_set(v, i, NULL);
-        if(rc < 0)
-        {
-            return rc;
-        }
-    }
-    return 1;
-}
-
-
-//It is your responsibility to properly dispose of the generated item by using free!
-void* vector_get(struct vector* v, int index)
-{
-    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
-    void* element = k_malloc(ptr->item_size);
-    memcpy(&element, (void*)vector_get_index_pointer(v, index), ptr->item_size);
-    return element; 
-}
-
-
-int vector_set(struct vector* v, int index, void* data)
-{
-    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
-    memcpy(vector_get_index_pointer(v, index), (void*)data, ptr->item_size);
-    return 1;
-}
-
-int vector_init(struct vector* v, size_t initial_length, size_t item_size)
-{
-    struct privatevector* ptr = (struct privatevector*) v->privatevector_ptr;
-    ptr->item_size = item_size;
-    if(initial_length > 0)
-    {
-        ptr->allocated_items = initial_length;
-    }
-    else
-    {
-        ptr->allocated_items = VECTOR_DEFAULT_SIZE;
-    }
-    ptr->num_items = 0;
     ptr->items = calloc(ptr->allocated_items, item_size);
     if(ptr->items == NULL)
     {

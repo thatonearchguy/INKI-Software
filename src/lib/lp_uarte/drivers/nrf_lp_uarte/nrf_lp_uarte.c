@@ -5,6 +5,7 @@
  * 
  */
 
+#ifdef CONFIG_SOC_SERIES_NRF52X
 
 #include <nrf52840.h>
 #include <hal/nrf_ppi.h> 
@@ -50,7 +51,7 @@ LOG_MODULE_DECLARE(lp_uarte_dev, 3);
  * Here we're just using vector to store pointers to PPI channels, so this is fine and will make code a lot more readable.
  * */
 #define GET_PPI_FROM_VEC(vector, index, name) \
-uint32_t* CONCAT(ppi_ptr_, index) = (uint32_t*)vector_get(&vector, index); \
+unsigned long* CONCAT(ppi_ptr_, index) = (unsigned long*)vector_get(&vector, index); \
 nrf_ppi_channel_t* name = (nrf_ppi_channel_t*) *CONCAT(ppi_ptr_, index); \
 free(CONCAT(ppi_ptr_, index)); \
 
@@ -66,7 +67,7 @@ LP_DRV_ERR_CHECK(nrfx_err_to_zephyr_err(err_code), "Error reallocating PPI chann
 
 nrf_uarte_config_t nrf_config;
 NRF_UARTE_Type nrf_uarte_reg;
-NRF_PPI_Type nrf_ppi_reg;
+NRF_PPI_Type nrf_dppi_reg;
 static NRF_QSPI_Type nrf_qspi_reg;
 NRF_GPIOTE_Type nrf_gpiote_reg;
 
@@ -150,8 +151,8 @@ const int nrfx_err_to_zephyr_err(nrfx_err_t err_code)
     return err_code;
 }
 
-void (*lp_uarte_rx_cb)(size_t len, void* data_ptr);
-void (*lp_uarte_tx_cb)(void* data_ptr);
+void (*lp_uarte_rx_cb)(size_t len, void* data_ptr, void* troll_ptr);
+void (*lp_uarte_tx_cb)(void* data_ptr, void* troll_ptr);
 
 
 void gpiote_lp_uarte_handler()
@@ -197,7 +198,7 @@ ISR_DIRECT_DECLARE(uarte_rxtx_handler)
     if(stopped)
     {
         nrf_uarte_event_clear(&nrf_uarte_reg, NRF_UARTE_EVENT_TXSTOPPED);
-        lp_uarte_tx_cb(tx_buf0_ptr);
+        lp_uarte_tx_cb(tx_buf0_ptr, tx_buf0_ptr);
     }
     ISR_DIRECT_PM();
     return 1;
@@ -371,11 +372,11 @@ static int nrf_lp_uarte_init(const struct lp_uarte_dev* dev)
     /* We will need at least four PPI channels I think */
     for(int i = 0; i < PPI_CHANNELS_REQUIRED; i ++)
     {
-        nrf_ppi_channel_t* c;
-        err_code = nrfx_ppi_channel_alloc(c);
+        nrf_ppi_channel_t c;
+        err_code = nrfx_ppi_channel_alloc(&c);
         if(err_code == NRFX_SUCCESS)
         {
-            uint32_t ptr = (uint32_t) c;
+            unsigned long ptr = (unsigned long) c;
             vector_push_back(&ppi_channels, &ptr);
         }
         else
@@ -494,3 +495,5 @@ int lp_uarte_drv_init(struct lp_uarte_dev* dev)
     dev->api = &nrf_lp_uarte_api;
     return 1;
 }
+
+#endif

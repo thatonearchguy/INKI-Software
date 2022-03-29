@@ -34,8 +34,8 @@ struct lp_uarte_dev_params {
     void* tx_buf_ptr;
     void* rx_buf0_ptr;
     void* rx_buf1_ptr;
-    void (*tx_cb)();
-    void (*rx_cb)(size_t len, void* data_ptr, void(*self)());
+    void (*tx_cb)(void* data_ptr, void* breadcrumb);
+    void (*rx_cb)(size_t len, void* data_ptr, void* breadcrumb);
 };
 
 #endif

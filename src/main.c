@@ -43,11 +43,13 @@ static struct vector* disk_vector_ptr = &disk_vector;
 
 static lv_disp_draw_buf_t disp_buf;
 
-#ifdef MARK_ONE
+
+
 static uint8_t LV_TICK_INCREMENT_MS = 4;
-static lv_color_t buf_1[ DT_PROP(DT_PATH(soc, spi_40023000, inki_ssd16xxfb_0), width) * DT_PROP(DT_PATH(soc, spi_40023000, inki_ssd16xxfb_0), height) / 10 ]; //Above 1/10th sized buffer, there is no performance gain
-static lv_color_t buf_2[ DT_PROP(DT_PATH(soc, spi_40023000, inki_ssd16xxfb_0), width) * DT_PROP(DT_PATH(soc, spi_40023000, inki_ssd16xxfb_0), height) / 10 ]; //Second buffer for DMA (background) transfer to the display
-#endif
+
+static lv_color_t buf_1[ DT_PROP(DT_INST(0, inki_ssd16xxfb), width) * DT_PROP(DT_INST(0, inki_ssd16xxfb), height) / 10 ]; //Above 1/10th sized buffer, there is no performance gain
+static lv_color_t buf_1[ DT_PROP(DT_INST(0, inki_ssd16xxfb), width) * DT_PROP(DT_INST(0, inki_ssd16xxfb), height) / 10 ]; //Above 1/10th sized buffer,
+
 
 //Recursive exponentiation by squaring algorithm
 int exp(int x, int n)

@@ -3221,7 +3221,7 @@ Let's take a look at the driver code (stepping down a rung on the hardware abstr
             #if defined(CONFIG_SOC_SERIES_NRF53X)
                 //This operation is only supported on nRF5340 - nRF52840 has XIP on all the time. 
                 //This just provides extra peace of mind that any application trying to perform an XIP read will be completely crashed while some DMA write is taking place. 
-                nrf_qspi_xip_set(&qspi_reg, en);
+                nrf_qspi_xip_set(&nrf_qspi_reg, en);
             #endif
 
         }
@@ -3270,7 +3270,7 @@ Let's take a look at the driver code (stepping down a rung on the hardware abstr
     {
         //Terminates the SHA256 generation process and outputs the final hash into a user-provided 32-byte buffer. 
         CRYSError_t err_code = nrf_cc310_bl_hash_sha256_finalize(sha_operation.p_hash_context, (uint8_t*)hash_buf);
-        if(err_code = CRYS_OK)
+        if(err_code == CRYS_OK)
         {
             sha_operation.initialised = -1;
             sha_operation.bytes_checked = 0;
@@ -4338,10 +4338,9 @@ We can see the subsystem filestructure - you have the main directory, which cont
     # Copyright (c) 2022 INKI-Systems Inc
     # Licensed under GPL 3
     #
-    #	Licensed under GPL 3
 
     config INKI_LP_UARTE_NRF52
-        bool "INKI-optimised display Drivers"
+        bool "INKI-optimised low power communication protocol"
         help
         Enable LP_IARTE driver for Nordic's NRF52 series of Bluetooth LE SoCs. 
         select INKI_LP_UARTE_DRV_EXISTS
@@ -4653,8 +4652,8 @@ Let's check out ``lp_uarte_cfg.h`` :
         void* tx_buf_ptr;
         void* rx_buf0_ptr;
         void* rx_buf1_ptr;
-        void (*tx_cb)();
-        void (*rx_cb)(size_t len, void* data_ptr, void(*self)());
+        void (*tx_cb)(void* data_ptr, void* breadcrumb);
+        void (*rx_cb)(size_t len, void* data_ptr, void* breadcrumb);
     };
 
     #endif
@@ -5220,7 +5219,7 @@ Now, let's take a look at the driver logic. The moment you've been waiting for.
     * Here we're just using vector to store pointers to PPI channels, so this is fine and will make code a lot more readable.
     * */
     #define GET_PPI_FROM_VEC(vector, index, name) \
-    uint32_t* CONCAT(ppi_ptr_, index) = (uint32_t*)vector_get(&vector, index); \
+    unsigned long* CONCAT(ppi_ptr_, index) = (unsigned long*)vector_get(&vector, index); \
     nrf_ppi_channel_t* name = (nrf_ppi_channel_t*) *CONCAT(ppi_ptr_, index); \
     free(CONCAT(ppi_ptr_, index)); \
 
@@ -5351,14 +5350,14 @@ Let's now take a look at the driver initialisation routine:
         /* initialising vector storing PPI pointers */
         vector_init(&ppi_channels, PPI_CHANNELS_REQUIRED, sizeof(nrf_ppi_channel_t*));
         /* Configuring NRF PPI peripheral to sync events to S0, S1, S2 GPIO events. */
-        /* We will need at least four PPI channels */
+        /* We will need at least four PPI channels I think */
         for(int i = 0; i < PPI_CHANNELS_REQUIRED; i ++)
         {
-            nrf_ppi_channel_t* c;
-            err_code = nrfx_ppi_channel_alloc(c);
+            nrf_ppi_channel_t c;
+            err_code = nrfx_ppi_channel_alloc(&c);
             if(err_code == NRFX_SUCCESS)
             {
-                uint32_t ptr = (uint32_t) c;
+                unsigned long ptr = (unsigned long) c;
                 vector_push_back(&ppi_channels, &ptr);
             }
             else
@@ -5515,8 +5514,8 @@ Here are the interrupt handlers:
 
 .. code-block:: c
 
-    void (*lp_uarte_rx_cb)(size_t len, void* data_ptr); //handler to call into higher level code
-    void (*lp_uarte_tx_cb)(void* data_ptr); //ditto
+    void (*lp_uarte_rx_cb)(size_t len, void* data_ptr, void* troll_ptr); //handler to call into higher level code
+    void (*lp_uarte_tx_cb)(void* data_ptr, void* troll_ptr); //ditto
 
 
     void gpiote_lp_uarte_handler()
@@ -5561,7 +5560,7 @@ Here are the interrupt handlers:
         if(stopped)
         {
             nrf_uarte_event_clear(&nrf_uarte_reg, NRF_UARTE_EVENT_TXSTOPPED);
-            lp_uarte_tx_cb(tx_buf0_ptr);
+            lp_uarte_tx_cb(tx_buf0_ptr, tx_buf0_ptr);
         }
         ISR_DIRECT_PM(); //Disable power management for best latency after ISR finishes.
         return 1;

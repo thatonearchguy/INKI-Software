@@ -9,10 +9,10 @@ project(inki_firmware)
 enable_language(ASM)
 
 set(WAMR_BUILD_PLATFORM "zephyr")
-if (defined CONFIG_SOC_SERIES_NRF52X)
+if (CONFIG_SOC_SERIES_NRF52X)
   set(WAMR_BUILD_TARGET "THUMBV7")
-elseif (defined CONFIG_SOC_SERIES_NRF53X)
-  set(WAMR_BUILD_TARGET "THUMBV8")
+elseif (CONFIG_SOC_SERIES_NRF53X)
+  set(WAMR_BUILD_TARGET "THUMBV8M")
 else()
   set(WAMR_BUILD_TARGET "THUMBV7")
 endif()
@@ -42,6 +42,7 @@ set (WAMR_ROOT_DIR
 set (MCUBOOT_DIR $ENV{ZEPHYR_BASE}/../bootloader/mcuboot)
 
 add_compile_options(-fdata-sections -ffunction-sections)
+
 add_link_options(-Wl,--gc-sections)
 
 add_subdirectory(lvgl)

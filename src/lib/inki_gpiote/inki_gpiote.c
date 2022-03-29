@@ -42,14 +42,27 @@ ISR_DIRECT_DECLARE(gpiote_handler)
 int inki_gpiote_init()
 {
     occupied = 0;
-    IRQ_DIRECT_CONNECT(GPIOTE_IRQn, 4, gpiote_handler, 0);
+    #ifdef CONFIG_SOC_SERIES_NRF52X
+        IRQ_DIRECT_CONNECT(GPIOTE_IRQn, 4, gpiote_handler, 0);
+    #endif
+    #ifdef CONFIG_SOC_SERIES_NRF53X
+        IRQ_DIRECT_CONNECT(GPIOTE1_IRQn, 4, gpiote_handler, 0);
+    #endif
     return 1;
 }
 
 int inki_gpiote_register_isr(void (*func_ptr)())
 {
     func_ptrs[occupied] = func_ptr;
-    if(occupied++ == 0) irq_enable(GPIOTE_IRQn);
+    if(occupied++ == 0) 
+    {
+        #ifdef CONFIG_SOC_SERIES_NRF52X
+            irq_enable(GPIOTE_IRQn);
+        #endif
+        #ifdef CONFIG_SOC_SERIES_NRF53X
+            irq_enable(GPIOTE1_IRQn);
+        #endif
+    }
     return 1;
 }
 int inki_gpiote_remove_isr(void (*func_ptr)())
@@ -81,6 +94,11 @@ int inki_gpiote_clear_all()
 {
     memset(func_ptrs, 0, occupied * sizeof(void(*)()));
     occupied = 0;
-    irq_disable(GPIOTE_IRQn);
+     #ifdef CONFIG_SOC_SERIES_NRF52X
+        irq_disable(GPIOTE_IRQn);
+    #endif
+    #ifdef CONFIG_SOC_SERIES_NRF53X
+        irq_disable(GPIOTE1_IRQn);
+    #endif
     return 1;
 }

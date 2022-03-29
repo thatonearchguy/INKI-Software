@@ -28,14 +28,6 @@
 #include <logging/log.h>
 #include <logging/log_instance.h>
 
-struct lp_uarte
-{
-    LOG_INSTANCE_PTR_DECLARE(log);
-    struct lp_uarte_dev_params param;
-    void* private_ptr;
-};
-
-
 struct lp_uarte_params {
     unsigned long baud;
     bool flow_control;
@@ -51,6 +43,15 @@ struct lp_uarte_params {
     uint32_t s1_pin;
     uint32_t s2_pin;
 };
+
+struct lp_uarte
+{
+    LOG_INSTANCE_PTR_DECLARE(log);
+    struct lp_uarte_params param;
+    void* private_ptr;
+};
+
+
 
 #define LP_UARTE_NAME "lp_uarte"
 
