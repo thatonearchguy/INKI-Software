@@ -6,9 +6,10 @@
  */
 
 
-#if defined(NRF52840_XXAA)
+#ifdef CONFIG_SOC_SERIES_NRF52X
     #include <nrf52840.h>
-#elif defined(CONFIG_SOC_SERIES_NRF53X)
+#endif
+#ifdef CONFIG_SOC_SERIES_NRF53X
     #include <nrf5340_application.h>
 #endif
 
@@ -17,8 +18,8 @@
 #include <errno.h>
 #include <hal/nrf_qspi.h>
 #include <nrfx_qspi.h>
-#include <../../nrf_cc310_bl/include/nrf_cc310_bl_init.h>
-#include <../../nrf_cc310_bl/include/nrf_cc310_bl_hash_sha256.h>
+#include <psa/crypto.h>
+#include <psa/crypto_extra.h>
 #include "../../xipa_dev.h"
 
 #define mod_name nrf_xip_qspi_xipa_drv
@@ -31,8 +32,10 @@ struct crypto_ctx
 {
     int initialised;
     int64_t bytes_checked;  
-    nrf_cc310_bl_hash_context_sha256_t *const p_hash_context;  
+    psa_hash_operation_t operation;
+    psa_status_t status;
 };
+
 
 struct crypto_ctx sha_operation = {.bytes_checked = -1, .initialised = -1};
 
@@ -73,28 +76,37 @@ static int nrf_qspi_disable_xip(const struct xipa_dev* dev)
 
 static int nrf_qspi_sha256_verif(const struct xipa_dev* dev, void* frag_buf, size_t frag_len)
 {
-    CRYSError_t err_code;
+    psa_status_t err_code;
     if(sha_operation.initialised == -1)
     {
-        if(nrf_cc310_bl_init() != 0)
+        if(psa_crypto_init() != PSA_SUCCESS)
         {
             return -1;
         }
-        NRF_CRYPTOCELL->ENABLE = 1;
+        //NRF_CRYPTOCELL->ENABLE = 1;
+        sha_operation.operation = psa_hash_operation_init();
 
-        err_code = nrf_cc310_bl_hash_sha256_init(sha_operation.p_hash_context);
-        if(err_code != CRYS_OK) return err_code;
+        err_code = psa_hash_setup(&sha_operation.operation, PSA_ALG_SHA_256);
+        if(err_code != PSA_SUCCESS) return -1;
+
         sha_operation.initialised = 1;
         sha_operation.bytes_checked = 0;
     }
-    err_code = nrf_cc310_bl_hash_sha256_update(sha_operation.p_hash_context, (const uint8_t*)frag_buf, (uint32_t)frag_len);
-    return err_code;
+    err_code = psa_hash_update(&sha_operation.operation, (const uint8_t*)frag_buf, (uint32_t)frag_len);
+    if(err_code == PSA_SUCCESS)
+    {
+        sha_operation.bytes_checked += frag_len;
+        return 1;
+    }
+    else return -1;
 }
 
 static int nrf_qspi_sha256_verif_fin(const struct xipa_dev* dev, void* hash_buf)
 {
-    CRYSError_t err_code = nrf_cc310_bl_hash_sha256_finalize(sha_operation.p_hash_context, (uint8_t*)hash_buf);
-    if(err_code == CRYS_OK)
+    size_t length = 0;
+    psa_status_t err_code = psa_hash_finish(&sha_operation.operation, hash_buf, 32, &length);
+
+    if(err_code == PSA_SUCCESS && length == PSA_HASH_LENGTH(PSA_ALG_SHA_256))
     {
         sha_operation.initialised = -1;
         sha_operation.bytes_checked = 0;

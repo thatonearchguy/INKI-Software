@@ -41,7 +41,19 @@ set (WAMR_ROOT_DIR
 
 set (MCUBOOT_DIR $ENV{ZEPHYR_BASE}/../bootloader/mcuboot)
 
-add_compile_options(-fdata-sections -ffunction-sections)
+
+if (CONFIG_SOC_SERIES_NRF52X)
+
+  add_compile_options(-fdata-sections -ffunction-sections -march=armv7e-m -mfpu=fpv4-sp-d16 -mfloat-abi=softfp)
+  add_link_options(-Wl,--gc-sections, -mfpu=fpv4-sp-d16 -mfloat-abi=softfp)
+
+
+elseif(CONFIG_SOC_SERIES_NRF53X)
+
+  add_compile_options(-fdata-sections -ffunction-sections -march=armv8-m.main+dsp -mfpu=fpv5-sp-d16 -mfloat-abi=softfp)
+  add_link_options(-Wl,--gc-sections, -mfpu=fpv5-sp-d16 -mfloat-abi=softfp)
+
+endif()
 
 add_link_options(-Wl,--gc-sections)
 

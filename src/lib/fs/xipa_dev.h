@@ -26,7 +26,7 @@ typedef int (*xipa_sha256_frag_finish)(const struct xipa_dev* dev, void* hash_bu
 //May add more funcions to api, but this is enough for now!
 __subsystem struct xipa_dev_api
 {
-    xipa_sha256_frag_verif verif;
+    xipa_sha256_frag_verif verif;   
     xipa_sha256_frag_finish fin;
     xipa_xip_setoffset setoffset;
     xipa_xip_enable en;
