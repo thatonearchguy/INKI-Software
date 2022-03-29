@@ -6338,6 +6338,9 @@ Now let's take a look at the .c file:
 
 Since I have used ``SendData()`` and ``SendCommand()`` throughout the implementation of the display driver, it will be a relatively trivial process to port this to Zephyr when the time comes. The reason why I haven't done this so far is because Zephyr has its own implementation of an SSD1681 driver that seems very robust and slightly over-engineered, and the fact that I am focussing on the low-level detail first before I go back to UI-building. 
 
+GUI - C++
+---------
+
 Back to the old C++ code, the next port of call was tailoring LVGL to be used nicely with my eInk display. Here's the main configuration file for LVGL, it is designed to be copied to known location and modified to achieve the behaviour and functionality we require (so this is not my code, but my custom configuration parameters). 
 
 .. code-block:: c
@@ -7353,7 +7356,7 @@ Most of this is self-explanatory, we're essentially checking whether the various
 Now let's examine the main menu:
 
 .. code-block:: c++
-    
+
     //Repeated from above for clarity
     lv_obj_t* home_scr;
     lv_obj_t* watchface_scr;
@@ -7550,6 +7553,20 @@ Now let's examine the actual LVGL-side input handling.
         SEGGER_RTT_WriteString(0, "Loaded watchface");
     }
 
+    //Dummy event handler for other menu items
+    static void event_handler(lv_event_t * e)
+    {
+        lv_event_code_t code = lv_event_get_code(e);
+        
+        if(code == LV_EVENT_CLICKED) {
+            LV_LOG_USER("Clicked");
+        }
+        else if(code == LV_EVENT_VALUE_CHANGED) {
+            LV_LOG_USER("Toggled");
+        }
+    }
+
+
 Yes, it's that simple! We register these callbacks when we initialise the watchface and main menu, so all we need to do to trigger the UI is to load one of these screens after we initialise them both by calling ``load_watchface()`` !
 
 When we switch to a different screen, we need to reassign our input driver instance to the new screen, which is why you see we not only perform ``lv_scr_load()`` on the screen in question, we also perform ``lv_indev_set_group()`` on the new screen's group to give it access to our input driver. 
@@ -7558,10 +7575,121 @@ Now, there's one last step to get everything working nicely. LVGL needs a period
 
 .. code-block:: c++
 
-#include "nrfx_gpiote.h"
-#include "nrf_svc.h"
-#include "nrf_nvic.h"
-#include "nrfx_rtc.h"
+    #include "nrfx_gpiote.h"
+    #include "nrf_svc.h"
+    #include "nrf_nvic.h"
+    #include "nrfx_rtc.h"
+
+    static const nrfx_rtc_t m_rtc = NRFX_RTC_INSTANCE(2);
+
+    static void gui_rtc_handler(nrfx_rtc_int_type_t int_type)
+    {
+        if(int_type == NRFX_RTC_INT_TICK)
+        {
+            lv_tick_inc(LV_TICK_INCREMENT_MS);
+        }
+    }
+
+    static void rtc_config(void)
+    {
+        nrfx_err_t err_code;
+
+        //Initialize RTC instance
+        nrfx_rtc_config_t config = NRFX_RTC_DEFAULT_CONFIG;
+        config.prescaler = (int)((32768*LV_TICK_INCREMENT_MS/1000)-1);
+        err_code = nrfx_rtc_init(&m_rtc, &config, gui_rtc_handler);
+        if(err_code!=NRFX_SUCCESS)
+        {
+        SEGGER_RTT_WriteString(0, "RTC Fail");
+        }
+        //Enable tick event & interrupt
+        nrfx_rtc_tick_enable(&m_rtc,true);
+        //Power on RTC instance
+        nrfx_rtc_enable(&m_rtc);
+    }
+
+By calling ``rtc_config()`` at startup we start the RTC with the correct prescaler value to call ``gui_rtc_handler()`` every 5ms. This was calculated using the formula in the datasheet for the nRF52840's RTC. 
+
+Now, the final step is to add an infinite loop that will repeatedly call LVGL's task function, allowing it to carry out background functions and execute the timer functions that we declared earlier on. 
+
+.. code-block:: c++
+
+    while(1) {
+        delay(5);
+        if(pdTRUE==xSemaphoreTake(GuiSemaphore, portMAX_DELAY)){
+            lv_timer_handler();
+            xSemaphoreGive(GuiSemaphore);
+        }
+    }
+
+And that's it! That's a proof of concept UI built using a graphics library, language, and programming paradigm I had very little experience with in the past. The next steps from here are obvious - upon completing the WAMR integration, we need to build a system that associates a screen or set of screens with a particular app or module, and allows for simple and convenient switching using well-defined APIs. This could take the form of an application class/struct that stores an internal screen, and has methods exposed to draw itself, destroy itself, or take control of the current screen. 
+This was the plan until I had to move down to C and implement the custom filesystem. 
+
+Miscellaneous
+-------------
+
+There's a few little things left that don't quite fit into any of the above considerations, but I feel should be mentioned. Getting shell support was in fact very straightforward even over RTT. I just had to enable a series of KConfig options in the main ``prj.conf`` :
+
+.. code-block:: kernel-config
+
+    #Interactive Shell
+    CONFIG_SHELL=y
+    CONFIG_SHELL_LOG_LEVEL_INF=y
+    CONFIG_FILE_SYSTEM_SHELL=n
+    CONFIG_SHELL_BACKEND_RTT=y
+    CONFIG_SHELL_BACKEND_SERIAL=n
+
+
+This provided a pretty robust, very Unix-like shell interface over RTT which could easily be extended in the future using custom bindings. 
+
+Then, exposing the flash storage medium over USB as mass storage was also fairly straightforward after writing the Disk API. There were just a few KConfig options that had to be set to enable this:
+
+.. code-block:: kernel-config
+
+    #USB
+    CONFIG_STDOUT_CONSOLE=y
+    CONFIG_USB=y
+    CONFIG_USB_DEVICE_STACK=y
+    CONFIG_USB_DEVICE_MANUFACTURER="INKI"
+    CONFIG_USB_DEVICE_PRODUCT="MARK ONE"
+    #CONFIG_USB_DFU_CLASS=y
+    CONFIG_USB_MASS_STORAGE=y
+    CONFIG_MASS_STORAGE_DISK_NAME="int_storage"
+    CONFIG_USB_DRIVER_LOG_LEVEL_INF=y
+    CONFIG_USB_DEVICE_LOG_LEVEL_INF=y
+    #CONFIG_IMG_MANAGER=y
+    CONFIG_USB_MASS_STORAGE_LOG_LEVEL_INF=y
+
+There was one "limitation" with the shell feature - the in-built file management shell protocol did not operate as it erroneously assumed one disk was connected to the system at a given time. This will be something to extend in the near future. 
+
+A quirk with the LVGL library was that it would not compile with the nRF52840's Floating Point Unit enabled - this was because the version of newlib that LVGL was targetting was built for software floating point operations, because internally LVGL didn't perform any floating point operations at all, everything was done in integers to reduce processor requirements and overhead. I tried setting all kinds of CMake flags like ``-mfloat-abi=hard`` which is supposed to point LVGL to the hardware floating point version of newlib to accelerate complex division routines, but nothing would compile, so I disabled it. This ended up being fine, as the nRF5340 that I replaced the nRF52840 with did not have an integrated floating point unit. 
+
+Fun fact - the nRF52840 has roughly 2kB of instruction cache, which can greatly improve responsiveness and speed when executing from external flash as commonly used instructions and routines can be stored within the cache. Enabling them is just another KConfig option:
+
+.. code-block:: kernel-config
+
+    #Peripherals
+    CONFIG_FPU=n
+    CONFIG_GPIO=y
+    CONFIG_NRF_ENABLE_ICACHE=y
+
+We're also enabling GPIO as we need it for GPIOTE to work in the Zephyr application. And thus, we wrap up the implementation section.
+
+Testing
+=======
+
+TODO - 1
+--------
+
+
+Evaluation
+==========
+
+TODO - 2
+--------
+
+
+
 
 
 .. [41] https://github.com/littlefs-project/littlefs
