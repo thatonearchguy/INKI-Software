@@ -1,0 +1,31 @@
+# INKI_XIPA_FS drivers
+
+
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
+
+
+menuconfig INKI_XIPA_FS
+	bool "INKI's custom XIPA_FS file system"
+	help
+	  Enable INKI_XIPA filesystem
+	  
+config INKI_XIPA_FS
+	bool "INKI's custom XIPA file system"
+	help
+	  Enable INKI_XIPA filesystem 
+
+if INKI_XIPA_FS
+
+config INKI_XIPA_DRV_EXISTS
+	bool #hidden 
+	help
+	  Private! Selected by driver.
+
+module = INKI_XIPA_FS
+module-str = inki_xipa_fs
+source "subsys/logging/Kconfig.template.log_config"
+
+rsource "drivers/nrf_xip_nor/Kconfig.nrf_xip_nor"
+
+endif # INKI_XIPA_FS

@@ -1,0 +1,50 @@
+# INKI_ICC - Inter Core Communication
+
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
+#
+#	Licensed under GPL 3
+#
+#
+
+menuconfig INKI_ICC
+	bool "INKI's custom low-power UART communication system"
+	help
+	  Enable INKI LP_UARTE subsystem
+	  
+config INKI_ICC
+	bool "INKI's custom low-power UART communication system"
+	
+
+if INKI_ICC
+
+config INKI_ICC_BKEND_EXISTS
+	bool #hidden 
+	help
+	  Private! Selected by driver.
+
+choice
+	prompt "Select backend for ICC"
+	depends on INKI_ICC
+
+	config LP_UARTE
+	tristate "Low-Power UARTE (with DMA)"
+	depends on INKI_LP_UARTE;
+
+	config LP_SPIE
+	tristate "Low-Power SPI (with DMA)"
+	depends on SPI;
+	
+endchoice
+	
+config INKI_ICC_LOG_LEVEL
+	int "Set desired log level for ICC subsystem"
+	help
+	   Set log level for low power inter-core-communication module: (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+module = INKI_ICC
+module-str = inki_icc
+source "subsys/logging/Kconfig.template.log_config"
+
+
+endif # INKI_ICC

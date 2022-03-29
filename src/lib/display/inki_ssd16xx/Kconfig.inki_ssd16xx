@@ -1,0 +1,11 @@
+# SSD16XX display controller configuration options
+
+# Copyright (c) 2018 Phytec Messtechnik GmbH
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
+
+config INKI_SSD16XX
+	bool "INKI-customised SSD16XX compatible display controller driver"
+	depends on SPI
+	help
+	  Enable INKI driver for SSD16XX compatible controller.

@@ -1,0 +1,59 @@
+# INKI_LP_UARTE drivers
+
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
+#
+#	Licensed under GPL 3
+#
+#
+
+menuconfig INKI_LP_UARTE
+	bool "INKI's custom low-power UART communication system"
+	help
+	  Enable INKI LP_UARTE subsystem
+	select INKI_ICC_BKEND_EXISTS
+	  
+config INKI_LP_UARTE
+	bool "INKI's custom low-power UART communication system"
+	help
+	  Enable INKI LP_UARTE subsystem 
+
+if INKI_LP_UARTE
+
+config INKI_LP_UARTE_DRV_EXISTS
+	bool #hidden 
+	help
+	  Private! Selected by driver.
+	
+config INKI_LP_UARTE_RX_BUF_LEN
+	int "Size of RX buffers - double buffered so this value muliplied by 2 is the total memory usage"
+	help
+	  Specify size of RX buffer. Internally they are double-buffered, so double this value to get total memory usage.
+
+config INKI_LP_UARTE_TX_BUF_LEN
+	int "Size of TX buffer - not internally double buffered"
+	help
+	  Specify size of TX buffer. Not double-buffered.
+
+config INKI_LP_UARTE_LOG_LEVEL
+	int "Set desired log level for low-power UARTE peripheral"
+	help
+	   Set log level for low power UARTE peripheral: (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+config INKI_LP_UARTE_IDENTIFIER
+	string "Set identifier that MCUs will use to verify messages"
+	help
+	  "Set identifier prepended to every packet that MCU will verify (unless in enhanced file-write mode)"
+
+config INKI_LP_UARTE_CB_PTRS
+	int "Set desired length for internal TX/RX callback function array"
+	help
+	  "Set desired length for internal TX/RX callback function array"
+
+module = INKI_LP_UARTE
+module-str = inki_lp_uarte
+source "subsys/logging/Kconfig.template.log_config"
+
+rsource "drivers/nrf_lp_uarte/Kconfig.nrf_lp_uarte"
+
+endif # INKI_LP_UARTE

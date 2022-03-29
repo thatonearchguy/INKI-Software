@@ -1,0 +1,10 @@
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
+#
+#	Licensed under GPL 3
+
+config INKI_LP_UARTE_NRF52
+	bool "INKI-optimised display Drivers"
+	help
+	  Enable LP_IARTE driver for Nordic's NRF52 series of Bluetooth LE SoCs. 
+	select INKI_LP_UARTE_DRV_EXISTS

@@ -1,0 +1,7 @@
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
+
+build:
+  name: inki_lp_uarte
+  cmake: .
+  kconfig: ./Kconfig

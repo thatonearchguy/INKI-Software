@@ -1,0 +1,34 @@
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
+
+mainmenu "INKI Options"
+
+config APP_INT_WIPE_STORAGE
+	bool "Option to clear the internal flash area before mounting"
+	help
+	  Use this to force an existing file system to be created.
+
+config APP_EXT_WIPE_STORAGE
+	bool "Option to clear the external flash area before mounting"
+	help
+	  Use this to force an existing file system to be created.
+
+config EFLASH_LOG_LEVEL
+	int "Set log level for External SPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+config IFLASH_LOG_LEVEL
+	int "Set log level for Internal Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+	
+config QFLASH_LOG_LEVEL
+	int "Set log level for Internal QSPI Flash (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+config VECTOR_LOG_LEVEL
+	int "Set log level for vector api (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+config XIPAFS_LOG_LEVEL
+	int "Set log level for eXecute In Place AoT File System (XIPAFS) api (1 - Critical errors only, 2 - Warnings, 3 - Information)"
+
+source "Kconfig.zephyr"
+rsource "src/lib/display/Kconfig"
+rsource "src/lib/fs/Kconfig"
+rsource "src/lib/lp_uarte/Kconfig"

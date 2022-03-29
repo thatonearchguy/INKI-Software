@@ -1,0 +1,31 @@
+# INKI_DISPLAY drivers
+
+# Copyright (c) 2017 Intel Corporation
+# Copyright (c) 2022 INKI-Systems Inc
+# Licensed under GPL 3
+
+menuconfig INKI_DISPLAY
+	bool "INKI-optimised display Drivers"
+	help
+	  Enable INKI_DISPLAY drivers
+	  
+config INKI_DISPLAY
+	bool "INKI-optimised display Drivers"
+	help
+	  Enable INKI_DISPLAY drivers
+
+if INKI_DISPLAY
+
+module = INKI_DISPLAY
+module-str = inki_display
+source "subsys/logging/Kconfig.template.log_config"
+
+rsource "inki_ssd16xx/Kconfig.inki_ssd16xx"
+
+config FRAMEBUF_INKI_DISPLAY
+	# Hidden, selected by client drivers.
+	bool
+	help
+	  Enable framebuffer-based INKI-display 'helper' driver.
+
+endif # INKI_DISPLAY
