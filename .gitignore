@@ -13,4 +13,5 @@ debug
 cmake-build-zdebug
 cmake-build-zrelease
 docs/source/_build
+CMakeFiles
 nrf5340_build

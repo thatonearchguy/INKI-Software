@@ -260,7 +260,7 @@ void main_lp_uarte_rx_cb(size_t len, void* data_ptr, void* troll_ptr)
     void* pkt_data_ptr;
     lp_uarte_decode_pkt(lp, data_ptr, pkt_data_ptr, len);
     if(pkt_data_ptr == NULL) return -EINVAL;
-    for(int i = 0; i < CONFIG_INKI_LP_UARTE_CB_PTRS; i++)
+    for(int i = 0; i < ptr->rx_occupied; i++)
     {
         //Iterate through and execute every callback
         (*ptr->rx_callbacks[i])(pkt_data_ptr, len);
@@ -272,7 +272,7 @@ void main_lp_uarte_tx_cb(void* troll_ptr)
 {
     //This is a dirty hack to get the struct containing the particular instance's function pointers. 
     struct private_ptr* ptr = CONTAINER_OF(troll_ptr, struct private_ptr, tx_buffer);
-    for(int i = 0; i < CONFIG_INKI_LP_UARTE_CB_PTRS; i++)
+    for(int i = 0; i < ptr->tx_occupied; i++)
     {
         //Iterate through and execute every callback. 
         (*ptr->tx_callbacks[i])();
@@ -454,13 +454,20 @@ volatile static int lp_uarte_decode_pkt(struct lp_uarte* lp, void* pkt_in, void*
     int rc;
     memcpy(crc_char, (char*)pkt_in + pkt_len - 4, 4);
     uint32_t num = (uint32_t) strtoul(crc_char, NULL, 10);
-    if (num == __UINT32_MAX__ && errno == ERANGE) rc = -1;
-    if(num != crc32_ieee((char*)pkt_in + sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER), pkt_len - 4 - sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER))) rc = -1;
-
-    data_out = (char*)pkt_in + sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER);
-    if(rc == -1)
+    if (num == __UINT32_MAX__ && errno == ERANGE)
     {
-        LOG_INST_ERR(lp->log, "CRC failed on received packet");
+        rc = -1;
+        LOG_INST_ERR(lp->log, "RX CRC failure");
+
+    }
+    else if(num != crc32_ieee((char*)pkt_in + sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER), pkt_len - 4 - sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER))) 
+    {
+        rc = -2;
+        LOG_INST_ERR(lp->log, "RX CRC mismatch");
+    }
+    else
+    {
+        data_out = (char*)pkt_in + sizeof(CONFIG_INKI_LP_UARTE_IDENTIFIER);
     }
     return rc;
 }

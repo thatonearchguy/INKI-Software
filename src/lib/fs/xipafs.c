@@ -1030,7 +1030,7 @@ int xipa_fs_align(struct xipafs *x, struct filerecord f_del)
         }
         while(arr_contains_string((char**)xipa_file_extensions, tempfr.run, RUN_SIZE) && 
             tempfr.name[sizeof(tempfr.name)-1] == '\0' &&
-            (temp_computed_record + (buffer_shift_count * (flash_bound_info->size / XIPA_JOURNAL_SIZE))) > 1000);
+            (temp_computed_record + (buffer_shift_count * (flash_bound_info->size / XIPA_JOURNAL_SIZE))) > 1023);
         current_superblock ++;
     }
 

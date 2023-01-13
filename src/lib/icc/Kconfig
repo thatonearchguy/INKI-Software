@@ -8,12 +8,12 @@
 #
 
 menuconfig INKI_ICC
-	bool "INKI's custom low-power UART communication system"
+	bool "INKI's custom low-power inter core communication system"
 	help
-	  Enable INKI LP_UARTE subsystem
+	  Enable INKI_ICC low-power core communication subsystem
 	  
 config INKI_ICC
-	bool "INKI's custom low-power UART communication system"
+	bool "INKI's custom low-power inter core communication system"
 	
 
 if INKI_ICC
